@@ -1,0 +1,5 @@
+swat.glb — "SWAT" by Quaternius (https://quaternius.com), downloaded from Poly Pizza:
+https://poly.pizza/m/Btfn3G5Xv4
+Licence: CC0 1.0 Universal (public domain) — free for commercial use, no attribution required
+(credited anyway on the game's start screen).
+In-game changes: colours re-tinted (guards green/black, SEALs tan/coyote), procedural rifle attached.

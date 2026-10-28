@@ -2,11 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>OPERATION: BLACK FILE — v0.4.6</title>
+<title>OPERATION: BLACK FILE — v0.5</title>
+<link rel="icon" href="data:,">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <!--
   =====================================================================
-  OPERATION: BLACK FILE  (v0.4.6 — mission select fix for iPad, free 360° turning on iPad, retuned damage, friendly markers on your squad, sniper mission, knife, Magic Keyboard controls, iPad aim/layout fix + DEBUG readout)
+  OPERATION: BLACK FILE  (v0.5 — real 3D soldiers, zone looks + signs, compass, map (M), radio hints, dual M1911s; v0.4.6 mission select fix for iPad, free 360° turning on iPad, retuned damage, friendly markers on your squad, sniper mission, knife, Magic Keyboard controls, iPad aim/layout fix + DEBUG readout)
   A tiny browser first-person shooter.
   - Mission structure & spy flavour inspired by GoldenEye 007 (N64)
   - Fast, aggressive maze shooting inspired by Wolfenstein 3D
@@ -71,7 +72,14 @@
   #ammoText { font-size: 34px; font-weight: bold; color: #fff; }
   #weaponName { font-size: 13px; color: #9c9; }
   #weaponExtra { font-size: 12px; color: #cc9; margin-top: 2px; }
-  #alertBox { top: 16px; left: 50%; transform: translateX(-50%); font-size: 14px; text-align: center; padding: 6px 14px; }
+  .credits { margin-top: 14px; font-size: 11px; color: #9a9; line-height: 1.5; border-top: 1px dashed #4a5a4a; padding-top: 8px; }
+  #compass { position: absolute; top: 6px; left: 50%; transform: translateX(-50%); width: 460px; height: 40px; }
+  #mapScreen { position: fixed; inset: 0; z-index: 60; display: none; background: rgba(0,10,0,0.92); align-items: center; justify-content: center; flex-direction: column;
+    font-family: "Courier New", monospace; color: #9f9; }
+  #mapScreen h2 { margin: 6px 0; letter-spacing: 3px; font-size: 18px; } #mapScreen p { margin: 4px; font-size: 13px; color: #8c8; }
+  #tMap  { right: 72px; top: 110px; width: 48px; height: 48px; font-size: 11px; }
+  #tDual { right: 300px; bottom: 190px; display: none; border-color: rgba(255,220,120,0.8); }
+  #alertBox { top: 52px; left: 50%; transform: translateX(-50%); font-size: 14px; text-align: center; padding: 6px 14px; }
   #alertText { font-weight: bold; letter-spacing: 2px; }
   #maskTag { display: none; margin-top: 4px; color: #6cf; font-size: 12px; letter-spacing: 2px; }
   #nvTag { top: 56px; right: 16px; font-size: 12px; text-align: right; display: none; color: #dfe8ff; }
@@ -191,6 +199,8 @@
       <label>Graphics: <select id="optQuality"><option value="high">High (desktop)</option><option value="low">Low (iPad / older laptops)</option></select></label>
     </div>
     <div class="controls" id="controlsStart"></div>
+    <div class="credits"><b>CREDITS</b><br>Soldier model: <b>"SWAT"</b> by <b>Quaternius</b> (quaternius.com, via poly.pizza) — CC0 1.0 public domain. Tinted and fitted with rifles in-game.<br>
+      3D engine: <b>Three.js</b> (MIT licence). Everything else made in code for this game.</div>
     <p id="loadError">Could not load the 3D library (Three.js). Check your internet connection and refresh.</p>
   </div>
 </div>
@@ -210,11 +220,14 @@
   <div class="tbtn" id="tStance">STANCE</div>
   <div class="tbtn" id="tNV">NV</div>
   <div class="tbtn" id="tIR">IR</div>
+  <div class="tbtn" id="tMap">MAP</div>
+  <div class="tbtn" id="tDual">DUAL</div>
   <div class="tbtn m2only" id="tRange">RANGE</div>
   <div class="tbtn m2only" id="tElevUp">ELEV +</div>
   <div class="tbtn m2only" id="tElevDn">ELEV −</div>
   <div class="tbtn m2only" id="tBreath">BREATH</div>
 </div>
+<div id="mapScreen"><h2 id="mapTitle">FACILITY MAP</h2><canvas id="mapCanvas"></canvas><p>Only places you've been are shown. ▲ = you · ☑ = intel found · ■ = elevator</p><p><b>M</b> or click / tap to close</p></div>
 <div id="xrayTint"></div>
 <div id="killcamTag">X-RAY KILL CAM<br><small>click / tap / any key to skip</small></div>
 
@@ -250,6 +263,7 @@
   <div class="panel" id="nvTag"></div>
   <div class="panel" id="windBox">WIND<br><span id="windArrow">↑</span><br><span id="windText"></span></div>
   <div id="killFeed"></div>
+  <canvas id="compass" width="460" height="40"></canvas>
   <div class="panel" id="alertBox">ALERT: <span id="alertText">UNAWARE</span><div id="maskTag">◉ SOUND MASKED</div></div>
   <div id="spotter"></div>
   <div class="panel" id="healthBox">HEALTH <span id="healthText">100</span><div id="healthBar"><div id="healthFill"></div></div><div id="stanceText">STANCE: STANDING</div></div>
@@ -300,6 +314,8 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { Pass } from 'three/addons/postprocessing/Pass.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { Water } from 'three/addons/objects/Water.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 
 // #####################################################################
 // ##  SECTION 0: VERSION, SAFETY NET & DEBUG READOUT (v0.4.2)        ##
@@ -308,7 +324,7 @@ import { Water } from 'three/addons/objects/Water.js';
 // ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
 // ##  part failed and why.                                           ##
 // #####################################################################
-const VERSION = 'v0.4.6';
+const VERSION = 'v0.5';
 // v0.4.4: the game must only ever start ONCE per page (one canvas, one camera, one loop).
 // If this script somehow ran a second time, stop the second copy right here.
 window.__valkyrieBoots = (window.__valkyrieBoots || 0) + 1;
@@ -354,6 +370,7 @@ function updateDebugHud(dt, ctx) {
     `nearest guard: ${ctx.near ? ctx.near.d.toFixed(1) + ' m, ' + ctx.near.state + ', sees you: ' + (ctx.near.sees === true ? 'YES' : ctx.near.sees) : 'none'}\n` +
     `crosshair on: ${esc(ctx.under)}\n` +
     `nearest teammate: ${ctx.mate || 'none'}\n` +
+    `figures: ${FIGURES.status === 'ok' ? '3D models (' + FIGURES.file + ')' : FIGURES.status === 'loading' ? 'loading 3D models…' : 'blocky (' + FIGURES.status + (FIGURES.error ? ': ' + esc(FIGURES.error) : '') + ')'}\n` +
     `instances: canvases ${document.querySelectorAll('canvas').length} · render loops ${loopCount} · startMission calls ${startCalls}${startBlocked ? ' (' + startBlocked + ' double-taps ignored)' : ''}\n` +
     `camera drawn at x ${drawnAt.x.toFixed(1)} z ${drawnAt.z.toFixed(1)}  ·  game logic at x ${ctx.pos.x.toFixed(1)} z ${ctx.pos.z.toFixed(1)}${drawnAt.distanceTo(ctx.pos) > 0.5 ? '  <span class="err">MISMATCH!</span>' : ''}\n` +
     `last shot: ${lastShotInfo ? 'from x ' + lastShotInfo.x.toFixed(1) + ' z ' + lastShotInfo.z.toFixed(1) + ' → ' + lastShotInfo.what + (lastShotInfo.d != null ? ' @ ' + lastShotInfo.d.toFixed(1) + ' m' : '') : 'none yet'}\n` +
@@ -659,8 +676,9 @@ const KNIFE_QUIPS = [
 const BRIEFINGS = {
   1: `<p><b>Wraith,</b> VALKYRIE — a rogue breakaway faction of the Kantor Group mercenaries — runs a hardened facility out of an old bunker. Inside are files on their warlord, <b>THE CONDUCTOR</b>, and the Moscow money man behind him.</p>
     <ul><li>Infiltrate the Valkyrie facility.</li><li>Retrieve all <b>intel files</b> (glowing yellow folders).</li><li>Reach the <b>extraction elevator</b> (unlocks once the intel is secured).</li></ul>
-    <p>Stay hidden: crouch or go prone, shoot when a jet, artillery or the faulty generator covers the noise (your spotter will say <b>"Now!"</b>), then relocate. You start with a suppressed Colt M1911. This message will self-destruct.</p>`,
-  2: `<p><b>OPERATION: COLD HORIZON.</b> The Black File intel led us to a Valkyrie airfield in the mountains. The Conductor's section leaders are meeting there tonight — and a convoy is loading out.</p>
+    <p>Stay hidden: crouch or go prone, shoot when a jet, artillery or the faulty generator covers the noise (your spotter will say <b>"Now!"</b>), then relocate. You start with a suppressed Colt M1911 — rumour says a <b>spare .45</b> is stashed in the <b>ARMORY</b>. This message will self-destruct.</p>
+    <p><b>Getting around:</b> the yellow <b>◆</b> on the compass (top of the screen) points at your next objective. Each area looks different — red-brick <b>OFFICES</b>, grey <b>WAREHOUSE</b>, blue <b>COMMS</b>, caged <b>ARMORY</b>, bright <b>ELEVATOR LOBBY</b> — and wall signs + yellow floor arrows lead to the elevator. Press <b>M</b> (or MAP) for a map of everywhere you've been. Lost for a couple of minutes? HAWK or DOC will radio a hint.</p>`,
+  2: `<p><b>OPERATION: COLD HORIZON.</b> <i>(The compass ◆ points at the next target.)</i> The Black File intel led us to a Valkyrie airfield in the mountains. The Conductor's section leaders are meeting there tonight — and a convoy is loading out.</p>
     <ul><li>You and your spotter <b>GRAVEL</b> are in a ridge nest about <b>1,150 m</b> north of the compound.</li>
     <li>Eliminate the <b>3 section leaders</b> (black kit, red berets) — CheyTac (key 8).</li>
     <li>Disable the <b>convoy</b> (hit the engine blocks) and destroy the <b>comms dish</b> — Barrett (key 7).</li>
@@ -678,6 +696,7 @@ const BRIEFINGS = {
 // ##   X  = extraction elevator (exit)                               ##
 // ##   H  = health kit   A  = ammo box                               ##
 // ##   B  = faulty generator (backfires = sound masking; shoot it!)  ##
+// ##   D  = the spare M1911 (dual pistols, v0.5)                     ##
 // ##  The outside edge should be all walls so you can't walk out.    ##
 // #####################################################################
 const MAP = [
@@ -695,7 +714,7 @@ const MAP = [
   "#.A.#.....#.....#.#...#",
   "#.###.#########.#.#.###",
   "#.#G..#...I...#...#.GX#",
-  "#.#.###.#####.#####.#.#",
+  "#.#D###.#####.#####.#.#",
   "#......A..G.......#.G.#",
   "#######################",
 ];
@@ -1094,8 +1113,7 @@ function buildLevel() {
         });
         if (!touchesFloor) continue;
         // Different areas of the base get brick or concrete walls.
-        const area = makeRandom(Math.floor(r / 4) * 31 + Math.floor(c / 5) * 7)();
-        const wall = new THREE.Mesh(wallGeometry, area < 0.4 ? brickMaterial : concreteMaterial);
+        const wall = new THREE.Mesh(wallGeometry, zoneMat[zoneAt(c, r).id].wall);   // v0.5: each zone has its own look
         wall.position.set(x, SETTINGS.wallHeight / 2, z);
         levelGroup.add(wall); wallMeshes.push(wall);
         continue;
@@ -1113,6 +1131,7 @@ function buildLevel() {
       if (ch === 'H') createPickup(x, z, 'health');
       if (ch === 'A') createPickup(x, z, 'ammo');
       if (ch === 'B') createGenerator(x, z);
+      if (ch === 'D') createPickup(x, z, 'pistol2');
     }
   }
   if (!foundStart) console.warn('MAP has no P (player start)!');
@@ -1151,6 +1170,8 @@ function buildLevel() {
 
   // Ceiling lamps, spread out so they don't bunch together.
   const lamps = [];
+  // the lobby always gets its own bright light (it's the way out)
+  for (let r = 0; r < rows && !lamps.length; r++) for (let c = 0; c < cols; c++) if (grid[r][c] === 'X') { lamps.push({ c, r }); break; }
   for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
     if (grid[r][c] === '#' || lamps.length >= SETTINGS.maxLights) continue;
     if (lamps.every(l => Math.abs(l.c - c) + Math.abs(l.r - r) >= 5)) lamps.push({ c, r });
@@ -1160,11 +1181,289 @@ function buildLevel() {
     const { x, z } = cellCenter(l.c, l.r);
     const lamp = new THREE.Mesh(lampGeometry, lampMaterial);
     lamp.position.set(x, SETTINGS.wallHeight - 0.04, z);
-    const light = new THREE.PointLight(0xffe2b0, SETTINGS.nightOps ? 0.25 : 4, 20, 1.2);   // night ops = dim emergency lights
+    const zl = zoneAt(l.c, l.r);
+    const light = new THREE.PointLight(zl.light, SETTINGS.nightOps ? 0.25 : zl.lightPower, 20, 1.2);   // night ops = dim emergency lights
     light.position.set(x, SETTINGS.wallHeight - 0.4, z);
     levelGroup.add(lamp, light);
   }
+  safe('zones', () => decorateZones());
   finalizeTargets();
+}
+
+
+// #####################################################################
+// ##  SECTION 6b: MISSION 1 ZONES, SIGNS & LANDMARKS (v0.5)          ##
+// ##  The facility is split into zones (rectangles of map squares),  ##
+// ##  each with its own walls, floor, lights and props, so you can   ##
+// ##  tell where you are. First matching rectangle wins.            ##
+// ##  c0..c1 = map columns, r0..r1 = map rows (0 = top row of MAP).  ##
+// #####################################################################
+const M1_ZONES = [
+  { id: 'lobby',     name: 'ELEVATOR LOBBY', c0: 19, c1: 22, r0: 12, r1: 16, color: '#ffffff', light: 0xffffff, lightPower: 7 },
+  { id: 'power',     name: 'POWER PLANT',    c0: 13, c1: 22, r0: 8,  r1: 11, color: '#7fbf6a', light: 0xd8ffd0, lightPower: 4 },
+  { id: 'comms',     name: 'COMMS',          c0: 12, c1: 22, r0: 0,  r1: 7,  color: '#4aa8ff', light: 0x6fa8ff, lightPower: 3 },
+  { id: 'offices',   name: 'OFFICES',        c0: 0,  c1: 11, r0: 0,  r1: 4,  color: '#e0703a', light: 0xffd9a0, lightPower: 4 },
+  { id: 'warehouse', name: 'WAREHOUSE',      c0: 0,  c1: 12, r0: 5,  r1: 10, color: '#e8c020', light: 0xfff6e8, lightPower: 4.5 },
+  { id: 'armory',    name: 'ARMORY',         c0: 0,  c1: 9,  r0: 11, r1: 16, color: '#c04040', light: 0xffc890, lightPower: 4 },
+  { id: 'records',   name: 'RECORDS',        c0: 0,  c1: 22, r0: 0,  r1: 16, color: '#c8b898', light: 0xfff0d0, lightPower: 4 },
+];
+function zoneAt(col, row) { return M1_ZONES.find(z => col >= z.c0 && col <= z.c1 && row >= z.r0 && row <= z.r1) || M1_ZONES[M1_ZONES.length - 1]; }
+function zoneAtXZ(x, z) { return zoneAt(Math.floor(x / CELL), Math.floor(z / CELL)); }
+
+// ---- Zone textures (all drawn in code) ----
+const zoneTex = {
+  carpet: makeCanvasTexture(128, (ctx, s) => { const r = makeRandom(11); ctx.fillStyle = '#3a3e4a'; ctx.fillRect(0, 0, s, s); addNoise(ctx, s, r, 2500, 0.18); ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.strokeRect(0, 0, s, s); }),
+  warehouseFloor: makeCanvasTexture(256, (ctx, s) => { const r = makeRandom(12); ctx.fillStyle = '#6e6e6a'; ctx.fillRect(0, 0, s, s); addNoise(ctx, s, r, 4000, 0.2);
+    ctx.fillStyle = '#d8b020'; ctx.fillRect(0, s * 0.47, s, s * 0.06); }),
+  serverFloor: makeCanvasTexture(128, (ctx, s) => { ctx.fillStyle = '#15181e'; ctx.fillRect(0, 0, s, s); ctx.strokeStyle = '#2c3a50'; ctx.lineWidth = 3;
+    for (let i = 0; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(i * s / 2, 0); ctx.lineTo(i * s / 2, s); ctx.moveTo(0, i * s / 2); ctx.lineTo(s, i * s / 2); ctx.stroke(); }
+    ctx.fillStyle = '#1e6aff'; for (const [x, y] of [[10, 10], [74, 74]]) ctx.fillRect(x, y, 4, 4); }),
+  powerFloor: makeCanvasTexture(128, (ctx, s) => { const r = makeRandom(13); ctx.fillStyle = '#4c5a48'; ctx.fillRect(0, 0, s, s); addNoise(ctx, s, r, 2500, 0.2); }),
+  steelPlate: makeCanvasTexture(128, (ctx, s) => { ctx.fillStyle = '#5c6066'; ctx.fillRect(0, 0, s, s); ctx.fillStyle = '#7a7f86';
+    for (let y = 0; y < s; y += 16) for (let x = (y / 16) % 2 ? 8 : 0; x < s; x += 16) { ctx.save(); ctx.translate(x + 4, y + 4); ctx.rotate(0.7); ctx.fillRect(-5, -1.5, 10, 3); ctx.restore(); } }),
+  lino: makeCanvasTexture(128, (ctx, s) => { for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) { ctx.fillStyle = (x + y) % 2 ? '#a89878' : '#c8b898'; ctx.fillRect(x * s / 4, y * s / 4, s / 4, s / 4); } }),
+  lobbyFloor: makeCanvasTexture(128, (ctx, s) => { ctx.fillStyle = '#e8eaee'; ctx.fillRect(0, 0, s, s); ctx.strokeStyle = '#b8bcc4'; ctx.lineWidth = 2;
+    ctx.strokeRect(1, 1, s / 2 - 2, s / 2 - 2); ctx.strokeRect(s / 2 + 1, 1, s / 2 - 2, s / 2 - 2); ctx.strokeRect(1, s / 2 + 1, s / 2 - 2, s / 2 - 2); ctx.strokeRect(s / 2 + 1, s / 2 + 1, s / 2 - 2, s / 2 - 2); }),
+  serverWall: makeCanvasTexture(256, (ctx, s) => { ctx.fillStyle = '#141a26'; ctx.fillRect(0, 0, s, s); ctx.strokeStyle = '#26324a'; ctx.lineWidth = 3;
+    for (let x = 0; x <= s; x += s / 4) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, s); ctx.stroke(); }
+    ctx.fillStyle = '#2a7aff'; ctx.fillRect(0, s * 0.8, s, 3); }),
+  powerWall: makeCanvasTexture(256, (ctx, s) => { const r = makeRandom(14); ctx.fillStyle = '#9aa88e'; ctx.fillRect(0, 0, s, s); ctx.fillStyle = '#3e5a3a'; ctx.fillRect(0, s * 0.62, s, s * 0.38);
+    addNoise(ctx, s, r, 3000, 0.15); ctx.fillStyle = '#d8b020'; ctx.fillRect(0, s * 0.6, s, 5); }),
+  cageWall: makeCanvasTexture(256, (ctx, s) => { const r = makeRandom(15); ctx.fillStyle = '#2b2b2c'; ctx.fillRect(0, 0, s, s); addNoise(ctx, s, r, 3000, 0.2);
+    ctx.strokeStyle = '#9a9ea4'; ctx.lineWidth = 2;
+    for (let i = -s; i < s * 2; i += 20) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i + s, s); ctx.moveTo(i, s); ctx.lineTo(i + s, 0); ctx.stroke(); }
+    ctx.fillStyle = '#55595e'; ctx.fillRect(0, 0, 10, s); ctx.fillRect(s - 10, 0, 10, s); ctx.fillRect(0, s - 14, s, 14); }),
+  plaster: makeCanvasTexture(256, (ctx, s) => { const r = makeRandom(16); ctx.fillStyle = '#cbbd9e'; ctx.fillRect(0, 0, s, s); addNoise(ctx, s, r, 3000, 0.1);
+    ctx.fillStyle = '#6a4a2a'; ctx.fillRect(0, s * 0.7, s, s * 0.3); ctx.fillStyle = '#4a3018'; ctx.fillRect(0, s * 0.69, s, 6); }),
+  lobbyWall: makeCanvasTexture(256, (ctx, s) => { ctx.fillStyle = '#f2f3f5'; ctx.fillRect(0, 0, s, s); ctx.strokeStyle = '#c8ccd2'; ctx.lineWidth = 2;
+    for (let i = 0; i <= s; i += 32) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, s); ctx.moveTo(0, i); ctx.lineTo(s, i); ctx.stroke(); }
+    ctx.fillStyle = '#2fbf4f'; ctx.fillRect(0, s * 0.55, s, 12); }),
+  wood: makeCanvasTexture(128, (ctx, s) => { const r = makeRandom(17); ctx.fillStyle = '#8a6a3a'; ctx.fillRect(0, 0, s, s); ctx.strokeStyle = '#5a4020'; ctx.lineWidth = 3;
+    for (let y = 0; y <= s; y += s / 4) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(s, y); ctx.stroke(); } ctx.strokeRect(2, 2, s - 4, s - 4);
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(s, s); ctx.stroke(); addNoise(ctx, s, r, 1500, 0.15); }),
+  rack: makeCanvasTexture(128, (ctx, s) => { ctx.fillStyle = '#0c0e12'; ctx.fillRect(0, 0, s, s);
+    for (let y = 6; y < s; y += 10) { ctx.fillStyle = '#1c222c'; ctx.fillRect(6, y, s - 12, 7);
+      for (let x = 10; x < s - 20; x += 9) { ctx.fillStyle = Math.random() < 0.6 ? '#3a9aff' : Math.random() < 0.5 ? '#40ff80' : '#203040'; ctx.fillRect(x, y + 2, 3, 3); } } }),
+};
+const zoneMat = {
+  offices:   { wall: null, floor: new THREE.MeshStandardMaterial({ map: zoneTex.carpet, roughness: 1 }) },
+  warehouse: { wall: null, floor: new THREE.MeshStandardMaterial({ map: zoneTex.warehouseFloor, roughness: 0.9 }) },
+  comms:     { wall: new THREE.MeshStandardMaterial({ map: zoneTex.serverWall, roughness: 0.6, metalness: 0.3, emissive: 0x061020 }), floor: new THREE.MeshStandardMaterial({ map: zoneTex.serverFloor, roughness: 0.5, metalness: 0.3 }) },
+  power:     { wall: new THREE.MeshStandardMaterial({ map: zoneTex.powerWall, roughness: 0.8 }), floor: new THREE.MeshStandardMaterial({ map: zoneTex.powerFloor, roughness: 0.9 }) },
+  armory:    { wall: new THREE.MeshStandardMaterial({ map: zoneTex.cageWall, roughness: 0.7, metalness: 0.3 }), floor: new THREE.MeshStandardMaterial({ map: zoneTex.steelPlate, roughness: 0.5, metalness: 0.5 }) },
+  records:   { wall: new THREE.MeshStandardMaterial({ map: zoneTex.plaster, roughness: 0.9 }), floor: new THREE.MeshStandardMaterial({ map: zoneTex.lino, roughness: 0.7 }) },
+  lobby:     { wall: new THREE.MeshStandardMaterial({ map: zoneTex.lobbyWall, roughness: 0.3, emissive: 0x202224 }), floor: new THREE.MeshStandardMaterial({ map: zoneTex.lobbyFloor, roughness: 0.25, metalness: 0.1 }) },
+};
+zoneMat.offices.wall = brickMaterial; zoneMat.warehouse.wall = concreteMaterial;
+
+// Canvas text: a sign (text on a coloured plate). Returns a plane mesh, w x h metres.
+const signCache = {};
+function makeSign(text, w = 1.6, h = 0.45, bg = '#103010', fg = '#e8ffe8', glow = true) {
+  const key = [text, w, h, bg, fg].join('|');
+  if (!signCache[key]) {
+    const c = document.createElement('canvas'); c.width = 512; c.height = Math.round(512 * h / w);
+    const g = c.getContext('2d');
+    g.fillStyle = bg; g.fillRect(0, 0, c.width, c.height);
+    g.strokeStyle = fg; g.lineWidth = 6; g.strokeRect(6, 6, c.width - 12, c.height - 12);
+    let size = c.height * 0.62; g.font = `bold ${size}px "Courier New", monospace`;
+    while (g.measureText(text).width > c.width * 0.9 && size > 10) { size -= 2; g.font = `bold ${size}px "Courier New", monospace`; }
+    g.fillStyle = fg; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, c.width / 2, c.height / 2 + 2);
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+    signCache[key] = glow ? new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }) : new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6, emissive: 0x111111 });
+  }
+  return new THREE.Mesh(new THREE.PlaneGeometry(w, h), signCache[key]);
+}
+// Put a flat thing on the face of wall square (wc, wr) that faces the open square (c, r).
+function onWallFace(mesh, c, r, wc, wr, y, along = 0) {
+  const cx = c * CELL + CELL / 2, cz = r * CELL + CELL / 2;
+  const nx = wc - c, nz = wr - r;                      // from the open square towards the wall
+  mesh.position.set(cx + nx * (CELL / 2 - 0.03) + (-nz) * along, y, cz + nz * (CELL / 2 - 0.03) + nx * along);
+  mesh.rotation.y = Math.atan2(-nx, -nz);              // face back into the open square
+  levelGroup.add(mesh); return mesh;
+}
+const propMat = {
+  desk: new THREE.MeshStandardMaterial({ color: 0x6a4c30, roughness: 0.7 }), metal: new THREE.MeshStandardMaterial({ color: 0x70757c, roughness: 0.5, metalness: 0.6 }),
+  dark: new THREE.MeshStandardMaterial({ color: 0x22252a, roughness: 0.6, metalness: 0.4 }), screen: new THREE.MeshBasicMaterial({ color: 0x4ab0ff }),
+  crate: new THREE.MeshStandardMaterial({ map: zoneTex.wood, roughness: 0.9 }), rack: new THREE.MeshStandardMaterial({ map: zoneTex.rack, emissive: 0xffffff, emissiveMap: zoneTex.rack, emissiveIntensity: 0.9, roughness: 0.5 }),
+  pipe: new THREE.MeshStandardMaterial({ color: 0x5a7a52, roughness: 0.5, metalness: 0.5 }), pipeRed: new THREE.MeshStandardMaterial({ color: 0x9a2a20, roughness: 0.5, metalness: 0.4 }),
+  green: new THREE.MeshStandardMaterial({ color: 0x3e4a2a, roughness: 0.8 }), yellow: new THREE.MeshStandardMaterial({ color: 0xe0b020, roughness: 0.6 }),
+  gun: new THREE.MeshStandardMaterial({ color: 0x18191b, roughness: 0.5, metalness: 0.5 }), paper: new THREE.MeshStandardMaterial({ color: 0xd8d0b8, roughness: 1 }),
+  core: new THREE.MeshBasicMaterial({ color: 0x3a8aff }), steelDoor: new THREE.MeshStandardMaterial({ color: 0xb8bec6, roughness: 0.25, metalness: 0.9 }),
+};
+const box = (w, h, d, mat, x, y, z, parent) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); parent.add(m); return m; };
+// Props stand against a wall: built in a local frame where +z points OUT of the wall.
+function propAgainstWall(kind, c, r, wc, wr, along, rand) {
+  const g = new THREE.Group(), cx = c * CELL + CELL / 2, cz = r * CELL + CELL / 2, nx = wc - c, nz = wr - r;
+  let depth = 0.7;
+  if (kind === 'desk') {
+    box(1.5, 0.06, 0.75, propMat.desk, 0, 0.76, 0, g); box(0.06, 0.74, 0.7, propMat.metal, -0.7, 0.37, 0, g); box(0.06, 0.74, 0.7, propMat.metal, 0.7, 0.37, 0, g);
+    box(0.5, 0.34, 0.04, propMat.dark, 0, 1.0, -0.15, g); box(0.44, 0.28, 0.01, propMat.screen, 0, 1.0, -0.125, g);
+    box(0.32, 0.03, 0.24, propMat.paper, 0.45, 0.8, 0.1, g); depth = 0.75;
+  } else if (kind === 'cabinet') { box(0.5, 1.35, 0.6, propMat.metal, 0, 0.675, 0, g); for (let i = 0; i < 4; i++) box(0.12, 0.03, 0.02, propMat.dark, 0, 0.3 + i * 0.3, 0.31, g); depth = 0.6; }
+  else if (kind === 'crates') { box(1, 1, 1, propMat.crate, 0, 0.5, 0, g); if (rand() < 0.6) box(0.8, 0.8, 0.8, propMat.crate, (rand() - 0.5) * 0.2, 1.4, 0, g).rotation.y = rand(); depth = 1.0; }
+  else if (kind === 'shelf') {
+    for (const x of [-0.95, 0.95]) box(0.06, 2.4, 0.6, propMat.yellow, x, 1.2, 0, g);
+    for (const y of [0.15, 0.95, 1.75]) { box(1.96, 0.05, 0.6, propMat.metal, 0, y, 0, g); for (let k = 0; k < 3; k++) if (rand() < 0.75) box(0.5, 0.45, 0.5, propMat.crate, -0.6 + k * 0.6, y + 0.27, 0, g); }
+    depth = 0.6;
+  } else if (kind === 'server') { for (const x of [-0.75, 0, 0.75]) { box(0.7, 2.1, 0.9, propMat.dark, x, 1.05, 0, g); box(0.62, 1.95, 0.01, propMat.rack, x, 1.05, 0.455, g); } depth = 0.9; }
+  else if (kind === 'weapons') {
+    box(1.8, 1.3, 0.08, propMat.dark, 0, 1.15, -0.25, g);
+    for (let k = 0; k < 5; k++) { const rf = box(0.06, 1.0, 0.1, propMat.gun, -0.72 + k * 0.36, 1.15, -0.17, g); rf.rotation.z = 0.08; box(0.05, 0.16, 0.08, propMat.gun, -0.72 + k * 0.36, 1.0, -0.1, g); }
+    box(0.9, 0.35, 0.45, propMat.green, 0, 0.18, 0.05, g); depth = 0.6;
+  } else if (kind === 'pipes') {
+    for (const [y, m] of [[2.55, propMat.pipe], [2.85, propMat.pipeRed], [0.35, propMat.pipe]]) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, CELL, 10), m); p.rotation.z = Math.PI / 2; p.position.set(0, y, -0.2); g.add(p); }
+    const valve = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.03, 6, 12), propMat.pipeRed); valve.position.set(0.4, 2.55, -0.05); g.add(valve); depth = 0.3;
+  } else if (kind === 'files') { box(1.8, 2.2, 0.5, propMat.desk, 0, 1.1, 0, g); for (let y = 0.3; y < 2.1; y += 0.4) box(1.7, 0.04, 0.02, propMat.dark, 0, y, 0.26, g); depth = 0.5; }
+  const ox = cx + nx * (CELL / 2 - depth / 2 - 0.02) + (-nz) * along, oz = cz + nz * (CELL / 2 - depth / 2 - 0.02) + nx * along;
+  g.position.set(ox, 0, oz); g.rotation.y = Math.atan2(-nx, -nz);
+  levelGroup.add(g);
+  if (kind !== 'pipes') props.push({ x: ox, z: oz, r: Math.min(depth / 2, 0.45) });
+  return g;
+}
+const ZONE_PROPS = { offices: ['desk', 'desk', 'cabinet'], warehouse: ['crates', 'shelf', 'crates'], comms: ['server', 'server'], power: ['pipes', 'pipes', 'crates'],
+  armory: ['weapons', 'weapons', 'crates'], records: ['files', 'files', 'cabinet'], lobby: [] };
+// Breadth-first distances from one square to every square (used by arrows, compass and hints).
+function gridDistances(sc, sr) {
+  const d = new Int16Array(worldRows * worldCols).fill(-1), q = [[sc, sr]];
+  if (isWall(sc, sr)) return d;
+  d[sr * worldCols + sc] = 0;
+  for (let h = 0; h < q.length; h++) {
+    const [c, r] = q[h], k = d[r * worldCols + c];
+    for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nc = c + dc, nr = r + dr;
+      if (nc < 0 || nr < 0 || nc >= worldCols || nr >= worldRows || isWall(nc, nr) || d[nr * worldCols + nc] >= 0) continue;
+      d[nr * worldCols + nc] = k + 1; q.push([nc, nr]);
+    }
+  }
+  return d;
+}
+const arrowTexture = makeCanvasTexture(128, (ctx, s) => {
+  ctx.clearRect(0, 0, s, s); ctx.fillStyle = 'rgba(255,210,40,0.92)';
+  ctx.beginPath(); ctx.moveTo(s / 2, 6); ctx.lineTo(s - 14, s * 0.48); ctx.lineTo(s * 0.64, s * 0.48); ctx.lineTo(s * 0.64, s - 8); ctx.lineTo(s * 0.36, s - 8); ctx.lineTo(s * 0.36, s * 0.48); ctx.lineTo(14, s * 0.48); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#222'; ctx.font = 'bold 15px monospace'; ctx.textAlign = 'center'; ctx.fillText('ELEV', s / 2, s * 0.8);
+});
+arrowTexture.wrapS = arrowTexture.wrapT = THREE.ClampToEdgeWrapping;
+const arrowMaterial = new THREE.MeshStandardMaterial({ map: arrowTexture, transparent: true, depthWrite: false, roughness: 0.8, emissive: 0x332200, polygonOffset: true, polygonOffsetFactor: -2 });
+let navInfo = null;     // per-level navigation data (exit distances, visited squares...)
+function decorateZones() {
+  const rand = makeRandom(4242), rows = worldRows, cols = worldCols;
+  // 1) Zone floors: one instanced tile per open square, per zone.
+  const tiles = {};
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) if (!isWall(c, r)) (tiles[zoneAt(c, r).id] = tiles[zoneAt(c, r).id] || []).push([c, r]);
+  const tileGeo = new THREE.PlaneGeometry(CELL, CELL); tileGeo.rotateX(-Math.PI / 2);
+  const mtx = new THREE.Matrix4();
+  for (const [id, list] of Object.entries(tiles)) {
+    const im = new THREE.InstancedMesh(tileGeo, zoneMat[id].floor, list.length);
+    list.forEach(([c, r], i) => im.setMatrixAt(i, mtx.makeTranslation(c * CELL + CELL / 2, 0.006, r * CELL + CELL / 2)));
+    levelGroup.add(im);
+  }
+  // 2) Props against the walls (deterministic, so the map always looks the same).
+  const special = new Set(['P', 'I', 'X', 'A', 'H', 'B', 'D']);
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    if (isWall(c, r) || special.has(grid[r][c])) continue;
+    const kinds = ZONE_PROPS[zoneAt(c, r).id]; if (!kinds.length) continue;
+    for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      if (!isWall(c + dc, r + dr) || rand() > 0.28) continue;
+      // keep corridors passable: only if the opposite side is open too (room / wide corridor) or the prop is flat
+      const kind = kinds[Math.floor(rand() * kinds.length)];
+      propAgainstWall(kind, c, r, c + dc, r + dr, (rand() - 0.5) * 1.2, rand);
+    }
+  }
+  // 3) Distances to the extraction elevator: floor arrows at junctions + corners.
+  const ex = Math.floor(exitZone.x / CELL), ez = Math.floor(exitZone.z / CELL);
+  const toExit = gridDistances(ex, ez);
+  const arrowGeo = new THREE.PlaneGeometry(1.4, 1.4); arrowGeo.rotateX(-Math.PI / 2);
+  const signsPlaced = new Set();
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    const k = toExit[r * cols + c]; if (k <= 0) continue;
+    const open = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dc, dr]) => !isWall(c + dc, r + dr));
+    const corner = open.length === 2 && (open[0][0] + open[1][0] !== 0 || open[0][1] + open[1][1] !== 0);
+    if (open.length < 3 && !corner && k % 4 !== 0) continue;
+    const next = open.find(([dc, dr]) => toExit[(r + dr) * cols + c + dc] === k - 1); if (!next) continue;
+    const a = new THREE.Mesh(arrowGeo, arrowMaterial);
+    a.position.set(c * CELL + CELL / 2, 0.012, r * CELL + CELL / 2); a.rotation.y = Math.atan2(-next[0], -next[1]);
+    levelGroup.add(a);
+    // At junctions, a wall sign "ELEVATOR ->" on a side wall, arrow pointing the right way for someone facing it.
+    if (open.length >= 3) {
+      for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        if (!isWall(c + dc, r + dr)) continue;
+        const dot = dc * next[0] + dr * next[1]; if (dot !== 0) continue;       // the go-direction runs along this wall
+        // facing the wall (looking along +(dc,dr)), your right-hand side is (-dr, dc)
+        const right = (-dr * next[0] + dc * next[1]) > 0;
+        onWallFace(makeSign(right ? 'ELEVATOR  →' : '←  ELEVATOR', 1.5, 0.36, '#0a2a10', '#7dff8c'), c, r, c + dc, r + dr, 2.35);
+        break;
+      }
+    }
+  }
+  // 4) Zone name signs where you walk from one zone into another (both sides of the doorway).
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    if (isWall(c, r)) continue;
+    for (const [dc, dr] of [[1, 0], [0, 1], [-1, 0], [0, -1]]) {
+      const nc = c + dc, nr = r + dr; if (isWall(nc, nr)) continue;
+      const za = zoneAt(c, r), zb = zoneAt(nc, nr); if (za === zb) continue;
+      const key = zb.id + '@' + nc + ',' + nr; if (signsPlaced.has(key)) continue; signsPlaced.add(key);
+      // sign for zone B above the doorway, on the wall of square B facing the way you walk in
+      const ahead = [nc + dc, nr + dr];
+      if (isWall(ahead[0], ahead[1])) onWallFace(makeSign(zb.name, 1.8, 0.42, '#111', zb.color), nc, nr, ahead[0], ahead[1], 2.6);
+      else for (const [sc, sr] of [[nc - dr, nr + dc], [nc + dr, nr - dc]]) if (isWall(sc, sr)) { onWallFace(makeSign(zb.name, 1.8, 0.42, '#111', zb.color), nc, nr, sc, sr, 2.6); break; }
+    }
+  }
+  // 5) Landmarks: big zone banners + a few one-of-a-kind set pieces.
+  const banners = { offices: ['VALKYRIE', '#7a0d0d', '#f0d8a0'], warehouse: ['LOADING BAY 3', '#202020', '#f0c020'], comms: ['NETWORK CORE', '#0a1a30', '#58b0ff'],
+    power: ['DANGER · HIGH VOLTAGE', '#e0b020', '#111'], armory: ['ARMORY · AUTHORISED ONLY', '#401010', '#ff8080'], records: ['ARCHIVES', '#3a2a18', '#e8d8b0'] };
+  for (const z of M1_ZONES) {
+    if (!banners[z.id]) continue;
+    // the open square nearest the zone's centre that has a wall to its north or south
+    const mc = (z.c0 + Math.min(z.c1, cols - 1)) / 2, mr = (z.r0 + Math.min(z.r1, rows - 1)) / 2; let best = null, bd = 1e9;
+    for (let r = z.r0; r <= Math.min(z.r1, rows - 1); r++) for (let c = z.c0; c <= Math.min(z.c1, cols - 1); c++) {
+      if (isWall(c, r) || zoneAt(c, r) !== z) continue;
+      const wall = [[0, -1], [0, 1], [1, 0], [-1, 0]].find(([dc, dr]) => isWall(c + dc, r + dr)); if (!wall) continue;
+      const d = Math.hypot(c - mc, r - mr); if (d < bd) { bd = d; best = [c, r, wall]; }
+    }
+    if (best) { const [b0, b1, b2] = banners[z.id]; onWallFace(makeSign(b0, 3.0, 1.1, b1, b2, false), best[0], best[1], best[0] + best[2][0], best[1] + best[2][1], 1.75); }
+  }
+  // The comms "network core": a glowing pillar in the biggest comms room.
+  for (const [c, r] of [[15, 3], [13, 3]]) if (!isWall(c, r) && zoneAt(c, r).id === 'comms') {
+    const core = new THREE.Group(); core.position.set(c * CELL + CELL / 2, 0, r * CELL + CELL / 2);
+    box(0.9, SETTINGS.wallHeight, 0.9, propMat.dark, 0, SETTINGS.wallHeight / 2, 0, core);
+    for (let y = 0.4; y < SETTINGS.wallHeight; y += 0.5) box(0.94, 0.06, 0.94, propMat.core, 0, y, 0, core);
+    levelGroup.add(core); props.push({ x: core.position.x, z: core.position.z, r: 0.6 }); break;
+  }
+  // A yellow forklift in the warehouse.
+  for (const [c, r] of [[9, 7], [10, 7]]) if (!isWall(c, r)) {
+    const f = new THREE.Group(); f.position.set(c * CELL + CELL / 2 + 0.8, 0, r * CELL + CELL / 2 - 0.6); f.rotation.y = 0.6;
+    box(1.1, 0.9, 1.8, propMat.yellow, 0, 0.6, 0, f); box(1.0, 0.08, 0.9, propMat.dark, 0, 2.0, -0.2, f);
+    for (const x of [-0.5, 0.5]) box(0.06, 1.9, 0.06, propMat.dark, x, 1.05, 0.4, f), box(0.06, 2.2, 0.06, propMat.dark, x * 0.6, 1.1, 1.0, f);
+    box(0.9, 0.06, 0.9, propMat.dark, 0, 0.15, 1.4, f); box(1.0, 1.0, 1.0, propMat.crate, 0, 0.7, 1.45, f);
+    levelGroup.add(f); props.push({ x: f.position.x, z: f.position.z, r: 0.8 }); break;
+  }
+  // 6) The elevator lobby: steel doors behind the pad, a lit sign and a barrier arm at the way in.
+  for (const [dc, dr] of [[1, 0], [0, -1], [0, 1], [-1, 0]]) if (isWall(ex + dc, ez + dr)) {
+    const doors = new THREE.Group();
+    box(1.1, 2.6, 0.06, propMat.steelDoor, -0.56, 1.3, 0, doors); box(1.1, 2.6, 0.06, propMat.steelDoor, 0.56, 1.3, 0, doors);
+    box(2.5, 0.2, 0.08, propMat.dark, 0, 2.7, 0, doors);
+    const lamp = box(0.3, 0.12, 0.06, new THREE.MeshBasicMaterial({ color: 0xff3030 }), 0, 2.95, 0.02, doors);
+    onWallFace(doors, ex, ez, ex + dc, ez + dr, 0);
+    onWallFace(makeSign('EXTRACTION ELEVATOR', 2.4, 0.4, '#04140a', '#40ff70'), ex, ez, ex + dc, ez + dr, 3.25);
+    exitZone.doorLamp = lamp; break;
+  }
+  // The way into the lobby: the open square next to the lobby that's outside it.
+  let gate = null;
+  for (let r = 0; r < rows && !gate; r++) for (let c = 0; c < cols && !gate; c++) {
+    if (isWall(c, r) || zoneAt(c, r).id !== 'lobby') continue;
+    for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (!isWall(c + dc, r + dr) && zoneAt(c + dc, r + dr).id !== 'lobby') { gate = { c, r, dc, dr }; break; }
+  }
+  if (gate) {
+    const arm = new THREE.Group(), gx = gate.c * CELL + CELL / 2 + gate.dc * CELL * 0.45, gz = gate.r * CELL + CELL / 2 + gate.dr * CELL * 0.45;
+    arm.position.set(gx + (gate.dr ? -CELL * 0.42 : 0), 1.0, gz + (gate.dc ? -CELL * 0.42 : 0));
+    const stripes = makeCanvasTexture(64, (ctx, s) => { for (let i = 0; i < 8; i++) { ctx.fillStyle = i % 2 ? '#111' : '#f0c020'; ctx.fillRect(i * s / 8, 0, s / 8, s); } });
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(CELL * 0.85, 0.1, 0.1), new THREE.MeshStandardMaterial({ map: stripes, emissive: 0x221800 }));
+    bar.position.x = CELL * 0.42; arm.add(bar); arm.rotation.y = gate.dr ? 0 : Math.PI / 2;
+    levelGroup.add(arm); exitZone.gateArm = arm;
+    const post = box(0.25, 1.1, 0.25, propMat.yellow, 0, 0.55, 0, levelGroup); post.position.set(arm.position.x, 0.55, arm.position.z);
+  }
+  navInfo = { toExit, visited: new Uint8Array(rows * cols), exitSeen: false, zonesSeen: new Set(), lastProgress: elapsed, lastHint: -1e9, hintCount: 0,
+    distField: null, distFrom: -1, distAt: 0 };
 }
 
 // #####################################################################
@@ -1189,6 +1488,8 @@ document.addEventListener('keydown', e => {
   noteInput('key ' + e.code);
   if (e.code === 'Backquote' || e.code === 'KeyG') { if (!e.repeat) toggleDebug(); e.preventDefault(); return; }
   if (killcam.active) { e.preventDefault(); endKillcam(); return; }   // any key skips the kill cam
+  if (e.code === 'KeyM' && (state === 'playing' || state === 'map')) { e.preventDefault(); if (!e.repeat) state === 'map' ? closeMap() : openMap(); return; }
+  if (state === 'map') { e.preventDefault(); return; }                // map open: the game is frozen
   if (state !== 'playing') return;
   // While playing, the page must not react to keys: no Tab focus jumps, no Space
   // "clicking" a focused button, no arrow/space scrolling, no quick-find on ' or /.
@@ -1212,6 +1513,7 @@ document.addEventListener('keydown', e => {
   if (e.code === 'KeyZ') setStance(player.stance === 'prone' ? 'stand' : 'prone');
   if (e.code === 'KeyN') cycleNightVision();
   if (e.code === 'KeyL') toggleIR();
+  if (e.code === 'KeyX') toggleDual();
   if (e.code.startsWith('Digit')) {               // number keys switch weapons
     const n = parseInt(e.code.slice(5), 10) - 1;
     if (n >= 0 && n < WEAPONS.length) switchWeapon(n);
@@ -1441,6 +1743,8 @@ function resetWeapons() {
   currentWeapon = 0; reloadTimer = 0; fireCooldown = 0; switchTimer = 0; boltTimer = 0;
   WEAPONS.forEach((w, i) => { w.suppressed = w.startSuppressed; updateSuppressorModel(i); });
   weaponModels.forEach((m, i) => (m.visible = i === 0));
+  dual.owned = false; dual.on = false; dual.side = 1; dual.force = 0;
+  if (typeof syncDualSuppressors === 'function') syncDualSuppressors();
 }
 // T key: screw the suppressor on or off (only on guns that allow it).
 function toggleSuppressor() {
@@ -1448,6 +1752,7 @@ function toggleSuppressor() {
   if (!w.canSuppress) { showMessage(w.name + " can't take a suppressor.", 1.5); return; }
   w.suppressed = !w.suppressed;
   updateSuppressorModel(currentWeapon);
+  if (currentWeapon === 0) syncDualSuppressors();
   SOUNDS.empty();
   showMessage(w.suppressed ? 'Suppressor ON — quieter, slightly weaker' : 'Suppressor OFF — loud, full power', 1.5);
 }
@@ -1459,9 +1764,9 @@ function switchWeapon(n) {
 }
 function startReload() {
   const w = WEAPONS[currentWeapon], s = weaponState[currentWeapon];
-  if (reloadTimer > 0 || s.ammo === w.magSize || s.reserve === 0) return;
-  reloadTimer = w.reloadTime;
-  SOUNDS.reload(w.reloadTime);
+  if (reloadTimer > 0 || s.ammo >= magSizeOf(currentWeapon) || s.reserve === 0) return;
+  reloadTimer = w.reloadTime * (dualActive() ? SETTINGS.dualReloadMult : 1);
+  SOUNDS.reload(reloadTimer);
 }
 
 document.addEventListener('mousedown', e => {
@@ -1480,6 +1785,7 @@ document.addEventListener('mousedown', e => {
 // Normal guns: hold the click to aim (Q toggles). 2-step scopes: each press goes zoom 1 -> zoom 2 -> off.
 let lastRightDown = -1e9, ctrlAiming = false;
 function aimPress(toggle) {
+  if (dualActive()) { dual.force = -1; queueShot(); return; }      // dual pistols: no sights — this fires the LEFT gun
   const levels = WEAPONS[currentWeapon].zoomLevels.length;
   if (levels > 1) setZoom((zoomStep + 1) % (levels + 1));
   else setZoom(toggle ? (zoomStep ? 0 : 1) : 1);
@@ -1543,6 +1849,11 @@ function tryShoot() {
   }
   s.ammo--; fireCooldown = w.fireDelay; player.shotsFired++;
   recoil = w.suppressed ? 0.7 : 1; flashTimer = 0.05;
+  const akimbo = dualActive();
+  if (akimbo) {                                    // two guns take turns: twice the rate, each gun kicks on its own
+    const side = dual.force || dual.side; dual.force = 0; dual.side = -side;
+    fireCooldown = w.fireDelay * 0.5; dual.recoil[String(side)] = recoil; dual.flash[String(side)] = 0.05; recoil *= 0.3; flashTimer = 0;
+  }
   if (w.suppressed) SOUNDS.suppressedShot(); else SOUNDS.gunshot(w.sound);
   if (w.boltAction) { boltTimer = 0.9; SOUNDS.bolt(); }
 
@@ -1557,7 +1868,7 @@ function tryShoot() {
   // BUG FIX v0.4.1: spread used to be added in *screen* units x20, which threw shots up to
   // ~2 degrees off the crosshair (a head 8 m away was missed most of the time). Now 'spread'
   // is a real angle in radians: the bullet leaves within that cone around the crosshair.
-  const spreadRad = aiming ? w.spread * 0.4 : w.spread;
+  const spreadRad = akimbo ? w.spread * SETTINGS.dualSpreadMult : aiming ? w.spread * 0.4 : w.spread;
   const shotDir = aimDirection();
   if (spreadRad > 0) {
     const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * spreadRad;
@@ -1791,7 +2102,7 @@ function updateWeapon(dt) {
   if (reloadTimer > 0) {
     reloadTimer -= dt;
     if (reloadTimer <= 0) {
-      const take = Math.min(w.magSize - s.ammo, s.reserve);
+      const take = Math.min(magSizeOf(currentWeapon) - s.ammo, s.reserve);
       s.ammo += take; s.reserve -= take; reloadTimer = 0;
     }
   }
@@ -1818,6 +2129,7 @@ function updateWeapon(dt) {
   weaponRoot.rotation.z = bolt * 0.35;
   weaponRoot.visible = !(aiming && w.scope);
   updateKnife(dt);             // knife slash (hides the gun while it plays)
+  updateDualModels(dt, aimY);  // v0.5: two pistols
 
   // Muzzle flash
   flashTimer -= dt;
@@ -1843,6 +2155,7 @@ const enemyGeo = {
 // opts (all optional): uniform colour, headgear ('hat' | 'helmet' | 'cap' | 'beret' | 'balaclava'),
 //   label (shown in the kill feed), officer, static (never walks), cover (runs for cover), baseY (height, e.g. a tower).
 function createEnemy(x, z, opts = {}) {
+  if (figuresReady()) { try { return createFigureEnemy(x, z, opts); } catch (err) { noteError('figures', err); FIGURES.status = 'failed'; FIGURES.error = 'build: ' + (err.message || err); } }
   const group = new THREE.Group();
   group.rotation.order = 'YXZ';           // turn first, then fall over (for the death animation)
   group.position.set(x, groundAt(x, z) + (opts.baseY || 0), z);
@@ -1901,6 +2214,236 @@ function createEnemy(x, z, opts = {}) {
   enemies.push(enemy);
 }
 
+
+// #####################################################################
+// ##  SECTION 9f: 3D SOLDIER MODELS (v0.5)                           ##
+// ##  Guards, SEAL teammates and the spotter are a rigged, animated  ##
+// ##  soldier ("SWAT" by Quaternius, CC0 / public domain), loaded    ##
+// ##  from models/swat.glb. Invisible hit boxes ride on the bones,   ##
+// ##  so head / torso / limb hits follow the animation. If the file  ##
+// ##  can't load, the game quietly uses the old blocky figures.      ##
+// #####################################################################
+const FIGURES = { status: 'loading', gltf: null, clips: {}, error: '', file: 'models/swat.glb' };
+const FIGURE_SKIN = {    // material colours per side ('Swat' = uniform, 'Swat_Black' = vest/boots/gloves/helmet)
+  guard: { Swat: 0x4b5a3a, Swat_Black: 0x141414, Visor: 0x1e241e },
+  seal:  { Swat: 0xb4a074, Swat_Black: 0x7a6440, Visor: 0x2a2a2a },
+};
+const hitboxMaterial = new THREE.MeshBasicMaterial({ visible: false });   // invisible, but bullets still hit it
+const _figM = new THREE.Matrix4(), _figM2 = new THREE.Matrix4(), _figV = new THREE.Vector3(), _figV2 = new THREE.Vector3(), _figQ = new THREE.Quaternion();
+const _ONE = new THREE.Vector3(1, 1, 1), _UP = new THREE.Vector3(0, 1, 0);
+// Tan "Multicam"-style camo for the SEALs (procedural, no image files).
+const multicamTexture = makeCanvasTexture(128, (ctx, sz) => {
+  const r = makeRandom(77);
+  ctx.fillStyle = '#b8a47a'; ctx.fillRect(0, 0, sz, sz);
+  for (const [c, n, rad] of [['#9c8a5e', 26, 14], ['#7d7049', 18, 10], ['#5f6340', 12, 8], ['#d2c29a', 14, 7], ['#4a3f2a', 8, 4]])
+    for (let i = 0; i < n; i++) { ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(r() * sz, r() * sz, rad * (0.5 + r()), rad * (0.3 + r() * 0.6), r() * 3, 0, 7); ctx.fill(); }
+}, 1, 1);
+function loadFigures() {
+  if (/[?&]blocky=1/.test(location.search)) { FIGURES.status = 'off'; FIGURES.error = 'blocky=1 in the link'; return; }
+  const timer = setTimeout(() => { if (FIGURES.status === 'loading') { FIGURES.status = 'failed'; FIGURES.error = 'timed out'; } }, 20000);
+  try {
+    new GLTFLoader().load(FIGURES.file, gltf => {
+      clearTimeout(timer);
+      if (FIGURES.status !== 'loading') return;
+      FIGURES.gltf = gltf;
+      for (const a of gltf.animations) FIGURES.clips[a.name.split('|').pop()] = a;
+      FIGURES.status = 'ok';
+      // Still on the briefing screen? Rebuild the level behind it with the new figures.
+      if (state === 'start') safe('figures:rebuild', () => { buildLevel(); resetPlayer(); resetWeapons(); resetMasking(); if (currentMission === 2) missionStartPose(); });
+    }, undefined, err => { clearTimeout(timer); FIGURES.status = 'failed'; FIGURES.error = String((err && err.message) || err).slice(0, 80); });
+  } catch (err) { clearTimeout(timer); FIGURES.status = 'failed'; FIGURES.error = String(err.message || err); }
+}
+function figuresReady() { return FIGURES.status === 'ok'; }
+// Put 'obj' on a bone so that it sits at a given place (in the figure's own space) right now,
+// and then follows that bone as it animates.
+function attachToBone(bone, obj, pos, quat) {
+  _figM.compose(pos, quat, _ONE);
+  _figM2.copy(bone.matrixWorld).invert().multiply(_figM);
+  _figM2.decompose(obj.position, obj.quaternion, obj.scale);
+  bone.add(obj);
+}
+// An invisible box from bone A to bone B (an arm or leg segment), tagged with its hit zone.
+function boneBox(bones, a, b, thick, zone, list, extend = 0) {
+  const pa = bones[a].getWorldPosition(new THREE.Vector3()), pb = bones[b].getWorldPosition(new THREE.Vector3());
+  const dir = pb.clone().sub(pa); const len = dir.length() + extend; dir.normalize();
+  const m = new THREE.Mesh(new THREE.BoxGeometry(thick, len, thick), hitboxMaterial);
+  m.userData.zone = zone; m.userData.hitbox = true;
+  attachToBone(bones[a], m, pa.clone().addScaledVector(dir, len / 2 - extend / 2), _figQ.clone().setFromUnitVectors(_UP, dir));
+  list.push(m); return m;
+}
+function centerBox(bone, w, h, d, center, zone, list) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), hitboxMaterial);
+  m.userData.zone = zone; m.userData.hitbox = true;
+  attachToBone(bone, m, center, new THREE.Quaternion());
+  list.push(m); return m;
+}
+const figureGunMat = new THREE.MeshStandardMaterial({ color: 0x1b1c1e, roughness: 0.5, metalness: 0.5 });
+const figureGunGeo = { body: new THREE.BoxGeometry(0.06, 0.09, 0.62), mag: new THREE.BoxGeometry(0.04, 0.16, 0.07), stock: new THREE.BoxGeometry(0.05, 0.11, 0.2), optic: new THREE.BoxGeometry(0.04, 0.05, 0.12) };
+// kind: 'guard' | 'seal';  opts.uniform overrides the uniform colour, opts.officer adds a red beret.
+const PROXY_GEO = { legs: new THREE.BoxGeometry(0.4, 0.9, 0.24), body: new THREE.BoxGeometry(0.48, 0.6, 0.3), head: new THREE.BoxGeometry(0.26, 0.3, 0.28) };
+const proxyMats = {};
+function proxyMaterial(hex) { return proxyMats[hex] || (proxyMats[hex] = new THREE.MeshLambertMaterial({ color: hex })); }
+SETTINGS.figureProxyPx = 36;     // figures shorter than this many pixels on screen use the 3-box stand-in
+function makeFigure(kind, opts = {}) {
+  const root = SkeletonUtils.clone(FIGURES.gltf.scene);
+  const mats = [], skin = FIGURE_SKIN[kind], full = [];
+  let headObj = null;
+  root.traverse(o => {
+    if (o.name === 'Swat_Head') headObj = o;
+    if (!o.isMesh) return;
+    o.material = o.material.clone();
+    const n = o.material.name;
+    if (skin[n] !== undefined) o.material.color.setHex(n === 'Swat' && opts.uniform !== undefined ? opts.uniform : skin[n]);
+    if (kind === 'seal' && n === 'Swat') { o.material.map = null; o.material.color.setHex(0xb39b6c); }   // tan (the model's UVs are too small for a camo pattern: it turned into static)
+    o.material.needsUpdate = true;
+    o.castShadow = true; o.userData.hot = true;
+    full.push(o); mats.push(o.material);
+  });
+  // Off-screen figures are skipped by the renderer (frustum culling). The skinned bounds are
+  // measured once in the bind pose, so pad them to cover running / falling poses.
+  for (const o of full) { if (o.isSkinnedMesh) { o.computeBoundingSphere(); o.boundingSphere.radius *= 1.6; } o.frustumCulled = true; }
+  // Far away (a few pixels tall) the detailed model is swapped for 3 boxes: same look at that size,
+  // a fraction of the work for the iPad. Through a scope it's close-up again, so the model comes back.
+  const proxy = new THREE.Group(); proxy.visible = false;
+  const pm = proxyMaterial(kind === 'seal' ? 0xb39b6c : (opts.uniform !== undefined ? opts.uniform : skin.Swat)), dark = proxyMaterial(skin.Swat_Black);
+  for (const [geo, mat, y] of [[PROXY_GEO.legs, pm, 0.45], [PROXY_GEO.body, pm, 1.18], [PROXY_GEO.head, dark, 1.62]]) {
+    const b = new THREE.Mesh(geo, mat); b.position.y = y; b.userData.hot = true; proxy.add(b);
+  }
+  if (root.scale.x) proxy.scale.setScalar(1 / root.scale.x);
+  root.add(proxy);
+  const mixer = new THREE.AnimationMixer(root), actions = {};
+  for (const [n, clip] of Object.entries(FIGURES.clips)) actions[n] = mixer.clipAction(clip);
+  if (actions.Death) { actions.Death.setLoop(THREE.LoopOnce); actions.Death.clampWhenFinished = true; }
+  const startClip = actions.Idle_Gun ? 'Idle_Gun' : Object.keys(actions)[0];
+  actions[startClip].play(); mixer.update(0); root.updateMatrixWorld(true);
+  const bones = {}; root.traverse(o => { if (o.isBone) bones[o.name] = o; });
+  const hit = [];
+  // Hit boxes, measured on the posed skeleton.
+  const head = bones.Head.getWorldPosition(new THREE.Vector3());
+  centerBox(bones.Head, 0.27, 0.32, 0.3, head.clone().add(new THREE.Vector3(0, 0.1, 0.03)), 'head', hit);
+  const abd = bones.Abdomen.getWorldPosition(new THREE.Vector3()), neck = bones.Neck.getWorldPosition(new THREE.Vector3());
+  centerBox(bones.Chest || bones.Torso, 0.48, neck.y - abd.y + 0.16, 0.32, abd.clone().lerp(neck, 0.5).setY((abd.y + neck.y) / 2 - 0.03), 'torso', hit);
+  for (const sd of ['L', 'R']) {
+    boneBox(bones, 'UpperArm' + sd, 'LowerArm' + sd, 0.13, 'limb', hit);
+    boneBox(bones, 'LowerArm' + sd, 'Wrist' + sd, 0.12, 'limb', hit, 0.08);
+    boneBox(bones, 'UpperLeg' + sd, 'LowerLeg' + sd, 0.18, 'limb', hit);
+    boneBox(bones, 'LowerLeg' + sd, 'Foot' + sd, 0.15, 'limb', hit, 0.05);
+  }
+  if (opts.officer) {        // section leaders: red beret
+    const beret = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.07, 0.3), new THREE.MeshStandardMaterial({ color: 0x9a1020, roughness: 0.9 }));
+    beret.rotation.z = 0.2; beret.userData.hot = true;
+    attachToBone(bones.Head, beret, head.clone().add(new THREE.Vector3(-0.02, 0.29, 0.02)), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, 0.2)));
+    mats.push(beret.material); full.push(beret);
+  }
+  // A rifle in the right hand (the model comes without one); its muzzle flash rides on it.
+  const rifle = new THREE.Group();
+  const body = new THREE.Mesh(figureGunGeo.body, figureGunMat); body.position.z = 0.16; rifle.add(body);
+  const mag = new THREE.Mesh(figureGunGeo.mag, figureGunMat); mag.position.set(0, -0.1, 0.2); rifle.add(mag);
+  const stock = new THREE.Mesh(figureGunGeo.stock, figureGunMat); stock.position.set(0, -0.02, -0.22); rifle.add(stock);
+  const optic = new THREE.Mesh(figureGunGeo.optic, figureGunMat); optic.position.set(0, 0.07, 0.12); rifle.add(optic);
+  rifle.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  const flash = new THREE.Mesh(enemyGeo.flash, new THREE.MeshBasicMaterial({ color: 0xffd27a }));
+  flash.position.set(0, 0, 0.5); flash.visible = false; rifle.add(flash);
+  // The rifle rides on the chest: held at a low ready while calm, levelled when he aims.
+  const chest = bones.Chest || bones.Torso;
+  const gunPos = new THREE.Vector3(-0.16, 1.12, 0.3);
+  const idleQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.55, 0.12, 0));   // muzzle down-and-in
+  const aimQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.05, 0, 0));
+  attachToBone(chest, rifle, gunPos.clone().add(new THREE.Vector3(0, 0.12, 0)), aimQ);
+  rifle.userData.aimQ = rifle.quaternion.clone(); rifle.userData.aimP = rifle.position.clone();
+  chest.remove(rifle);
+  attachToBone(chest, rifle, gunPos, idleQ);
+  rifle.userData.idleQ = rifle.quaternion.clone(); rifle.userData.idleP = rifle.position.clone();
+  rifle.userData.aim = 0;
+  full.push(rifle);
+  return { root, mixer, actions, bones, hit, headObj: headObj || new THREE.Object3D(), mats, flash, rifle, current: startClip, farDt: 0, full, proxy, lod: false };
+}
+// Pick the detailed model or the far stand-in for every figure, just before drawing a frame.
+const lodV = new THREE.Vector3();
+function updateFigureLOD() {
+  if (!FIGURES.gltf) return;
+  const k = window.innerHeight / 2 / Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
+  const one = f => {
+    if (!f || !f.proxy) return;
+    const d = f.root.getWorldPosition(lodV).distanceTo(camera.position);
+    const far = 1.8 / Math.max(d, 0.1) * k < SETTINGS.figureProxyPx;
+    if (far !== f.lod) { f.lod = far; for (const m of f.full) m.visible = !far; f.proxy.visible = far; if (!far) { f.mixer.update(f.farDt); f.farDt = 0; } }
+    if (far) f.proxy.rotation.x = f.current === 'Death' ? -Math.PI / 2 : 0;
+  };
+  for (const e of enemies) one(e.fig);
+  for (const t of teammates) one(t.fig);
+}
+// Blend to another animation (only when it changes). 'speed' scales its playback rate.
+function playFigure(fig, name, speed = 1) {
+  if (!fig.actions[name]) return;
+  if (fig.current !== name) {
+    const prev = fig.actions[fig.current], next = fig.actions[name];
+    next.reset(); next.setEffectiveWeight(1); next.play();
+    if (prev) prev.crossFadeTo(next, name === 'Death' ? 0.12 : 0.22, false);
+    fig.current = name;
+  }
+  fig.actions[name].timeScale = speed;
+}
+// Advance the animation. Far-away figures update less often (saves time on the iPad).
+function tickFigure(fig, dt, distance) {
+  fig.farDt += dt;
+  if (fig.lod && fig.farDt < 0.5) return;                    // a 3-box stand-in right now: nothing to animate
+  const every = distance > 400 ? 0.2 : distance > 150 ? 0.1 : distance > 60 ? 0.033 : 0;
+  if (fig.farDt < every) return;
+  fig.mixer.update(fig.farDt); fig.farDt = 0;
+}
+
+// The v0.5 guard: same fields as the blocky one, so all the game code (AI, hits, x-ray, knife) still works.
+function createFigureEnemy(x, z, opts = {}) {
+  const group = new THREE.Group();
+  group.rotation.order = 'YXZ';
+  group.position.set(x, groundAt(x, z) + (opts.baseY || 0), z);
+  const fig = makeFigure('guard', { uniform: opts.uniform, officer: opts.officer });
+  group.add(fig.root);
+  const hitMeshes = fig.hit;
+  const head = hitMeshes.find(m => m.userData.zone === 'head');
+  levelGroup.add(group);
+  const enemy = {
+    group, legL: new THREE.Object3D(), legR: new THREE.Object3D(), head, hat: fig.headObj, flash: fig.flash, hitMeshes, materials: fig.mats, fig,
+    health: SETTINGS.enemyHealth,
+    state: 'idle',
+    yaw: Math.random() * Math.PI * 2, baseYaw: 0, targetYaw: 0, idleTimer: 0,
+    reaction: 0, fireCooldown: 0, hitFlash: 0, flashTimer: 0, staggerTimer: 0,
+    path: [], pathTimer: 0, pathGoal: '', walkTime: Math.random() * 10, deathTime: 0,
+    post: { x, z }, patrol: null, patrolPause: 0, returning: false,
+    detect: 0, suspTimer: 0, searchPoint: null, searchRadius: 0, searchTimer: 0, searchArrived: false, sweepTarget: null,
+    lastKnown: null, lostTimer: 0, blindCooldown: 2,
+    bodyTarget: null, bodyTimer: 0, bodyCheck: Math.random() * 0.25, discovered: false, claimedBy: null, warned: false,
+    label: opts.label || 'Guard', officer: !!opts.officer, static: !!opts.static, coverSeeker: !!opts.cover,
+    baseY: opts.baseY || 0, cover: null, inCover: false, identified: false,
+  };
+  enemy.baseYaw = enemy.targetYaw = enemy.yaw;
+  hitMeshes.forEach(m => (m.userData.enemy = enemy));
+  // stagger the idle animations so the guards don't breathe in sync
+  fig.mixer.update(Math.random() * 1.5);
+  enemies.push(enemy);
+}
+// Which animation should a guard play right now?
+function animateGuard(e, dt, moving, speed) {
+  const f = e.fig;
+  let clip = 'Idle_Gun', rate = 1;
+  if (moving) {
+    if (speed > SETTINGS.patrolSpeed * 1.4) { clip = e.state === 'chase' && f.actions.Run_Shoot ? 'Run_Shoot' : 'Run'; rate = Math.min(1.3, speed / 4.5); }
+    else { clip = 'Walk'; rate = Math.max(0.6, speed / 1.4); }
+  } else if (e.state === 'chase') clip = e.flashTimer > 0 ? 'Gun_Shoot' : 'Idle_Gun_Pointing';
+  else if (e.state === 'suspicious' || e.state === 'search') clip = 'Idle_Gun_Pointing';
+  if (e.staggerTimer > 0 && f.actions.HitRecieve) clip = 'HitRecieve';
+  playFigure(f, clip, rate);
+  aimFigureRifle(f, e.state === 'chase' || e.state === 'suspicious' || e.state === 'search', dt);
+  tickFigure(f, dt, e.group.position.distanceTo(camera.position));
+}
+function aimFigureRifle(f, aimed, dt) {
+  const u = f.rifle.userData, t = THREE.MathUtils.clamp(u.aim + (aimed ? dt : -dt) * 4, 0, 1);
+  if (t === u.aim && (t === 0 || t === 1) && u.set) return;
+  u.aim = t; u.set = true;
+  f.rifle.quaternion.slerpQuaternions(u.idleQ, u.aimQ, t);
+  f.rifle.position.lerpVectors(u.idleP, u.aimP, t);
+}
 // ---- Quips: pick which narrator line (if any) to say after a kill ----
 let lastQuipTime = -99;
 const recentKillTimes = [];
@@ -1922,6 +2465,7 @@ function quipForKill(poppedHead) {
 
 // opts.knife = true: silent knife takedown (quiet, its own quips).
 function killEnemy(e, poppedHead = false, opts = {}) {
+  if (typeof noteProgress === 'function') noteProgress();
   e.state = 'dead'; e.deathTime = 0; e.flash.visible = false; e.bodyTarget = null;
   player.kills++;
   // Kill feed, e.g. "Section leader, headshot, 1,243 m"
@@ -1991,6 +2535,15 @@ function blindFire(e) {
 function updateEnemy(e, dt) {
   const pos = e.group.position;
   // --- Dead: fall over backwards, then stay on the floor ---
+  if (e.state === 'dead' && e.fig) {            // v0.5 figure: play the death animation, then lie still
+    e.deathTime += dt;
+    if (e.fig.current !== 'Death') playFigure(e.fig, 'Death', 1.2);
+    if (e.deathTime < 2) e.fig.mixer.update(dt);
+    e.group.rotation.z = 0;
+    pos.y = groundAt(pos.x, pos.z) + e.baseY;
+    e.materials.forEach(m => m.emissive && m.emissive.setRGB(0, 0, 0));
+    return;
+  }
   if (e.state === 'dead') {
     e.deathTime += dt;
     const fall = Math.min(e.deathTime * 3, 1);
@@ -2002,7 +2555,7 @@ function updateEnemy(e, dt) {
   }
   // --- Red flash when hit ---
   e.hitFlash -= dt;
-  e.materials.forEach(m => m.emissive.setRGB(e.hitFlash > 0 ? 0.8 : 0, 0, 0));
+  e.materials.forEach(m => m.emissive && m.emissive.setRGB(e.hitFlash > 0 ? 0.8 : 0, 0, 0));
   e.flashTimer -= dt; e.flash.visible = e.flashTimer > 0;
 
   const px = camera.position.x, pz = camera.position.z;
@@ -2116,6 +2669,7 @@ function updateEnemy(e, dt) {
   e.legL.rotation.x = swing; e.legR.rotation.x = -swing;
   e.group.rotation.y = e.yaw;
   pos.y = groundAt(pos.x, pos.z) + e.baseY;                // stand on the ground (or the tower)
+  if (e.fig) animateGuard(e, dt, moveLen > 0.01, speed);
 }
 
 // #####################################################################
@@ -2470,6 +3024,7 @@ function friendlyMarker(name) {
   return sp;
 }
 function createTeammate(x, z, name, opts = {}) {
+  if (figuresReady()) { try { return createFigureTeammate(x, z, name, opts); } catch (err) { noteError('figures', err); } }
   const group = new THREE.Group(); group.position.set(x, 0, z);
   const camo = new THREE.MeshStandardMaterial({ color: 0xb4a074, roughness: 0.9 });   // tan Multicam
   const gear = new THREE.MeshStandardMaterial({ color: 0x8a7148, roughness: 0.8 });   // coyote brown plate carrier
@@ -2498,6 +3053,23 @@ function createTeammate(x, z, name, opts = {}) {
   teammates.push(mate);
   return mate;
 }
+function createFigureTeammate(x, z, name, opts = {}) {
+  const group = new THREE.Group(); group.position.set(x, 0, z); group.rotation.order = 'YXZ';
+  const fig = makeFigure('seal');
+  group.add(fig.root);
+  const strobe = makeStrobe(fig.bones.Head, 0, 0, 0);       // IR strobe on top of the helmet
+  strobe.position.set(0, 0, 0); attachToBone(fig.bones.Head, strobe, fig.bones.Head.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.3, -0.06)), new THREE.Quaternion());
+  const marker = friendlyMarker(name); marker.position.y = 2.25; group.add(marker);
+  if (opts.noMarker) marker.visible = false;
+  const meshes = fig.hit;
+  const mate = { group, name, legL: new THREE.Object3D(), legR: new THREE.Object3D(), strobe, marker, meshes, fig, laser: makeIRLaser(levelGroup), yaw: 0, path: [], pathTimer: 0, pathGoal: '',
+    walkTime: 0, blinkOffset: Math.random(), flinch: 0 };
+  meshes.forEach(m => (m.userData.teammate = mate));
+  fig.mixer.update(Math.random());
+  levelGroup.add(group);
+  teammates.push(mate);
+  return mate;
+}
 // You shot (or slashed at) one of your own: no damage, but a loud reminder.
 let lastFriendlyWarn = -1e9;
 function friendlyHit(mate, how = 'shot') {
@@ -2514,7 +3086,8 @@ function updateTeammates(dt) {
   teammates.forEach((m, i) => {
     const pos = m.group.position;
     if (m.static) {                                        // Mission 2 spotter: lies prone beside you
-      pos.y = groundAt(pos.x, pos.z) + 0.2; m.group.rotation.y = 0; m.group.rotation.x = Math.PI / 2;   // head towards the compound, face down
+      pos.y = groundAt(pos.x, pos.z) + (m.fig ? 0.12 : 0.2); m.group.rotation.y = 0; m.group.rotation.x = Math.PI / 2;   // head towards the compound, face down
+      if (m.fig) { playFigure(m.fig, m.fig.actions.Idle_Neutral ? 'Idle_Neutral' : 'Idle', 0.5); tickFigure(m.fig, dt, 0); }
       m.strobe.visible = nvOn && ((masking.time + m.blinkOffset) % 1) < 0.08;
       setLaser(m.laser, null, null, false);
       return;
@@ -2550,6 +3123,7 @@ function updateTeammates(dt) {
     }
     const swing = Math.hypot(move.x, move.z) > 0.01 ? Math.sin(m.walkTime) * 0.6 : 0;
     m.legL.rotation.x = swing; m.legR.rotation.x = -swing;
+    if (m.fig) { const mv = Math.hypot(move.x, move.z) > 0.01; playFigure(m.fig, mv ? (speed > 4.6 ? 'Run' : 'Walk') : 'Idle_Gun', mv ? (speed > 4.6 ? 1 : 1.3) : 1); tickFigure(m.fig, dt, d); }
     m.group.rotation.y = m.yaw;
     m.flinch = Math.max(0, (m.flinch || 0) - dt);
     m.group.rotation.x = m.static ? m.group.rotation.x : -m.flinch * 0.5;      // ducks when you shoot near him
@@ -2683,7 +3257,7 @@ function renderThermalMask() {
   const swapped = [], hidden = [];
   scene.traverse(o => {
     if (!o.visible) return;
-    if (o.isLine || o.isPoints) { hidden.push(o); return; }
+    if (o.isLine || o.isPoints || o.userData.hitbox) { hidden.push(o); return; }
     if (!o.isMesh) return;
     const transparent = !Array.isArray(o.material) && o.material.transparent;
     if (transparent && !o.userData.hot) { hidden.push(o); return; }
@@ -2742,6 +3316,13 @@ function createExit(x, z) {
 }
 
 function createPickup(x, z, type) {
+  if (type === 'pistol2') {                    // v0.5: the spare M1911 in the armory
+    const mesh = new THREE.Group(); mesh.position.set(x, 0.9, z);
+    const gun = buildGunModel(WEAPONS[0]); gun.visible = true; gun.scale.setScalar(1.8); gun.rotation.y = Math.PI / 2; mesh.add(gun);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.45, 0.6, 28), new THREE.MeshBasicMaterial({ color: 0xffd060, transparent: true, opacity: 0.6, side: THREE.DoubleSide }));
+    ring.rotation.x = -Math.PI / 2; ring.position.y = -0.88; mesh.add(ring);
+    levelGroup.add(mesh); pickups.push({ mesh, type, taken: false }); return;
+  }
   const mesh = type === 'health'
     ? new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.3, 0.45), new THREE.MeshStandardMaterial({ map: healthTexture }))
     : new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.22, 0.28), new THREE.MeshStandardMaterial({ color: 0x4a5a2a, emissive: 0x111800 }));
@@ -2763,13 +3344,15 @@ function updateObjectives(dt, time) {
       SOUNDS.pickup();
       if (intelItems.every(i => i.collected)) showMessage('ALL INTEL SECURED — get to the extraction elevator!', 4);
       else showMessage('Intel acquired: ' + item.name, 2.5);
+      noteProgress();
     }
   }
   for (const p of pickups) {
     if (p.taken) continue;
     p.mesh.rotation.y += dt * 2;
     if (Math.hypot(p.mesh.position.x - px, p.mesh.position.z - pz) > 1.1) continue;
-    if (p.type === 'health') {
+    if (p.type === 'pistol2') pickUpSecondPistol();
+    else if (p.type === 'health') {
       if (player.health >= SETTINGS.playerMaxHealth) continue;     // save it for later
       player.health = Math.min(SETTINGS.playerMaxHealth, player.health + SETTINGS.healthPackAmount);
       showMessage('+ Health', 1.2);
@@ -2855,8 +3438,11 @@ function updateHUD(dt) {
   hud.healthText.textContent = Math.ceil(player.health);
   hud.healthFill.style.width = (player.health / SETTINGS.playerMaxHealth * 100) + '%';
   hud.ammoText.textContent = reloadTimer > 0 ? 'RELOADING' : `${s.ammo} / ${s.reserve}`;
-  hud.weaponName.textContent = `[${currentWeapon + 1}] ${displayName(w)} — ${w.caliber}`;
+  const akimbo = dualActive();
+  hud.weaponName.textContent = akimbo ? `[1] DUAL ${displayName(w)} ×2 — ${w.caliber}` : `[${currentWeapon + 1}] ${displayName(w)} — ${w.caliber}`;
   let extra = w.canSuppress ? `SUPPRESSOR: ${w.suppressed ? 'ON' : 'OFF'} [T]` : 'No suppressor';
+  if (akimbo) extra += ' · AKIMBO [X]'; else if (currentWeapon === 0 && dual.owned) extra += ' · X = dual';
+  $('tDual').style.display = dual.owned ? 'flex' : 'none';
   if (w.zoomLevels.length > 1) extra += ` · ZOOM ${zoomStep}/${w.zoomLevels.length}`;
   if (w.penetration) extra += ' · PENETRATES';
   if (boltTimer > 0) extra += ' · BOLT';
@@ -3047,6 +3633,7 @@ function touchButton(id, onDown, onUp) {
 }
 touchButton('tFire', () => { touch.fire = true; queueShot(); }, () => { touch.fire = false; triggerReleased = true; });
 touchButton('tAim', () => {                       // tap to toggle aim (2-step scopes cycle)
+  if (dualActive()) { dual.force = -1; queueShot(); return; }
   const levels = WEAPONS[currentWeapon].zoomLevels.length;
   setZoom((zoomStep + 1) % (levels + 1));
 });
@@ -3058,6 +3645,8 @@ touchButton('tPause', () => pauseGame('Paused'));
 touchButton('tStance', () => setStance({ stand: 'crouch', crouch: 'prone', prone: 'stand' }[player.stance]));
 touchButton('tNV', () => cycleNightVision());
 touchButton('tIR', () => toggleIR());
+touchButton('tMap', () => openMap());
+touchButton('tDual', () => toggleDual());
 touchButton('tRange', () => laseRange());
 touchButton('tElevUp', () => dialElevation(1));
 touchButton('tElevDn', () => dialElevation(-1));
@@ -4368,13 +4957,14 @@ const CONTROLS = [
     ['Push cursor to an edge', 'keep turning (iPad: Safari can\'t capture the trackpad)'],
     ['2-finger swipe', 'look / turn — unlimited 360° (when the trackpad isn\'t captured)'],
     ['Click (1 finger)', 'fire'],
-    ['2-finger click', 'aim / scope (snipers: again = 2nd zoom, again = off)'],
+    ['2-finger click', 'aim / scope (snipers: again = 2nd zoom, again = off) · dual pistols: fire LEFT gun'],
+    ['Click with dual pistols', 'fire — the two guns take turns (no aiming, wider spread, 14-round shared ammo)'],
     ['2-finger scroll', 'captured trackpad / mouse wheel: switch weapon · scoped sniper: elevation'],
   ]],
   ['Keyboard', [
     ['W A S D', 'move'],
     ['Shift', 'sprint · while scoped: hold breath'],
-    ['Q', 'aim / scope (same as 2-finger click)'],
+    ['Q', 'aim / scope (same as 2-finger click) · dual pistols: fire the LEFT gun'],
     ['V', 'knife (from behind = silent takedown)'],
     ['R', 'reload'],
     ['1 – 8', 'pick weapon'],
@@ -4385,6 +4975,8 @@ const CONTROLS = [
     ['N', 'night vision (off / white / + thermal)'],
     ['L', 'IR laser + illuminator'],
     ['F', 'laser rangefinder'],
+    ['M', 'map of where you\'ve been (game pauses · M again or click to close)'],
+    ['X', 'dual M1911s on / off (once you find the second one in the ARMORY)'],
     ['← →  or  J K', 'turn (hold to speed up)'],
     ['↑ ↓', 'look up / down · sniper rifles: scope elevation'],
     ['[ ]', 'scope elevation (sniper rifles)'],
@@ -4395,6 +4987,7 @@ const CONTROLS = [
   ['Touch screen', [
     ['Left thumb', 'move'],
     ['Right thumb', 'look (drag, lift, drag again for a full 360°) · buttons for everything else'],
+    ['MAP / DUAL buttons', 'open the map · two pistols on / off (AIM fires the left gun while dual)'],
   ]],
 ];
 function renderControls() {
@@ -4413,6 +5006,212 @@ function setLookSensitivity(v) {
 }
 document.querySelectorAll('.sensSlider').forEach(s => s.addEventListener('input', () => setLookSensitivity(s.value)));
 { let saved = null; try { saved = localStorage.getItem('valkyrieLookSens'); } catch (err) { /* ignore */ } setLookSensitivity(saved || 1.3); }
+
+
+// #####################################################################
+// ##  SECTION 12c: NAVIGATION (v0.5) — compass, map (M), radio hints ##
+// #####################################################################
+SETTINGS.hintAfter = 120;      // seconds with no intel and no kills before a teammate radios a hint
+SETTINGS.hintCooldown = 75;    // seconds between hints
+BASE_SETTINGS.hintAfter = 120; BASE_SETTINGS.hintCooldown = 75;
+const COMPASS_WORDS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
+function bearingTo(x, z) { return Math.atan2(x - camera.position.x, -(z - camera.position.z)); }   // 0 = north (towards row 0), clockwise
+function headingNow() { return -new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ').y; }
+function cellOf(x, z) { return [Math.floor(x / CELL), Math.floor(z / CELL)]; }
+// Grid distances from the player's square (recomputed only when you step into a new square).
+function playerDistances() {
+  if (!navInfo) return null;
+  const [c, r] = cellOf(camera.position.x, camera.position.z), k = r * worldCols + c;
+  if (navInfo.distFrom !== k) { navInfo.distField = gridDistances(c, r); navInfo.distFrom = k; }
+  return navInfo.distField;
+}
+// The thing the compass points at.
+function currentObjective() {
+  if (currentMission === 1) {
+    const left = intelItems.filter(i => !i.collected);
+    if (left.length) {
+      const d = playerDistances();
+      let best = null, bd = Infinity;
+      for (const i of left) { const [c, r] = cellOf(i.group.position.x, i.group.position.z); const k = d ? d[r * worldCols + c] : -1; const v = k >= 0 ? k : 999 + dist2D(i.group.position.x, i.group.position.z, camera.position.x, camera.position.z); if (v < bd) { bd = v; best = i; } }
+      return { x: best.group.position.x, z: best.group.position.z, label: 'INTEL' };
+    }
+    return exitZone ? { x: exitZone.x, z: exitZone.z, label: 'ELEVATOR' } : null;
+  }
+  if (currentMission === 2) {
+    const near = list => list.reduce((b, o) => (!b || o.d < b.d ? o : b), null);
+    const leaders = enemies.filter(e => e.officer && e.state !== 'dead').map(e => ({ x: e.group.position.x, z: e.group.position.z, d: dist2D(e.group.position.x, e.group.position.z, camera.position.x, camera.position.z) }));
+    if (leaders.length) return { ...near(leaders), label: 'SECTION LEADER' };
+    const convoy = materiel.filter(m => m.convoy && !m.destroyed).map(m => ({ x: m.x, z: m.z, d: dist2D(m.x, m.z, camera.position.x, camera.position.z) }));
+    if (convoy.length) return { ...near(convoy), label: 'CONVOY' };
+    const dish = materiel.find(m => m.type === 'dish' && !m.destroyed);
+    if (dish) return { x: dish.x, z: dish.z, label: 'COMMS DISH' };
+    return exitZone ? { x: exitZone.x, z: exitZone.z, label: 'LZ' } : null;
+  }
+  return null;
+}
+const compassCtx = document.getElementById('compass').getContext('2d');
+let compassAt = 0;
+function drawCompass() {
+  const now = performance.now(); if (now - compassAt < 80) return; compassAt = now;
+  const g = compassCtx, W = 460, H = 40, span = Math.PI * 0.85, head = headingNow();
+  g.clearRect(0, 0, W, H);
+  g.fillStyle = 'rgba(0,14,0,0.55)'; g.fillRect(0, 0, W, 24); g.strokeStyle = 'rgba(120,255,120,0.4)'; g.strokeRect(0.5, 0.5, W - 1, 23);
+  const xOf = a => { let d = a - head; d = Math.atan2(Math.sin(d), Math.cos(d)); return W / 2 + d / span * W; };
+  g.textAlign = 'center'; g.font = 'bold 12px "Courier New", monospace';
+  for (let i = 0; i < 24; i++) {
+    const a = i * Math.PI / 12, x = xOf(a); if (x < 4 || x > W - 4) continue;
+    const major = i % 3 === 0;
+    g.strokeStyle = 'rgba(160,255,160,' + (major ? 0.9 : 0.4) + ')'; g.beginPath(); g.moveTo(x, major ? 2 : 14); g.lineTo(x, major ? 8 : 20); g.stroke();
+    if (major) { g.fillStyle = i === 0 ? '#ff7a7a' : '#cfc'; g.fillText(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][i / 3], x, 20); }
+  }
+  g.fillStyle = '#fff'; g.fillRect(W / 2 - 1, 0, 2, 6);
+  const o = currentObjective();
+  if (o) {
+    let x = xOf(bearingTo(o.x, o.z)); const off = x < 10 ? -1 : x > W - 10 ? 1 : 0; x = THREE.MathUtils.clamp(x, 10, W - 10);
+    g.fillStyle = '#ffd23a'; g.beginPath(); g.moveTo(x, 4); g.lineTo(x + 6, 12); g.lineTo(x, 20); g.lineTo(x - 6, 12); g.closePath(); g.fill();
+    const dist = Math.round(dist2D(o.x, o.z, camera.position.x, camera.position.z));
+    const text = (off < 0 ? '◀ ' : '') + o.label + ' ' + dist.toLocaleString('en-US') + ' m' + (off > 0 ? ' ▶' : '');
+    g.font = 'bold 12px "Courier New", monospace'; const tw = g.measureText(text).width + 10;
+    const tx = THREE.MathUtils.clamp(x, tw / 2, W - tw / 2);
+    g.fillStyle = 'rgba(0,0,0,0.6)'; g.fillRect(tx - tw / 2, 25, tw, 15); g.fillStyle = '#ffd23a'; g.fillText(text, tx, 37);
+  }
+}
+// Remember where you've been (for the map), and what you've seen.
+function updateNavigation(dt) {
+  if (currentMission !== 1 || !navInfo) return;
+  const [c, r] = cellOf(camera.position.x, camera.position.z);
+  for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+    const cc = c + dc, rr = r + dr; if (cc < 0 || rr < 0 || cc >= worldCols || rr >= worldRows) continue;
+    navInfo.visited[rr * worldCols + cc] = 1;
+  }
+  navInfo.zonesSeen.add(zoneAt(c, r).id);
+  if (!navInfo.exitSeen && exitZone && dist2D(exitZone.x, exitZone.z, camera.position.x, camera.position.z) < 16 && hasLineOfSight(camera.position.x, camera.position.z, exitZone.x, exitZone.z)) {
+    navInfo.exitSeen = true; showMessage('Extraction elevator spotted — it\'s on your map (M).', 2.5);
+  }
+  if (exitZone && exitZone.gateArm) exitZone.gateArm.rotation.z += ((exitZone.unlocked ? 1.4 : 0) - exitZone.gateArm.rotation.z) * Math.min(1, dt * 2);
+  if (exitZone && exitZone.doorLamp) exitZone.doorLamp.material.color.set(exitZone.unlocked ? 0x30ff60 : 0xff3030);
+  // No progress for a while? A teammate radios a hint.
+  if (elapsed - navInfo.lastProgress > SETTINGS.hintAfter && elapsed - navInfo.lastHint > SETTINGS.hintCooldown) giveHint();
+}
+function noteProgress() { if (navInfo) navInfo.lastProgress = elapsed; }
+function radioSay(caller, text, seconds = 6) {
+  hud.spotter.textContent = caller + ': ' + text; hud.spotter.style.opacity = 1; hud.spotterTimer = seconds;
+  lastSpotterTime = performance.now() / 1000; SOUNDS.radio();
+}
+function giveHint() {
+  navInfo.lastHint = elapsed;
+  const o = currentObjective(); if (!o) return;
+  const [sc, sr] = cellOf(camera.position.x, camera.position.z), [tc, tr] = cellOf(o.x, o.z);
+  const path = findPath(sc, sr, tc, tr);
+  const step = path[Math.min(2, path.length - 1)] || [tc, tr];
+  const a = Math.atan2(step[0] * CELL + CELL / 2 - camera.position.x, -(step[1] * CELL + CELL / 2 - camera.position.z));
+  const word = COMPASS_WORDS[((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8];
+  const zone = zoneAt(tc, tr), caller = navInfo.hintCount++ % 2 ? 'DOC' : 'HAWK';
+  const what = o.label === 'ELEVATOR' ? 'The elevator' : 'The next intel file';
+  radioSay(caller, `Wraith, head ${word} from here. ${what} is in the ${zone.name}, about ${Math.round(path.length * CELL)} m of corridor away. Follow the yellow ◆ on your compass${o.label === 'ELEVATOR' ? ' and the yellow floor arrows' : ''}.`, 8);
+}
+// ---- The map screen (M / MAP button). The game is frozen while it's open. ----
+let mapOpenedAt = 0;
+function openMap() {
+  if (state !== 'playing') return;
+  if (currentMission !== 1 || !navInfo) { showMessage('No floor plan for an outdoor op — follow the yellow ◆ on the compass.', 2.5); return; }
+  releaseInputs(); state = 'map'; mapOpenedAt = performance.now();
+  $('mapScreen').style.display = 'flex'; drawMap();
+}
+function closeMap() {
+  if (state !== 'map') return;
+  $('mapScreen').style.display = 'none'; state = 'playing'; clock.getDelta();
+}
+function drawMap() {
+  const cv = $('mapCanvas'), rows = worldRows, cols = worldCols;
+  const px = Math.floor(Math.min(window.innerWidth * 0.9 / cols, window.innerHeight * 0.75 / rows));
+  cv.width = cols * px; cv.height = rows * px;
+  const g = cv.getContext('2d'), V = navInfo.visited;
+  g.fillStyle = '#020802'; g.fillRect(0, 0, cv.width, cv.height);
+  const seen = (c, r) => c >= 0 && r >= 0 && c < cols && r < rows && V[r * cols + c];
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    if (!seen(c, r)) continue;
+    if (isWall(c, r)) { g.fillStyle = '#26402a'; g.fillRect(c * px, r * px, px, px); continue; }
+    g.fillStyle = '#2f6a36'; g.fillRect(c * px, r * px, px, px);
+    g.fillStyle = zoneAt(c, r).color; g.globalAlpha = 0.35; g.fillRect(c * px + 1, r * px + 1, px - 2, px - 2); g.globalAlpha = 1;
+  }
+  // zone names (once you've been in that zone)
+  g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `bold ${Math.max(9, px * 0.32)}px "Courier New", monospace`;
+  for (const z of M1_ZONES) {
+    if (!navInfo.zonesSeen.has(z.id)) continue;
+    let sx = 0, sy = 0, n = 0;
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) if (!isWall(c, r) && zoneAt(c, r) === z && seen(c, r)) { sx += c; sy += r; n++; }
+    if (n) { g.fillStyle = z.color; g.fillText(z.name, (sx / n + 0.5) * px, (sy / n + 0.5) * px); }
+  }
+  // intel you found, and seen-but-not-taken
+  for (const i of intelItems) {
+    const [c, r] = cellOf(i.group.position.x, i.group.position.z);
+    if (i.collected) { g.fillStyle = '#6f6'; g.fillText('☑', (c + 0.5) * px, (r + 0.5) * px); }
+    else if (seen(c, r)) { g.fillStyle = '#ffd23a'; g.fillText('?', (c + 0.5) * px, (r + 0.5) * px); }
+  }
+  if (exitZone && navInfo.exitSeen) {
+    const [c, r] = cellOf(exitZone.x, exitZone.z);
+    g.fillStyle = exitZone.unlocked ? '#3f6' : '#f44'; g.fillRect(c * px + px * 0.2, r * px + px * 0.2, px * 0.6, px * 0.6);
+    g.fillStyle = '#fff'; g.font = `bold ${Math.max(8, px * 0.22)}px monospace`; g.fillText('ELEV', (c + 0.5) * px, (r + 0.5) * px);
+  }
+  // you: an arrow pointing where you look
+  const h = headingNow(), x = camera.position.x / CELL * px, y = camera.position.z / CELL * px, L = px * 0.42;
+  g.save(); g.translate(x, y); g.rotate(h); g.fillStyle = '#ffe23a';
+  g.beginPath(); g.moveTo(0, -L); g.lineTo(L * 0.6, L * 0.6); g.lineTo(0, L * 0.25); g.lineTo(-L * 0.6, L * 0.6); g.closePath(); g.fill(); g.restore();
+  $('mapTitle').textContent = 'FACILITY MAP — ' + (zoneAt(...cellOf(camera.position.x, camera.position.z)).name) + '   ·   ' + intelItems.filter(i => i.collected).length + '/' + intelItems.length + ' intel';
+}
+$('mapScreen').addEventListener('click', () => { if (performance.now() - mapOpenedAt > 250) closeMap(); });
+$('mapScreen').addEventListener('touchend', e => { e.preventDefault(); if (performance.now() - mapOpenedAt > 250) closeMap(); }, { passive: false });
+
+// #####################################################################
+// ##  SECTION 8c: DUAL M1911s (v0.5) — "akimbo", GoldenEye style     ##
+// ##  A second Colt is hidden in the ARMORY ('D' on the map).        ##
+// ##  Click = fire (the guns take turns) · Q / 2-finger click = fire ##
+// ##  the left gun · X = back to one pistol (and again for two).     ##
+// ##  No aiming down the sights, wider spread, one shared ammo pool. ##
+// #####################################################################
+const dual = { owned: false, on: false, side: 1, force: 0, recoil: { '1': 0, '-1': 0 }, flash: { '1': 0, '-1': 0 } };
+SETTINGS.dualSpreadMult = 3; SETTINGS.dualReloadMult = 1.4;
+function dualActive() { return dual.owned && dual.on && currentWeapon === 0; }
+function magSizeOf(i) { return i === 0 && dual.owned && dual.on ? WEAPONS[0].magSize * 2 : WEAPONS[i].magSize; }
+const dualRoot = new THREE.Group(); weaponScene.add(dualRoot); dualRoot.visible = false;
+const dualGuns = { '1': buildGunModel(WEAPONS[0]), '-1': buildGunModel(WEAPONS[0]) };
+for (const k of ['1', '-1']) { dualGuns[k].visible = true; dualRoot.add(dualGuns[k]); }
+function syncDualSuppressors() {
+  for (const k of ['1', '-1']) { const d = dualGuns[k].userData, on = WEAPONS[0].suppressed;
+    d.suppressor.visible = on; d.flash.position.set(0, d.muzzleY, d.muzzleZ - (on ? d.supLen + 0.02 : 0.03)); d.flash.scale.setScalar(on ? 0.35 : 1); }
+}
+function toggleDual() {
+  if (!dual.owned) { showMessage('Only one pistol. Word is there\'s a spare .45 somewhere in the ARMORY.', 2.5); return; }
+  dual.on = !dual.on;
+  if (currentWeapon !== 0) switchWeapon(0);
+  const s = weaponState[0];
+  if (!dual.on && s.ammo > WEAPONS[0].magSize) { s.reserve += s.ammo - WEAPONS[0].magSize; s.ammo = WEAPONS[0].magSize; }
+  setZoom(0); reloadTimer = 0; switchTimer = 0.3;
+  showMessage(dual.on ? 'DUAL M1911s — click fires (they take turns) · Q / 2-finger click = left gun · X = one gun' : 'Single M1911 — aim (Q / 2-finger click) is back · X = dual', 2.2);
+}
+function pickUpSecondPistol() {
+  dual.owned = true; dual.on = true;
+  if (currentWeapon !== 0) switchWeapon(0);
+  weaponState[0].ammo += WEAPONS[0].magSize; weaponState[0].reserve += WEAPONS[0].magSize;   // it comes loaded, plus a spare mag
+  syncDualSuppressors();
+  showMessage('AKIMBO! Second Colt M1911. Click = fire (alternating) · Q / 2-finger click = left gun · X = single / dual', 4);
+  showQuip(['Two .45s. Because one is merely a suggestion.', 'Fourteen rounds of diplomacy, sir.', 'Mr. Bond would approve. HR would not.'][Math.floor(Math.random() * 3)]);
+}
+function updateDualModels(dt, aimY) {
+  const on = dualActive();
+  if (currentWeapon === 0) weaponModels[0].visible = !on;
+  dualRoot.visible = on && weaponRoot.visible;
+  if (!on) return;
+  for (const k of ['1', '-1']) {
+    const side = +k, g = dualGuns[k];
+    dual.recoil[k] = Math.max(0, dual.recoil[k] - dt * 8); dual.flash[k] -= dt;
+    const reloadDip = reloadTimer > 0 ? Math.sin((1 - reloadTimer / (WEAPONS[0].reloadTime * SETTINGS.dualReloadMult)) * Math.PI) : 0;
+    g.position.set(0.22 * side, aimY + 0.04 - reloadDip * 0.1, -0.5 + dual.recoil[k] * 0.07);
+    g.rotation.set(dual.recoil[k] * 0.16 + reloadDip * 0.6, -0.05 * side, 0);
+    g.userData.flash.visible = dual.flash[k] > 0; g.userData.flash.rotation.z = Math.random() * Math.PI;
+  }
+}
 
 // #####################################################################
 // ##  SECTION 13: GAME STATE (start, pause, win, lose, restart)      ##
@@ -4628,8 +5427,10 @@ function gameLoop() {
     safe('spotter', () => updateSpotter(dt));
     safe('objectives', () => updateObjectives(dt, elapsed));
     safe('hud', () => updateHUD(dt));
+    safe('nav', () => updateNavigation(dt));
+    safe('compass', () => drawCompass());
   }
-  if (killcam.active) { safe('render', () => { renderer.clear(); renderer.render(scene, camera); }); return; }
+  if (killcam.active) { safe('render', () => { updateFigureLOD(); renderer.clear(); renderer.render(scene, camera); }); return; }
   safe('materiel', () => updateMateriel(dt));
   safe('effects', () => updateEffects(dt));
   safe('touch', () => updateTouchLayer());
@@ -4640,6 +5441,7 @@ function gameLoop() {
   // Draw the world, then the gun on top (through the night-vision filter if it's on).
   safe('render', () => {
     camera.updateMatrixWorld(); drawnAt.setFromMatrixPosition(camera.matrixWorld);   // where the picture is drawn from (DEBUG)
+    updateFigureLOD();                                                            // v0.5: far figures -> 3-box stand-ins
     if (nvMode > 0) { renderNightVision(elapsed); return; }
     renderer.clear();
     renderer.render(scene, camera);
@@ -4699,6 +5501,7 @@ function underCrosshair() {
   return (live ? (e.state === 'dead' ? 'dead guard ' : 'guard (' + e.state + ') ') : 'GHOST guard (not in game!) ') + h.distance.toFixed(1) + ' m';
 }
 
+loadFigures();
 // Build the level once so it shows behind the briefing screen, then start the loop.
 applyMission(chosenMission);
 buildLevel(); resetPlayer(); resetWeapons(); resetMasking(); if (chosenMission === 2) missionStartPose();
@@ -4708,7 +5511,7 @@ if (!debugInfo.on) document.getElementById('debugHud').style.display = 'none';
 // Handy for testing in the browser console (F12), e.g.  __game.SETTINGS.enemyDamage = 0
 window.__game = {
   SETTINGS, CALIBERS, WEAPONS, player, camera, startMission, switchWeapon,
-  enemies: () => enemies, state: () => state, debugInfo, VERSION, aimOffset: () => aimOffset, lastShotInfo: () => lastShotInfo,
+  enemies: () => enemies, state: () => state, weaponState: () => weaponState, renderFrame: () => { updateFigureLOD(); renderer.render(scene, camera); }, figureLOD: () => enemies.filter(e => e.fig && e.fig.lod).length, glFinish: () => renderer.getContext().finish(), debugInfo, VERSION, aimOffset: () => aimOffset, lastShotInfo: () => lastShotInfo,
   // Debug: what would a ray from the screen centre hit right now? (nearest first)
   rayHits: () => {
     raycaster.setFromCamera(new THREE.Vector2(0, 0), camera); raycaster.far = 2000;
@@ -4722,7 +5525,7 @@ window.__game = {
   lastProjectile: () => lastProjectile && { start: lastProjectile.start.toArray().map(v => +v.toFixed(2)), pos: lastProjectile.pos.toArray().map(v => +v.toFixed(2)), done: lastProjectile.done, t: +lastProjectile.t.toFixed(3), hits: lastProjectile.hitSet.size, dir0: lastProjectile.path[1] ? lastProjectile.path[1].clone().sub(lastProjectile.path[0]).normalize().toArray().map(v => +v.toFixed(4)) : null },
   shoot: () => { triggerReleased = true; fireCooldown = 0; switchTimer = 0; reloadTimer = 0; tryShoot(); },
   shootEnemy: (i, zone, dist) => shootEnemy(enemies[i], WEAPONS[currentWeapon], zone, dist, enemies[i].group.position.clone().setY(1.5)),
-  toggleSuppressor, damagePlayer, touch, pauseGame, keys, edgeTurn, setLookSensitivity, lastMouse: () => lastMouseXY, setLastMouse: v => (lastMouseXY = v), aimKind: () => aimKind, startCalls: () => ({ startCalls, startBlocked, loopCount }), underCrosshair,
+  toggleSuppressor, damagePlayer, touch, pauseGame, dual, toggleDual, dualActive, openMap, closeMap, navInfo: () => navInfo, currentObjective, giveHint, zoneAt, pickups: () => pickups, intel: () => intelItems, FIGURES, figuresReady, keys, edgeTurn, setLookSensitivity, lastMouse: () => lastMouseXY, setLastMouse: v => (lastMouseXY = v), aimKind: () => aimKind, startCalls: () => ({ startCalls, startBlocked, loopCount }), underCrosshair,
   setStance, cycleNightVision, toggleIR, masking, teammates: () => teammates, generatorBackfire, sabotageGenerator,
   // Mission 2 / sniper test hooks
   selectMission: m => chooseMission(m, false),
