@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>OPERATION: BLACK FILE — v0.4.5</title>
+<title>OPERATION: BLACK FILE — v0.4.6</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <!--
   =====================================================================
-  OPERATION: BLACK FILE  (v0.4.5 — free 360° turning on iPad, retuned damage, friendly markers on your squad, sniper mission, knife, Magic Keyboard controls, iPad aim/layout fix + DEBUG readout)
+  OPERATION: BLACK FILE  (v0.4.6 — mission select fix for iPad, free 360° turning on iPad, retuned damage, friendly markers on your squad, sniper mission, knife, Magic Keyboard controls, iPad aim/layout fix + DEBUG readout)
   A tiny browser first-person shooter.
   - Mission structure & spy flavour inspired by GoldenEye 007 (N64)
   - Fast, aggressive maze shooting inspired by Wolfenstein 3D
@@ -126,7 +126,9 @@
   /* mission select on the start screen */
   .missions { display: flex; gap: 10px; margin: 10px 0 12px; }
   .missions label { flex: 1; border: 1px solid #4a4; padding: 8px 10px; cursor: pointer; font-size: 13px; }
-  .missions label.sel { background: rgba(80,255,80,0.15); border-color: #8f8; }
+  .missions label.sel { background: rgba(80,255,80,0.22); border: 2px solid #9f9; box-shadow: 0 0 12px rgba(120,255,120,0.55); }
+  .missions label.sel b::after { content: '  ✔ SELECTED'; color: #cfc; }
+  .missions label { touch-action: manipulation; -webkit-user-select: none; user-select: none; }
   .missions input { margin-right: 6px; }
   .missions b { color: #9f9; }
   .dossier { max-height: 94vh; overflow-y: auto; }
@@ -306,7 +308,7 @@ import { Water } from 'three/addons/objects/Water.js';
 // ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
 // ##  part failed and why.                                           ##
 // #####################################################################
-const VERSION = 'v0.4.5';
+const VERSION = 'v0.4.6';
 // v0.4.4: the game must only ever start ONCE per page (one canvas, one camera, one loop).
 // If this script somehow ran a second time, stop the second copy right here.
 window.__valkyrieBoots = (window.__valkyrieBoots || 0) + 1;
@@ -4471,7 +4473,22 @@ function applyMission(m) {
   $('m1Card').classList.toggle('sel', m === 1); $('m2Card').classList.toggle('sel', m === 2);
   $('briefText').innerHTML = BRIEFINGS[m];
 }
-function selectedMission() { return parseInt(document.querySelector('input[name="mission"]:checked').value, 10); }
+// v0.4.6 (iPad fix): the chosen mission lives in a variable, not only in the radio button,
+// because on some iPads tapping the mission card never ticked its radio (always Mission 1).
+let chosenMission = 1;
+const MISSION_NAMES = { 1: 'BLACK FILE', 2: 'COLD HORIZON' };
+function selectedMission() { return chosenMission; }
+function chooseMission(m, rebuild = true) {
+  m = m === 2 ? 2 : 1;
+  const changed = m !== chosenMission;
+  chosenMission = m;
+  document.querySelectorAll('input[name="mission"]').forEach(r => (r.checked = +r.value === m));
+  $('m1Card').classList.toggle('sel', m === 1); $('m2Card').classList.toggle('sel', m === 2);
+  $('startBtn').textContent = '▶ START: ' + MISSION_NAMES[m];
+  if (changed && rebuild && state === 'start') {
+    applyMission(m); buildLevel(); resetPlayer(); resetWeapons(); resetMasking(); missionStartPose();
+  }
+}
 // Put the player in the right starting pose for the mission.
 function missionStartPose() {
   zeroRange = 100; scopeState.breath = SETTINGS.holdBreathTime; scopeState.gasp = 0;
@@ -4495,7 +4512,7 @@ function startMission() {
   // Each step in a safety net: even if one part fails on some browser, the game still
   // reaches 'playing' (and the DEBUG box says what failed) instead of sitting dead.
   safe('start:killcam', () => { if (killcam.active) endKillcam(); });
-  safe('start:mission', () => applyMission(selectedMission()));
+  safe('start:mission', () => { chooseMission(selectedMission(), false); applyMission(selectedMission()); });
   safe('start:audio', () => initAudio());
   safe('start:level', () => buildLevel());
   safe('start:reset', () => { resetPlayer(); resetWeapons(); resetMasking(); missionStartPose(); resetSpotter(); });
@@ -4537,9 +4554,16 @@ $('optNight').checked = SETTINGS.nightOps;
 $('optXray').checked = SETTINGS.xrayCam;
 $('optQuality').value = SETTINGS.graphicsQuality;
 // Picking a mission shows its briefing and builds it behind the start screen.
-document.querySelectorAll('input[name="mission"]').forEach(r => r.addEventListener('change', () => {
-  applyMission(selectedMission()); buildLevel(); resetPlayer(); resetWeapons(); resetMasking(); missionStartPose();
-}));
+document.querySelectorAll('input[name="mission"]').forEach(r => r.addEventListener('change', () => { if (r.checked) chooseMission(+r.value); }));
+// Tapping / clicking anywhere on a mission card picks it (pointer, touch AND click, whichever arrives).
+for (const [id, m] of [['m1Card', 1], ['m2Card', 2]]) for (const ev of ['pointerup', 'touchend', 'click'])
+  $(id).addEventListener(ev, () => { noteInput('mission card ' + m + ' (' + ev + ')'); chooseMission(m); });
+// A link can pick the mission: ...?mission=2  or  ...#m2
+{
+  const q = new URLSearchParams(location.search).get('mission'), h = (location.hash || '').toLowerCase();
+  const want = q === '2' || h === '#m2' || h === '#mission2' ? 2 : 1;
+  chosenMission = 0; chooseMission(want, false);     // the level itself is built once, below
+}
 $('menuBtn').addEventListener('click', () => { $('endScreen').style.display = 'none'; $('startScreen').style.display = 'flex'; hud.root.style.display = 'none'; state = 'start'; });
 $('startBtn').addEventListener('click', startMission);
 $('restartBtn').addEventListener('click', startMission);
@@ -4676,8 +4700,8 @@ function underCrosshair() {
 }
 
 // Build the level once so it shows behind the briefing screen, then start the loop.
-applyMission(1);
-buildLevel(); resetPlayer(); resetWeapons(); resetMasking();
+applyMission(chosenMission);
+buildLevel(); resetPlayer(); resetWeapons(); resetMasking(); if (chosenMission === 2) missionStartPose();
 if (!window.__valkyrieLoop) { window.__valkyrieLoop = true; loopCount++; renderer.setAnimationLoop(gameLoop); }
 window.__gameLoaded = true;
 if (!debugInfo.on) document.getElementById('debugHud').style.display = 'none';
@@ -4701,7 +4725,7 @@ window.__game = {
   toggleSuppressor, damagePlayer, touch, pauseGame, keys, edgeTurn, setLookSensitivity, lastMouse: () => lastMouseXY, setLastMouse: v => (lastMouseXY = v), aimKind: () => aimKind, startCalls: () => ({ startCalls, startBlocked, loopCount }), underCrosshair,
   setStance, cycleNightVision, toggleIR, masking, teammates: () => teammates, generatorBackfire, sabotageGenerator,
   // Mission 2 / sniper test hooks
-  selectMission: m => { document.querySelector(`input[name="mission"][value="${m}"]`).checked = true; },
+  selectMission: m => chooseMission(m, false),
   mission: () => currentMission, groundAt, terrainHeight, materiel: () => materiel, sniperObjectives, projectiles: () => projectiles,
   laseRange, dialElevation, zero: () => zeroRange, setZero: r => (zeroRange = r), wind, flightAt, zeroAngle, killcam, endKillcam,
   hasLineOfSight, explodeMateriel, hitMateriel, scopeState, lastLase: () => lastLase, kill: () => killcam,
