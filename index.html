@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>OPERATION: BLACK FILE — v0.4</title>
+<title>OPERATION: BLACK FILE — v0.4.1</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <!--
   =====================================================================
-  OPERATION: BLACK FILE  (v0.4 — now with Mission 2: the sniper mission)
+  OPERATION: BLACK FILE  (v0.4.1 — sniper mission, hit-detection fixes, knife, Magic Keyboard controls)
   A tiny browser first-person shooter.
   - Mission structure & spy flavour inspired by GoldenEye 007 (N64)
   - Fast, aggressive maze shooting inspired by Wolfenstein 3D
@@ -43,6 +43,7 @@
   #tAim    { right: 140px; bottom: 190px; }
   #tReload { right: 140px; bottom: 110px; }
   #tSupp   { right: 220px; bottom: 110px; }
+  #tKnife  { right: 300px; bottom: 110px; border-color: rgba(220,220,255,0.7); }
   #tWeapon { right: 44px;  bottom: 220px; }
   #tPause  { right: 16px;  top: 110px; width: 48px; height: 48px; }
   #tStance { right: 140px; bottom: 270px; }
@@ -135,6 +136,10 @@
   .stamp { display: inline-block; border: 2px solid #c33; color: #e44; padding: 2px 8px; transform: rotate(-4deg);
     font-weight: bold; letter-spacing: 3px; margin-bottom: 10px; }
   .controls { font-size: 13px; color: #aca; columns: 2; }
+  .controls h4 { column-span: all; margin: 10px 0 4px; color: #8f8; letter-spacing: 1px; font-size: 13px; }
+  .controls .crow { display: flex; gap: 8px; break-inside: avoid; text-align: left; margin: 1px 0; }
+  .controls .crow b { color: #dfd; flex: 0 0 112px; }
+  .controls h3 { column-span: all; margin: 14px 0 2px; color: #8f8; letter-spacing: 2px; font-size: 14px; text-align: left; }
   .modes { margin: 14px 0; padding: 10px; border: 1px dashed #4a4; }
   .modes label { display: block; margin: 4px 0; cursor: pointer; font-size: 14px; }
   .modes small { color: #8a8; }
@@ -172,11 +177,7 @@
         <small>— slow-motion bullet cam + X-ray on great sniper shots (Mission 2).</small></label>
       <label>Graphics: <select id="optQuality"><option value="high">High (desktop)</option><option value="low">Low (iPad / older laptops)</option></select></label>
     </div>
-    <div class="controls">
-      Mouse — look<br>Left click — fire<br>Right click — aim / scope<br>&nbsp;&nbsp;(snipers: click again = 2nd zoom)<br>R — reload<br>
-      W A S D — move<br>Shift — sprint (scoped: hold breath)<br>1–8 or scroll — switch weapon<br>T — suppressor on/off<br>C — crouch · Z — prone<br>N — night vision · L — IR laser<br>
-      [ ] or PgUp/PgDn — scope elevation<br>Scroll while scoped — elevation<br>F — laser rangefinder<br>Esc or P — pause<br>Touch screen: left thumb moves, right thumb looks
-    </div>
+    <div class="controls" id="controlsStart"></div>
     <p id="loadError">Could not load the 3D library (Three.js). Check your internet connection and refresh.</p>
   </div>
 </div>
@@ -190,6 +191,7 @@
   <div class="tbtn" id="tAim">AIM</div>
   <div class="tbtn" id="tReload">RELOAD</div>
   <div class="tbtn" id="tSupp">SUPP</div>
+  <div class="tbtn" id="tKnife">KNIFE</div>
   <div class="tbtn" id="tWeapon">GUN ▸</div>
   <div class="tbtn" id="tPause">II</div>
   <div class="tbtn" id="tStance">STANCE</div>
@@ -205,9 +207,10 @@
 
 <!-- ================= PAUSE SCREEN ================= -->
 <div id="pauseScreen" class="screen">
-  <div class="dossier" style="text-align:center">
-    <h1>PAUSED</h1>
-    <p id="pauseText">Click to resume the mission.</p>
+  <div class="dossier">
+    <h1 style="text-align:center">PAUSED</h1>
+    <p id="pauseText" style="text-align:center">Click to resume the mission.</p>
+    <div class="controls" id="controlsPause"></div>
   </div>
 </div>
 
@@ -353,6 +356,14 @@ const SETTINGS = {
   gore: true,                // false = no blood and no head explosions
   killQuipChance: 0.35,      // chance of a quip on a normal kill
   quipCooldown: 4,           // seconds between normal kill quips
+
+  // ---- Knife (V key / KNIFE button) ----
+  knifeRange: 2.0,           // metres: how close a guard must be to reach him with the knife
+  knifeArc: 0.75,            // how wide the slash reaches (radians either side of the crosshair)
+  knifeDamage: 80,           // damage of a slash from the front (arcade health is 100)
+  knifeCooldown: 0.55,       // seconds between slashes
+  knifeNoticeRadius: 10,     // metres: guards this close hear a FRONT knife fight
+  knifeBehindDot: -0.2,      // how far 'behind' you must be for a silent takedown (-1 = dead behind)
   multiKillWindow: 2.0,      // kills this close together (seconds) count as a multi-kill
 
   // ---- Enemies (guards) ----
@@ -506,6 +517,16 @@ const PINK_MIST_QUIPS = [
   "Congratulations, you've invented the open-concept skull.",
   "The Geneva folks are gonna want a word about that one.",
   "Sometimes 'dead' needs an exclamation point.",
+];
+
+// Silent knife takedowns from behind.
+const KNIFE_QUIPS = [
+  "Shhh. He's resting. Permanently.",
+  "Quietest retirement party Valkyrie ever threw.",
+  "He never heard it coming. That's kind of the point.",
+  "Steel: still works, no batteries required.",
+  "Tap on the shoulder would've been rude. This was ruder.",
+  "And that's why you don't stand with your back to the door.",
 ];
 
 // #####################################################################
@@ -798,6 +819,9 @@ const SOUNDS = {
   boom(vol = 1)      { playNoise(0.9, 1.0 * vol, 500); playTone(60, 22, 1.4, 0.7 * vol); playRumble(2.5, 0.5 * vol, 300, 50, 0.05, 'lowpass'); },
   backfire(vol)      { playNoise(0.35, 1.0 * vol, 700); playTone(70, 30, 0.3, 0.6 * vol); playNoise(0.2, 0.6 * vol, 900, 0.18); },
   huh(vol)           { playTone(330, 440, 0.12, 0.12 * vol, 'triangle'); },
+  knifeSwish()       { playNoise(0.14, 0.22, 3500); },
+  knifeHit()         { playNoise(0.08, 0.3, 900); playTone(110, 60, 0.1, 0.25); },
+  takedown()         { playNoise(0.1, 0.18, 700); playTone(90, 45, 0.18, 0.15); },   // quiet on purpose
   radio()            { playNoise(0.06, 0.12, 3000); playTone(1200, 1200, 0.05, 0.05, 'square'); },
   nvToggle(on)       { playTone(on ? 6000 : 9000, on ? 11000 : 4000, 0.35, 0.03); },
   suppressedShot()   { playTone(95, 40, 0.14, 0.55); playNoise(0.1, 0.3, 450); playTone(2400, 1900, 0.02, 0.05, 'square'); },
@@ -1012,13 +1036,26 @@ const player = {
   startTime: 0,
 };
 const keys = {};
+// Keys that only exist on big keyboards (PgUp/PgDn) still work, but nothing NEEDS them.
+const ELEV_UP = ['BracketRight', 'ArrowUp', 'PageUp'], ELEV_DOWN = ['BracketLeft', 'ArrowDown', 'PageDown'];
 document.addEventListener('keydown', e => {
-  keys[e.code] = true;
-  if (killcam.active) { endKillcam(); return; }        // any key skips the kill cam
+  // Cmd / Ctrl combos belong to Safari (Cmd+Tab, Cmd+R...). Ignore them completely and
+  // don't remember the key as "held" (its key-up may never arrive while Cmd is down).
+  if (e.metaKey || e.ctrlKey) return;
+  if (killcam.active) { e.preventDefault(); endKillcam(); return; }   // any key skips the kill cam
   if (state !== 'playing') return;
-  if (e.code === 'BracketRight' || e.code === 'PageUp') { e.preventDefault(); dialElevation(1); }
-  if (e.code === 'BracketLeft' || e.code === 'PageDown') { e.preventDefault(); dialElevation(-1); }
+  // While playing, the page must not react to keys: no Tab focus jumps, no Space
+  // "clicking" a focused button, no arrow/space scrolling, no quick-find on ' or /.
+  e.preventDefault();
+  keys[e.code] = true;
+  if (e.repeat) return;                                // holding a key: act once
+  if (ELEV_UP.includes(e.code)) dialElevation(1);
+  if (ELEV_DOWN.includes(e.code)) dialElevation(-1);
+  if (e.code === 'KeyQ') aimPress(true);
+  if (e.code === 'Comma') switchWeapon((currentWeapon + WEAPONS.length - 1) % WEAPONS.length);
+  if (e.code === 'Period') switchWeapon((currentWeapon + 1) % WEAPONS.length);
   if (e.code === 'KeyF') laseRange();
+  if (e.code === 'KeyV') knifeAttack();
   if (e.code === 'KeyR') startReload();
   if (e.code === 'KeyP') pauseGame('Paused');   // handy on iPad keyboards that have no Esc key
   if (e.code === 'KeyT') toggleSuppressor();
@@ -1031,7 +1068,9 @@ document.addEventListener('keydown', e => {
     if (n >= 0 && n < WEAPONS.length) switchWeapon(n);
   }
 });
-document.addEventListener('keyup', e => { keys[e.code] = false; });
+document.addEventListener('keyup', e => { keys[e.code] = false; if (state === 'playing') e.preventDefault(); });
+// Switching away (Cmd+Tab, app switcher): forget held keys so you don't keep walking.
+window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouseDown = false; });
 
 // Stand / crouch / prone. Lower = slower but much harder to spot (see SETTINGS).
 function setStance(s) { player.stance = s; }
@@ -1100,6 +1139,12 @@ function damagePlayer(amount, fromX, fromZ) {
 let weaponState = [];   // ammo counters, one entry per weapon
 let currentWeapon = 0, fireCooldown = 0, reloadTimer = 0, recoil = 0, flashTimer = 0, switchTimer = 0, boltTimer = 0;
 let mouseDown = false, aiming = false, zoomStep = 0, triggerReleased = true;
+// A quick click/tap (button down AND up between two frames — common with an iPad trackpad
+// "tap to click") must still fire, so every press is remembered for a moment (see queueShot).
+// The press is kept for 0.25 s of GAME time (counted down in updateWeapon), so even a slow
+// frame can't make it expire before the game has had a chance to fire it.
+let shotQueued = 0;
+function queueShot() { shotQueued = 0.25; triggerReleased = true; }
 // zoomStep 0 = not aiming, 1 = first zoom level, 2 = second (2-step scopes only)
 function setZoom(step) { zoomStep = step; aiming = step > 0; }
 // The name shown on screen, e.g. "Colt M1911 .45 (Suppressed)".
@@ -1244,20 +1289,32 @@ document.addEventListener('mousedown', e => {
   if (killcam.active) { endKillcam(); return; }        // click skips the kill cam
   if (state !== 'playing') return;
   if (cameFromTouch()) return;                 // ignore the fake mouse click a finger tap makes
-  if (e.button === 0 && e.ctrlKey) e = { button: 2 };   // Mac habit: Ctrl+click = right click
-  if (e.button === 0) mouseDown = true;
-  if (e.button === 2) {
-    const levels = WEAPONS[currentWeapon].zoomLevels.length;
-    // Normal guns: hold to aim. 2-step scopes: each click goes zoom 1 -> zoom 2 -> off.
-    setZoom(levels > 1 ? (zoomStep + 1) % (levels + 1) : 1);
-  }
+  e.preventDefault();
+  // Lost the pointer without pausing (can happen on iPad)? Any click grabs it again.
+  if (!controls.isLocked && !touch.active) lockMouse();
+  if (e.button === 0 && e.ctrlKey) { ctrlAiming = true; e = { button: 2 }; }   // Mac/iPad: Ctrl+click is the system right click
+  if (e.button === 0) { mouseDown = true; queueShot(); }
+  if (e.button === 2) { lastRightDown = performance.now(); aimPress(false); }
 });
+// AIM: two-finger click / right click / Q key.
+// Normal guns: hold the click to aim (Q toggles). 2-step scopes: each press goes zoom 1 -> zoom 2 -> off.
+let lastRightDown = -1e9, ctrlAiming = false;
+function aimPress(toggle) {
+  const levels = WEAPONS[currentWeapon].zoomLevels.length;
+  if (levels > 1) setZoom((zoomStep + 1) % (levels + 1));
+  else setZoom(toggle ? (zoomStep ? 0 : 1) : 1);
+}
 document.addEventListener('mouseup', e => {
+  if (e.button === 0 && ctrlAiming) { ctrlAiming = false; e = { button: 2 }; }
   if (e.button === 0) { mouseDown = false; triggerReleased = true; }
   if (e.button === 2 && WEAPONS[currentWeapon].zoomLevels.length === 1) setZoom(0);
 });
 // Right click / two-finger trackpad click must NOT open the browser menu.
-window.addEventListener('contextmenu', e => e.preventDefault(), { capture: true });
+// Some iPad setups send ONLY a 'contextmenu' (no right-button mousedown): then it toggles aim.
+window.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  if (state === 'playing' && !killcam.active && !cameFromTouch() && performance.now() - lastRightDown > 400) aimPress(true);
+}, { capture: true });
 // Scroll wheel / two-finger trackpad scroll switches weapons (a little "dead zone" so it isn't twitchy).
 let scrollAccum = 0, lastScrollSwitch = 0;
 window.addEventListener('wheel', e => {
@@ -1285,6 +1342,7 @@ function tryShoot() {
   if (reloadTimer > 0 || fireCooldown > 0 || switchTimer > 0) return;
   if (!w.automatic && !triggerReleased) return;    // semi-auto: one shot per click
   triggerReleased = false;
+  shotQueued = 0;                                  // this press has been used
   if (s.ammo <= 0) {
     SOUNDS.empty(); fireCooldown = 0.25;
     if (s.reserve > 0) startReload();
@@ -1303,12 +1361,24 @@ function tryShoot() {
   if (w.projectile) { fireProjectile(w); applyKick(w); return; }
 
   // HITSCAN: fire an invisible ray straight out of the screen centre (plus a little spread).
-  const spread = (aiming ? w.spread * 0.3 : w.spread) * 20;
-  raycaster.setFromCamera(new THREE.Vector2((Math.random() - 0.5) * spread, (Math.random() - 0.5) * spread), camera);
+  // BUG FIX v0.4.1: spread used to be added in *screen* units x20, which threw shots up to
+  // ~2 degrees off the crosshair (a head 8 m away was missed most of the time). Now 'spread'
+  // is a real angle in radians: the bullet leaves within that cone around the crosshair.
+  const spreadRad = aiming ? w.spread * 0.4 : w.spread;
+  const shotDir = camera.getWorldDirection(new THREE.Vector3());
+  if (spreadRad > 0) {
+    const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * spreadRad;
+    const right = new THREE.Vector3().crossVectors(shotDir, camera.up).normalize();
+    const up = new THREE.Vector3().crossVectors(right, shotDir).normalize();
+    shotDir.addScaledVector(right, Math.cos(a) * r).addScaledVector(up, Math.sin(a) * r).normalize();
+  }
+  raycaster.set(camera.position, shotDir);
   raycaster.far = (heightField ? 600 : 150) * (w.suppressed ? SETTINGS.suppressorRangeMult : 1);
   raycaster.far = groundHitDistance(raycaster.ray.origin, raycaster.ray.direction, raycaster.far);   // hillsides stop bullets
   const targets = wallMeshes.concat(...enemies.filter(e => e.state !== 'dead').map(e => e.hitMeshes.filter(m => m.visible)));
   const hits = raycaster.intersectObjects(targets, false);
+  pointBlankHits(raycaster.ray, hits);          // muzzle already touching a guard? still counts
+  lastShotRay = { o: raycaster.ray.origin.toArray(), d: raycaster.ray.direction.toArray(), far: raycaster.far, hits: hits.slice(0, 4).map(h => (h.object.userData.enemy ? 'E:' + h.object.userData.zone : 'W') + '@' + h.distance.toFixed(2)) };
   // Walk through everything the ray touched, nearest first. Most guns stop at the
   // first thing; guns with 'penetration' (Barrett) punch through that many walls/guards.
   let throughLeft = w.penetration || 0, power = 1, countedHit = false;
@@ -1339,6 +1409,25 @@ function tryShoot() {
     throughLeft--; power *= 0.6;          // loses 40% power each time it punches through
   }
   applyKick(w);
+}
+// A ray that STARTS inside a box can't "see" that box (it only hits faces from outside),
+// so with the muzzle pressed against a guard's head the shot used to pass through.
+// This adds those touching hits at distance ~0 so they come first.
+const _pbBox = new THREE.Box3();
+let lastShotRay = null;   // for the automated tests
+function pointBlankHits(ray, hits) {
+  const o = ray.origin;
+  for (const e of enemies) {
+    if (e.state === 'dead' || e.group.position.distanceTo(o) > 3) continue;
+    for (const m of e.hitMeshes) {
+      if (!m.visible) continue;
+      _pbBox.setFromObject(m).expandByScalar(0.05);
+      if (_pbBox.containsPoint(o) || _pbBox.containsPoint(o.clone().addScaledVector(ray.direction, 0.15))) {
+        hits.unshift({ object: m, distance: 0.1, point: o.clone().addScaledVector(ray.direction, 0.1) });
+        break;
+      }
+    }
+  }
 }
 // Kick the camera up a little (recoil) — AFTER the bullet has left.
 function applyKick(w) {
@@ -1395,10 +1484,102 @@ function shootEnemy(e, weapon, zone, distance, point, power = 1) {
   }
 }
 
+// #####################################################################
+// ##  SECTION 8b: KNIFE (V key / KNIFE button)                       ##
+// ##  Close range only (SETTINGS.knifeRange). From BEHIND an unaware ##
+// ##  guard = instant silent takedown. From the FRONT = a big slash, ##
+// ##  but he (and anyone close) knows you're there.                  ##
+// #####################################################################
+const knifeModel = new THREE.Group();
+{
+  const steel = new THREE.MeshStandardMaterial({ color: 0xc8ccd0, roughness: 0.25, metalness: 0.9 });
+  const black = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.8 });
+  const glove = new THREE.MeshStandardMaterial({ color: 0x20221e, roughness: 0.95 });
+  const blade = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.008, 0.2), steel); blade.position.z = -0.16;
+  const tip = new THREE.Mesh(new THREE.ConeGeometry(0.014, 0.05, 4), steel); tip.rotation.x = -Math.PI / 2; tip.position.z = -0.285;
+  const guard = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.016, 0.014), black); guard.position.z = -0.055;
+  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.018, 0.11, 10), black); handle.rotation.x = Math.PI / 2;
+  const hand = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.06, 0.09), glove);
+  knifeModel.add(blade, tip, guard, handle, hand);
+  knifeModel.visible = false; knifeModel.scale.setScalar(1.7);
+  weaponScene.add(knifeModel);
+}
+let knifeTimer = 0, knifeAnim = 0;
+// Find the guard the knife can reach: close, roughly in front of you, nothing in between.
+function knifeTarget() {
+  const fwd = camera.getWorldDirection(new THREE.Vector3()); fwd.y = 0; fwd.normalize();
+  const px = camera.position.x, pz = camera.position.z, feet = camera.position.y - player.eyeY;
+  let best = null, bestD = Infinity;
+  for (const e of enemies) {
+    if (e.state === 'dead') continue;
+    const ep = e.group.position, d = dist2D(px, pz, ep.x, ep.z);
+    if (d > SETTINGS.knifeRange || d >= bestD) continue;
+    if (Math.abs(ep.y - feet) > 1.5) continue;                         // e.g. a guard up a tower
+    const ang = Math.acos(THREE.MathUtils.clamp(((ep.x - px) * fwd.x + (ep.z - pz) * fwd.z) / Math.max(d, 1e-3), -1, 1));
+    if (d > 0.6 && ang > SETTINGS.knifeArc) continue;                  // not in front of you
+    if (!hasLineOfSight(px, pz, ep.x, ep.z)) continue;
+    best = e; bestD = d;
+  }
+  return best ? { e: best, d: bestD } : null;
+}
+// Are you behind him, and is he unaware of you?
+function isBehindUnaware(e) {
+  if (e.state === 'chase') return false;
+  const ep = e.group.position;
+  const tx = camera.position.x - ep.x, tz = camera.position.z - ep.z, len = Math.hypot(tx, tz) || 1;
+  const dot = (Math.sin(e.yaw) * tx + Math.cos(e.yaw) * tz) / len;    // 1 = he's facing you, -1 = his back
+  return dot < SETTINGS.knifeBehindDot;
+}
+function knifeAttack() {
+  if (state !== 'playing' || knifeTimer > 0 || killcam.active) return;
+  knifeTimer = SETTINGS.knifeCooldown; knifeAnim = 0.3;
+  setZoom(0);
+  SOUNDS.knifeSwish();
+  const t = knifeTarget();
+  if (!t) return;                                                      // slashed thin air
+  const e = t.e, chest = e.group.position.clone(); chest.y += 1.3;
+  if (isBehindUnaware(e)) {
+    // SILENT TAKEDOWN: instant, no alarm, no gunshot noise.
+    e.health = 0; e.hitFlash = 0.12;
+    if (SETTINGS.gore) spawnParticles(chest, 0x8a0000, 10, 1.5, 0.04);
+    lastHit = { zone: 'knife', distance: t.d };
+    killEnemy(e, false, { knife: true });
+    flashHitmarker(true);
+    return;
+  }
+  // FROM THE FRONT: a heavy slash, but now it's a fight.
+  SOUNDS.knifeHit();
+  const dmg = SETTINGS.oneShotOneKill ? 9999 : SETTINGS.knifeDamage;
+  e.health -= dmg; e.hitFlash = 0.12;
+  spawnParticles(chest, SETTINGS.gore ? 0x8a0000 : 0x888888, 8, 2, 0.05);
+  if (e.health <= 0) { lastHit = { zone: 'knifeFront', distance: t.d }; killEnemy(e); flashHitmarker(true); }
+  else { alertEnemy(e, true); flashHitmarker(false); }
+  // The scuffle is noisy: anyone close comes to look (or opens fire if he can see you).
+  for (const o of enemies) {
+    if (o === e || o.state === 'dead') continue;
+    if (o.group.position.distanceTo(e.group.position) < SETTINGS.knifeNoticeRadius) {
+      if (canGuardSeePlayer(o)) alertEnemy(o); else startSearch(o, camera.position.x, camera.position.z, 4);
+    }
+  }
+}
+// The slash animation: the gun dips away, the knife sweeps right-to-left across the screen.
+function updateKnife(dt) {
+  knifeTimer = Math.max(0, knifeTimer - dt);
+  knifeAnim = Math.max(0, knifeAnim - dt);
+  const on = knifeAnim > 0;
+  knifeModel.visible = on;
+  if (!on) return;
+  const p = 1 - knifeAnim / 0.3;                                       // 0 -> 1 during the slash
+  knifeModel.position.set(0.42 - p * 0.8, -0.2 - Math.sin(p * Math.PI) * 0.07, -0.45);
+  knifeModel.rotation.set(-0.2, 0.9 - p * 1.6, -0.5 + p * 0.9);
+  weaponRoot.visible = false;
+}
+
 function updateWeapon(dt) {
   const w = WEAPONS[currentWeapon], s = weaponState[currentWeapon];
   fireCooldown -= dt; switchTimer = Math.max(0, switchTimer - dt);
-  if (mouseDown || touch.fire) tryShoot();
+  if (mouseDown || touch.fire || shotQueued > 0) tryShoot();
+  shotQueued = Math.max(0, shotQueued - dt);
   if (reloadTimer > 0) {
     reloadTimer -= dt;
     if (reloadTimer <= 0) {
@@ -1428,6 +1609,7 @@ function updateWeapon(dt) {
   weaponRoot.rotation.x = recoil * 0.12 * w.sound + reloadDip * 0.6;
   weaponRoot.rotation.z = bolt * 0.35;
   weaponRoot.visible = !(aiming && w.scope);
+  updateKnife(dt);             // knife slash (hides the gun while it plays)
 
   // Muzzle flash
   flashTimer -= dt;
@@ -1530,7 +1712,8 @@ function quipForKill(poppedHead) {
   else if (Math.random() < SETTINGS.killQuipChance) sayQuip(KILL_QUIPS, SETTINGS.quipCooldown);
 }
 
-function killEnemy(e, poppedHead = false) {
+// opts.knife = true: silent knife takedown (quiet, its own quips).
+function killEnemy(e, poppedHead = false, opts = {}) {
   e.state = 'dead'; e.deathTime = 0; e.flash.visible = false; e.bodyTarget = null;
   player.kills++;
   // Kill feed, e.g. "Section leader, headshot, 1,243 m"
@@ -1538,8 +1721,8 @@ function killEnemy(e, poppedHead = false) {
   if (info) addKillFeed(`${e.label}, ${poppedHead ? 'pink mist' : ZONE_WORDS[info.zone] || 'kill'}, ${fmtDist(info.distance)}`);
   spotterKillCall(e, info);
   witnessKill(e);              // did another guard see that?
-  quipForKill(poppedHead);
-  SOUNDS.enemyDeath(volumeAt(e.group.position.x, e.group.position.z));
+  if (opts.knife) { sayQuip(KNIFE_QUIPS, 0); SOUNDS.takedown(); }
+  else { quipForKill(poppedHead); SOUNDS.enemyDeath(volumeAt(e.group.position.x, e.group.position.z)); }
   if (Math.random() < SETTINGS.ammoDropChance) createPickup(e.group.position.x + 0.5, e.group.position.z + 0.3, 'ammo');
 }
 
@@ -2539,13 +2722,14 @@ function touchButton(id, onDown, onUp) {
   el.addEventListener('touchend', up, { passive: false });
   el.addEventListener('touchcancel', up, { passive: false });
 }
-touchButton('tFire', () => { touch.fire = true; }, () => { touch.fire = false; triggerReleased = true; });
+touchButton('tFire', () => { touch.fire = true; queueShot(); }, () => { touch.fire = false; triggerReleased = true; });
 touchButton('tAim', () => {                       // tap to toggle aim (2-step scopes cycle)
   const levels = WEAPONS[currentWeapon].zoomLevels.length;
   setZoom((zoomStep + 1) % (levels + 1));
 });
 touchButton('tReload', () => startReload());
 touchButton('tSupp', () => toggleSuppressor());
+touchButton('tKnife', () => knifeAttack());
 touchButton('tWeapon', () => switchWeapon((currentWeapon + 1) % WEAPONS.length));
 touchButton('tPause', () => pauseGame('Paused'));
 touchButton('tStance', () => setStance({ stand: 'crouch', crouch: 'prone', prone: 'stand' }[player.stance]));
@@ -3282,23 +3466,30 @@ const bulletRay = new THREE.Raycaster();
 const tracerMaterial = new THREE.LineBasicMaterial({ color: 0xfff0c0, transparent: true, opacity: 0.85 });
 const traceGlowMaterial = new THREE.MeshBasicMaterial({ color: 0xfff4d0, transparent: true, opacity: 0.7, depthWrite: false });
 const traceGlowGeometry = new THREE.SphereGeometry(1, 8, 6);
+let lastProjectile = null;   // for the automated tests
 function fireProjectile(w) {
   const cal = CALIBERS[w.caliber];
   const aim = findAimTarget();                                   // for the spotter's miss call
   const dir = camera.getWorldDirection(new THREE.Vector3());
   const right = new THREE.Vector3().crossVectors(dir, camera.up).normalize();
-  dir.applyAxisAngle(right, zeroAngle(cal, zeroRange));          // the scope's elevation setting
+  // The dialled elevation only applies when looking through the scope. Firing from the hip /
+  // without the scope uses a fixed 100 m battle zero. (BUG FIX v0.4.1: the SCAR-H has no scope
+  // but used the 1100 m sniper dial in Mission 2, so every close shot sailed over heads.)
+  const scoped = aiming && w.scope;
+  dir.applyAxisAngle(right, zeroAngle(cal, scoped ? zeroRange : 100));
   if (!aiming) {                                                 // firing from the hip is sloppy
     const s = 0.02; dir.x += (Math.random() - 0.5) * s; dir.y += (Math.random() - 0.5) * s; dir.z += (Math.random() - 0.5) * s; dir.normalize();
   }
-  const start = camera.position.clone().addScaledVector(dir, 0.6);
+  // BUG FIX v0.4.1: the bullet used to appear 0.6 m in front of your eyes, so a guard closer
+  // than that was skipped. Now it starts at the eye (point-blank shots count).
+  const start = camera.position.clone();
   const tracer = new THREE.Line(new THREE.BufferGeometry().setFromPoints([start, start.clone()]), tracerMaterial);
   tracer.frustumCulled = false;
   const glow = new THREE.Mesh(traceGlowGeometry, traceGlowMaterial); glow.position.copy(start);
   levelGroup.add(tracer, glow);
   const p = { w, cal, pos: start.clone(), vel: dir.clone().multiplyScalar(cal.velocity), start: start.clone(), right, t: 0,
     path: [start.clone()], power: 1, pen: w.penetration || 0, hitSet: new Set(), tracer, glow, aim, done: false, counted: false, fade: 0.6 };
-  projectiles.push(p);
+  projectiles.push(p); lastProjectile = p;
   return p;
 }
 function updateProjectiles(dt) {
@@ -3444,7 +3635,8 @@ function laseRange() {
 // Hitscan guns outdoors: stop the shot where it hits the hillside.
 function groundHitDistance(origin, dir, maxDist) {
   if (!heightField) return maxDist;
-  for (let d = 1; d < maxDist; d += 1) if (origin.y + dir.y * d < groundAt(origin.x + dir.x * d, origin.z + dir.z * d)) return d;
+  // Skip the first 2 m: lying prone, a tiny bump in front of your nose must not "eat" the shot.
+  for (let d = 2; d < maxDist; d += 1) if (origin.y + dir.y * d < groundAt(origin.x + dir.x * d, origin.z + dir.z * d) - 0.05) return d;
   return maxDist;
 }
 
@@ -3663,7 +3855,7 @@ function addKillFeed(text) {
     div.style.opacity = 0; setTimeout(() => div.remove(), 600); }, 7000);
   fade();
 }
-const ZONE_WORDS = { head: 'headshot', torso: 'body shot', limb: 'limb shot', explosion: 'explosion' };
+const ZONE_WORDS = { head: 'headshot', torso: 'body shot', limb: 'limb shot', explosion: 'explosion', knife: 'knife takedown', knifeFront: 'knife' };
 
 // #####################################################################
 // ##  SECTION 18: X-RAY KILL CAM  (SETTINGS.xrayCam)                 ##
@@ -3842,6 +4034,47 @@ function endKillcam() {
   if (state === 'playing') hud.root.style.display = 'block';
 }
 
+// ---- CONTROLS LIST: shown on the start AND pause screens ----
+// Every action has a plain key that exists on an Apple Magic Keyboard for iPad
+// (no Esc, no PgUp/PgDn, no F1-F12 needed) and NOTHING uses Cmd/Ctrl shortcuts,
+// because Safari keeps those for itself.
+const CONTROLS = [
+  ['Trackpad / mouse', [
+    ['Move finger', 'look around'],
+    ['Click (1 finger)', 'fire'],
+    ['2-finger click', 'aim / scope (snipers: again = 2nd zoom, again = off)'],
+    ['2-finger scroll', 'switch weapon · while scoped: scope elevation'],
+  ]],
+  ['Keyboard', [
+    ['W A S D', 'move'],
+    ['Shift', 'sprint · while scoped: hold breath'],
+    ['Q', 'aim / scope (same as 2-finger click)'],
+    ['V', 'knife (from behind = silent takedown)'],
+    ['R', 'reload'],
+    ['1 – 8', 'pick weapon'],
+    [', and .', 'previous / next weapon'],
+    ['T', 'suppressor on / off'],
+    ['C', 'crouch'],
+    ['Z', 'go prone'],
+    ['N', 'night vision (off / white / + thermal)'],
+    ['L', 'IR laser + illuminator'],
+    ['F', 'laser rangefinder'],
+    ['[ ]  or  ↑ ↓', 'scope elevation (sniper rifles)'],
+    ['P', 'pause (Esc also works on keyboards that have it)'],
+    ['Any key / click', 'skip the X-ray kill cam'],
+  ]],
+  ['Touch screen', [
+    ['Left thumb', 'move'],
+    ['Right thumb', 'look · buttons for everything else'],
+  ]],
+];
+function renderControls() {
+  const html = '<h3>CONTROLS (MAGIC KEYBOARD + TRACKPAD)</h3>' + CONTROLS.map(([title, rows]) => `<h4>${title}</h4>` +
+    rows.map(([k, what]) => `<div class="crow"><b>${k}</b><span>${what}</span></div>`).join('')).join('');
+  for (const id of ['controlsStart', 'controlsPause']) $(id).innerHTML = html;
+}
+renderControls();
+
 // #####################################################################
 // ##  SECTION 13: GAME STATE (start, pause, win, lose, restart)      ##
 // #####################################################################
@@ -3909,11 +4142,12 @@ function startMission() {
   initAudio();
   buildLevel(); resetPlayer(); resetWeapons(); resetMasking(); missionStartPose(); resetSpotter();
   hud.killFeed.innerHTML = '';
-  mouseDown = false; setZoom(0);
+  mouseDown = false; setZoom(0); knifeTimer = 0; knifeAnim = 0;
   $('startScreen').style.display = $('endScreen').style.display = $('pauseScreen').style.display = 'none';
   hud.root.style.display = 'block';
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();   // so Space/Enter can't "press" the start button again
   state = 'playing';
-  showMessage(currentMission === 2 ? 'Operation COLD HORIZON. Lase (F), dial ([ ]), breathe (Shift), send it.' : 'Mission start. Find the intel.', 3);
+  showMessage(currentMission === 2 ? 'Operation COLD HORIZON. Lase (F), dial ([ ] or ↑ ↓), breathe (Shift), send it.' : 'Mission start. Find the intel. (V = knife)', 3);
   if (cameFromTouch()) touch.active = true;   // started with a tap: show the touch buttons
   else lockMouse();                           // started with a click: capture mouse/trackpad
 }
@@ -4012,6 +4246,17 @@ window.__gameLoaded = true;
 window.__game = {
   SETTINGS, CALIBERS, WEAPONS, player, camera, startMission, switchWeapon,
   enemies: () => enemies, state: () => state,
+  // Debug: what would a ray from the screen centre hit right now? (nearest first)
+  rayHits: () => {
+    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera); raycaster.far = 2000;
+    const targets = wallMeshes.concat(...enemies.filter(e => e.state !== 'dead').map(e => e.hitMeshes.filter(m => m.visible)));
+    return raycaster.intersectObjects(targets, false).slice(0, 6).map(h => ({ d: +h.distance.toFixed(2), enemy: !!h.object.userData.enemy, zone: h.object.userData.zone || '', name: h.object.name || h.object.type, vis: h.object.visible }));
+  },
+  refill: () => { weaponState.forEach((s, i) => { s.ammo = WEAPONS[i].magSize; s.reserve = WEAPONS[i].reserve; }); reloadTimer = 0; },
+  fireDebug: () => ({ mouseDown, triggerReleased, fireCooldown, switchTimer, reloadTimer, shotQueued, ammo: weaponState[currentWeapon].ammo }),
+  lastShotRay: () => lastShotRay,
+  knife: () => { knifeTimer = 0; knifeAttack(); },
+  lastProjectile: () => lastProjectile && { start: lastProjectile.start.toArray().map(v => +v.toFixed(2)), pos: lastProjectile.pos.toArray().map(v => +v.toFixed(2)), done: lastProjectile.done, t: +lastProjectile.t.toFixed(3), hits: lastProjectile.hitSet.size, dir0: lastProjectile.path[1] ? lastProjectile.path[1].clone().sub(lastProjectile.path[0]).normalize().toArray().map(v => +v.toFixed(4)) : null },
   shoot: () => { triggerReleased = true; fireCooldown = 0; switchTimer = 0; reloadTimer = 0; tryShoot(); },
   shootEnemy: (i, zone, dist) => shootEnemy(enemies[i], WEAPONS[currentWeapon], zone, dist, enemies[i].group.position.clone().setY(1.5)),
   toggleSuppressor, damagePlayer, touch, pauseGame,
