@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>OPERATION: BLACK FILE — v0.4.1</title>
+<title>OPERATION: BLACK FILE — v0.4.2</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <!--
   =====================================================================
-  OPERATION: BLACK FILE  (v0.4.1 — sniper mission, hit-detection fixes, knife, Magic Keyboard controls)
+  OPERATION: BLACK FILE  (v0.4.2 — sniper mission, knife, Magic Keyboard controls, Safari/iPad safety net + DEBUG readout)
   A tiny browser first-person shooter.
   - Mission structure & spy flavour inspired by GoldenEye 007 (N64)
   - Fast, aggressive maze shooting inspired by Wolfenstein 3D
@@ -52,6 +52,11 @@
 
   /* ---------- HUD (heads-up display) ---------- */
   #hud { position: fixed; inset: 0; pointer-events: none; display: none; }
+  /* DEBUG readout (toggle with the ` key or G). Sits above everything, never blocks clicks. */
+  #debugHud { position: fixed; left: 8px; bottom: 104px; z-index: 50; pointer-events: none; max-width: 46vw;
+    font: 11px/1.35 "Courier New", monospace; color: #cfc; background: rgba(0,0,0,0.6); padding: 5px 8px;
+    border: 1px solid rgba(120,255,120,0.35); white-space: pre-wrap; }
+  #debugHud .err { color: #ff6b6b; }
   .panel { position: absolute; background: rgba(0, 12, 0, 0.55); border: 1px solid rgba(120, 255, 120, 0.35);
     padding: 10px 14px; text-shadow: 0 0 4px #000; }
   #objectives { top: 16px; left: 16px; min-width: 260px; font-size: 14px; }
@@ -245,7 +250,19 @@
   <div id="hitmarker"><div class="a"></div><div class="b"></div><div class="c"></div><div class="d"></div></div>
 </div>
 
-<!-- Safety net: if the 3D library can't download, tell the player instead of showing nothing. -->
+<div id="debugHud">DEBUG: loading…</div>
+<!-- Safety net #1: catch ANY error (even one that stops the game from loading) so the
+     DEBUG readout can show it in red. This plain script runs before the game module. -->
+<script>
+  window.__errors = [];
+  window.addEventListener('error', function (e) {
+    window.__errors.push((e.message || 'error') + ' @ ' + String(e.filename || '').split('/').pop() + ':' + (e.lineno || '?'));
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason; window.__errors.push('promise: ' + (r && r.message ? r.message : r));
+  });
+</script>
+<!-- Safety net #2: if the 3D library can't download, tell the player instead of showing nothing. -->
 <script>
   setTimeout(function () {
     if (!window.__gameLoaded) document.getElementById('loadError').style.display = 'block';
@@ -272,6 +289,59 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { Pass } from 'three/addons/postprocessing/Pass.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { Water } from 'three/addons/objects/Water.js';
+
+// #####################################################################
+// ##  SECTION 0: VERSION, SAFETY NET & DEBUG READOUT (v0.4.2)        ##
+// ##  Every part of the per-frame update runs inside safe(), so if   ##
+// ##  one part crashes (say, on iPad Safari) everything else keeps   ##
+// ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
+// ##  part failed and why.                                           ##
+// #####################################################################
+const VERSION = 'v0.4.2';
+const DEBUG_ON_BY_DEFAULT = true;     // set to false once things are working on the iPad
+const debugInfo = { on: DEBUG_ON_BY_DEFAULT, lastInput: '-', lastInputAt: 0, errors: {}, lastError: null,
+  fps: 0, frameCount: 0, fpsTimer: 0, updates: 0, shownAt: 0 };
+// Run one part of the game; if it throws, remember the first error (and keep going).
+function safe(name, fn) {
+  try { fn(); } catch (err) { noteError(name, err); }
+}
+function noteError(name, err) {
+  const msg = String((err && err.message) || err);
+  if (!debugInfo.errors[name]) {                      // log the FIRST error of each part (not 60/s)
+    debugInfo.errors[name] = 0;
+    console.error('[' + name + '] ' + ((err && err.stack) || msg));
+  }
+  debugInfo.errors[name]++;
+  debugInfo.lastError = { name, msg };
+}
+window.__noteError = noteError;
+function noteLock(what) { debugInfo.lockEvent = what + ' @' + (performance.now() / 1000).toFixed(1) + 's'; }
+function noteInput(what) { debugInfo.lastInput = what; debugInfo.lastInputAt = performance.now(); }
+function toggleDebug() { debugInfo.on = !debugInfo.on; document.getElementById('debugHud').style.display = debugInfo.on ? 'block' : 'none'; }
+function esc(t) { return String(t).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]); }
+// Called once per frame (cheap: the text is only rebuilt 4x a second).
+function updateDebugHud(dt, ctx) {
+  debugInfo.frameCount++; debugInfo.fpsTimer += dt;
+  if (debugInfo.fpsTimer >= 0.5) { debugInfo.fps = debugInfo.frameCount / debugInfo.fpsTimer; debugInfo.frameCount = 0; debugInfo.fpsTimer = 0; }
+  if (!debugInfo.on) return;
+  const now = performance.now();
+  if (now - debugInfo.shownAt < 250) return;
+  debugInfo.shownAt = now;
+  const ago = debugInfo.lastInputAt ? ((now - debugInfo.lastInputAt) / 1000).toFixed(1) + 's ago' : '';
+  let html = `DEBUG ${VERSION}  (\` or G hides)\n` +
+    `state: ${ctx.state}   pointer locked: ${ctx.locked ? 'YES' : 'no'}   touch mode: ${ctx.touch ? 'yes' : 'no'}\n` +
+    `last pointer-lock event: ${debugInfo.lockEvent || 'none yet'}\n` +
+    `fps: ${debugInfo.fps.toFixed(0)}   updates: ${debugInfo.updates}   mission: ${ctx.mission}\n` +
+    `guards alive: ${ctx.alive} (${ctx.mix})\n` +
+    `last input: ${esc(debugInfo.lastInput)} ${ago}`;
+  if (debugInfo.lastError) {
+    const counts = Object.entries(debugInfo.errors).map(([k, v]) => k + '×' + v).join(' ');
+    html += `\n<span class="err">caught error in [${esc(debugInfo.lastError.name)}]: ${esc(debugInfo.lastError.msg)}\n(${esc(counts)})</span>`;
+  }
+  const g = window.__errors || [];
+  if (g.length) html += `\n<span class="err">page error: ${esc(g[g.length - 1])}${g.length > 1 ? ' (+' + (g.length - 1) + ' more)' : ''}</span>`;
+  document.getElementById('debugHud').innerHTML = html;
+}
 
 // #####################################################################
 // ##  SECTION 1: SETTINGS                                            ##
@@ -763,8 +833,13 @@ const decalMaterial    = new THREE.MeshBasicMaterial({ color: 0x111111, transpar
 // #####################################################################
 let audioCtx = null, masterGain = null, noiseBuffer = null;
 function initAudio() {
-  if (audioCtx) { audioCtx.resume(); return; }
-  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  try { initAudio_(); } catch (err) { audioCtx = null; noteSoundError(err); }   // no sound is better than no game
+}
+function initAudio_() {
+  if (audioCtx) { const r = audioCtx.resume(); if (r && r.catch) r.catch(() => {}); return; }
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+  audioCtx = new AC();
   masterGain = audioCtx.createGain();
   masterGain.gain.value = SETTINGS.masterVolume;
   masterGain.connect(audioCtx.destination);
@@ -774,7 +849,20 @@ function initAudio() {
   for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
 }
 // A burst of filtered noise (bangs, splats)
+// Sounds must NEVER break the game: a bad number (NaN, 0 into an exponential ramp) or a
+// browser quirk (Safari) used to be able to throw in the middle of a hit or a guard's AI.
+const safeVol = v => (Number.isFinite(v) ? Math.max(0.0001, v) : 0.0001);
 function playNoise(duration, volume, filterFreq, delay = 0) {
+  try { playNoise_(duration, safeVol(volume), filterFreq, delay); } catch (err) { noteSoundError(err); }
+}
+function playRumble(duration, volume, f0, f1, attack, type = 'lowpass') {
+  try { playRumble_(duration, safeVol(volume), f0, f1, attack, type); } catch (err) { noteSoundError(err); }
+}
+function playTone(freq, endFreq, duration, volume, type = 'sine', delay = 0) {
+  try { playTone_(freq, endFreq, duration, safeVol(volume), type, delay); } catch (err) { noteSoundError(err); }
+}
+function noteSoundError(err) { if (window.__noteError) window.__noteError('sound', err); }
+function playNoise_(duration, volume, filterFreq, delay = 0) {
   if (!audioCtx) return;
   const t = audioCtx.currentTime + delay;
   const src = audioCtx.createBufferSource(); src.buffer = noiseBuffer;
@@ -786,7 +874,7 @@ function playNoise(duration, volume, filterFreq, delay = 0) {
   src.start(t); src.stop(t + duration);
 }
 // A long filtered rumble/whoosh that fades in and out (jets, thunder)
-function playRumble(duration, volume, f0, f1, attack, type = 'lowpass') {
+function playRumble_(duration, volume, f0, f1, attack, type = 'lowpass') {
   if (!audioCtx) return;
   const t = audioCtx.currentTime;
   const src = audioCtx.createBufferSource(); src.buffer = noiseBuffer; src.loop = true;
@@ -799,7 +887,7 @@ function playRumble(duration, volume, f0, f1, attack, type = 'lowpass') {
   src.start(t); src.stop(t + duration + 0.05);
 }
 // A beep / tone that can slide in pitch
-function playTone(freq, endFreq, duration, volume, type = 'sine', delay = 0) {
+function playTone_(freq, endFreq, duration, volume, type = 'sine', delay = 0) {
   if (!audioCtx) return;
   const t = audioCtx.currentTime + delay;
   const osc = audioCtx.createOscillator(); osc.type = type;
@@ -1042,6 +1130,8 @@ document.addEventListener('keydown', e => {
   // Cmd / Ctrl combos belong to Safari (Cmd+Tab, Cmd+R...). Ignore them completely and
   // don't remember the key as "held" (its key-up may never arrive while Cmd is down).
   if (e.metaKey || e.ctrlKey) return;
+  noteInput('key ' + e.code);
+  if (e.code === 'Backquote' || e.code === 'KeyG') { if (!e.repeat) toggleDebug(); e.preventDefault(); return; }
   if (killcam.active) { e.preventDefault(); endKillcam(); return; }   // any key skips the kill cam
   if (state !== 'playing') return;
   // While playing, the page must not react to keys: no Tab focus jumps, no Space
@@ -1055,7 +1145,7 @@ document.addEventListener('keydown', e => {
   if (e.code === 'Comma') switchWeapon((currentWeapon + WEAPONS.length - 1) % WEAPONS.length);
   if (e.code === 'Period') switchWeapon((currentWeapon + 1) % WEAPONS.length);
   if (e.code === 'KeyF') laseRange();
-  if (e.code === 'KeyV') knifeAttack();
+  if (e.code === 'KeyV') safe('knife', knifeAttack);
   if (e.code === 'KeyR') startReload();
   if (e.code === 'KeyP') pauseGame('Paused');   // handy on iPad keyboards that have no Esc key
   if (e.code === 'KeyT') toggleSuppressor();
@@ -1086,6 +1176,9 @@ function resetPlayer() {
 
 const _forward = new THREE.Vector3(), _right = new THREE.Vector3();
 function updatePlayer(dt) {
+  // ← → turn (handy when the trackpad can't be captured).
+  const turn = (keys.ArrowLeft ? 1 : 0) - (keys.ArrowRight ? 1 : 0);
+  if (turn) turnCamera(-turn * 1.8 * dt * (camera.fov / BASE_FOV), 0);
   // Which way is "forward" (ignoring looking up/down)?
   camera.getWorldDirection(_forward); _forward.y = 0; _forward.normalize();
   _right.crossVectors(_forward, camera.up).normalize();
@@ -1286,6 +1379,7 @@ function startReload() {
 }
 
 document.addEventListener('mousedown', e => {
+  noteInput('mouse button ' + e.button + (e.ctrlKey ? ' +ctrl' : ''));
   if (killcam.active) { endKillcam(); return; }        // click skips the kill cam
   if (state !== 'playing') return;
   if (cameFromTouch()) return;                 // ignore the fake mouse click a finger tap makes
@@ -1318,6 +1412,7 @@ window.addEventListener('contextmenu', e => {
 // Scroll wheel / two-finger trackpad scroll switches weapons (a little "dead zone" so it isn't twitchy).
 let scrollAccum = 0, lastScrollSwitch = 0;
 window.addEventListener('wheel', e => {
+  noteInput('scroll ' + Math.round(e.deltaY));
   if (state !== 'playing') return;
   e.preventDefault();
   const w = WEAPONS[currentWeapon];
@@ -2654,12 +2749,39 @@ const touch = {
 };
 const STICK_RADIUS = 55;         // pixels the joystick knob can travel
 // True if the last click/tap came from a finger rather than a mouse/trackpad.
-function cameFromTouch() { return performance.now() - lastTouchTime < 800; }
+// v0.4.2: Pointer Events tell us what really made a press: 'mouse' (mouse OR iPad trackpad),
+// 'touch' (a finger) or 'pen'. A trackpad click must never be mistaken for a finger tap
+// (that used to make the game ignore it), so the pointer type wins when we know it.
+let lastPointerType = '', lastPointerTime = -99999;
+window.addEventListener('pointerdown', e => {
+  lastPointerType = e.pointerType || ''; lastPointerTime = performance.now();
+  noteInput('pointer ' + (e.pointerType || '?') + ' button ' + e.button);
+}, { capture: true });
+function recentMousePointer() { return lastPointerType === 'mouse' && performance.now() - lastPointerTime < 800; }
+function cameFromTouch() { return !recentMousePointer() && performance.now() - lastTouchTime < 800; }
 
 // Any real touch on the screen switches the touch buttons on.
-window.addEventListener('touchstart', () => { lastTouchTime = performance.now(); touch.active = true; if (killcam.active) endKillcam(); }, { passive: true, capture: true });
+window.addEventListener('touchstart', e => {
+  noteInput('touch x' + (e.touches ? e.touches.length : 1));
+  if (recentMousePointer() && performance.now() - lastPointerTime < 60) return;   // trackpad pretending to be a touch
+  lastTouchTime = performance.now(); touch.active = true; if (killcam.active) endKillcam();
+}, { passive: true, capture: true });
 // Trackpad/mouse movement or a key press while the pointer is locked hides them again.
 document.addEventListener('mousemove', () => { if (controls.isLocked && touch.active) touch.active = false; });
+// FALLBACK LOOK: no pointer lock (Safari refused / not yet granted)? Move the camera with the
+// trackpad anyway, using the same maths as PointerLockControls.
+document.addEventListener('mousemove', e => {
+  if (state !== 'playing' || controls.isLocked || touch.active || killcam.active || cameFromTouch()) return;
+  const mx = e.movementX || 0, my = e.movementY || 0;
+  if (!mx && !my) return;
+  turnCamera(mx * 0.002 * controls.pointerSpeed, my * 0.002 * controls.pointerSpeed);
+});
+function turnCamera(dx, dy) {
+  const euler = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ');
+  euler.y -= dx;
+  euler.x = THREE.MathUtils.clamp(euler.x - dy, -Math.PI / 2 + 0.05, Math.PI / 2 - 0.05);
+  camera.quaternion.setFromEuler(euler);
+}
 document.addEventListener('keydown', () => { if (controls.isLocked && touch.active) touch.active = false; });
 
 // Turn the camera from a finger drag (same maths as mouse look).
@@ -2729,7 +2851,7 @@ touchButton('tAim', () => {                       // tap to toggle aim (2-step s
 });
 touchButton('tReload', () => startReload());
 touchButton('tSupp', () => toggleSuppressor());
-touchButton('tKnife', () => knifeAttack());
+touchButton('tKnife', () => safe('knife', knifeAttack));
 touchButton('tWeapon', () => switchWeapon((currentWeapon + 1) % WEAPONS.length));
 touchButton('tPause', () => pauseGame('Paused'));
 touchButton('tStance', () => setStance({ stand: 'crouch', crouch: 'prone', prone: 'stand' }[player.stance]));
@@ -4060,6 +4182,8 @@ const CONTROLS = [
     ['L', 'IR laser + illuminator'],
     ['F', 'laser rangefinder'],
     ['[ ]  or  ↑ ↓', 'scope elevation (sniper rifles)'],
+    ['← →', 'turn (if the trackpad isn\'t captured)'],
+    ['` or G', 'DEBUG readout on / off'],
     ['P', 'pause (Esc also works on keyboards that have it)'],
     ['Any key / click', 'skip the X-ray kill cam'],
   ]],
@@ -4093,11 +4217,14 @@ function pauseGame(text) {
   $('pauseScreen').style.display = 'flex';
   if (controls.isLocked) controls.unlock();
 }
+// v0.4.2 (iPad/Safari fix): the game NEVER waits for pointer lock any more. Clicking resume
+// starts playing straight away and *asks* for the pointer; if Safari is slow, says no, or
+// never answers, you keep playing (trackpad look still works, see 'fallback look' below).
 function resumeGame() {
   if (state !== 'paused') return;
-  if (cameFromTouch()) {                 // finger tap: just play on with touch controls
-    state = 'playing'; touch.active = true; $('pauseScreen').style.display = 'none';
-  } else lockMouse();                    // click: recapture the pointer; 'lock' resumes the game
+  state = 'playing'; $('pauseScreen').style.display = 'none';
+  if (cameFromTouch()) touch.active = true;   // finger tap: play on with touch controls
+  else lockMouse();                            // click: also try to capture the pointer
 }
 // Mission-specific settings + renderer setup (sky, shadows, view distance).
 function applyMission(m) {
@@ -4137,10 +4264,14 @@ function missionStartPose() {
   }
 }
 function startMission() {
-  if (killcam.active) endKillcam();
-  applyMission(selectedMission());
-  initAudio();
-  buildLevel(); resetPlayer(); resetWeapons(); resetMasking(); missionStartPose(); resetSpotter();
+  noteInput('start mission');
+  // Each step in a safety net: even if one part fails on some browser, the game still
+  // reaches 'playing' (and the DEBUG box says what failed) instead of sitting dead.
+  safe('start:killcam', () => { if (killcam.active) endKillcam(); });
+  safe('start:mission', () => applyMission(selectedMission()));
+  safe('start:audio', () => initAudio());
+  safe('start:level', () => buildLevel());
+  safe('start:reset', () => { resetPlayer(); resetWeapons(); resetMasking(); missionStartPose(); resetSpotter(); });
   hud.killFeed.innerHTML = '';
   mouseDown = false; setZoom(0); knifeTimer = 0; knifeAnim = 0;
   $('startScreen').style.display = $('endScreen').style.display = $('pauseScreen').style.display = 'none';
@@ -4185,13 +4316,28 @@ $('menuBtn').addEventListener('click', () => { $('endScreen').style.display = 'n
 $('startBtn').addEventListener('click', startMission);
 $('restartBtn').addEventListener('click', startMission);
 $('pauseScreen').addEventListener('click', resumeGame);
-controls.addEventListener('lock', () => { if (state === 'paused') { state = 'playing'; $('pauseScreen').style.display = 'none'; } });
+let lockedSince = 0;   // when pointer lock last really started (0 = not locked)
+controls.addEventListener('lock', () => {
+  lockedSince = performance.now(); noteLock('locked');
+  if (state === 'paused') { state = 'playing'; $('pauseScreen').style.display = 'none'; }
+});
 // Pointer lock ended (Esc, Cmd+Tab, iPad gesture...): pause instead of leaving the mouse stuck.
-controls.addEventListener('unlock', () => { if (state === 'playing' && !touch.active) pauseGame('Paused'); });
+// Only a REAL loss of a lock we held (Esc, app switch) pauses. Safari can fire a stray
+// 'pointerlockchange' when it refuses a lock — that must not freeze the game behind a pause.
+controls.addEventListener('unlock', () => {
+  const held = lockedSince && performance.now() - lockedSince > 300;
+  lockedSince = 0; noteLock('unlocked');
+  if (held && state === 'playing' && !touch.active) pauseGame('Paused');
+});
 // The browser refused pointer lock: don't break, just ask for another click.
+// Refused: keep playing anyway (no pause!). Look still works with the trackpad, just with
+// a visible cursor; clicking again retries the capture.
+let lockRefusedAt = -1e9;
 document.addEventListener('pointerlockerror', () => {
-  if (state === 'playing' && !touch.active) pauseGame('Mouse capture was blocked');
-  else if (state === 'paused') $('pauseText').textContent = 'Mouse capture was blocked — wait a second, then click again (or tap to use touch controls).';
+  noteLock('REFUSED by browser');
+  if (state === 'playing' && performance.now() - lockRefusedAt > 8000)
+    showMessage('Trackpad capture refused by the browser — playing anyway. Click to retry; ← → also turn.', 4);
+  lockRefusedAt = performance.now();
 });
 // Switching apps or tabs pauses the game.
 document.addEventListener('visibilitychange', () => { if (document.hidden) pauseGame('Paused'); });
@@ -4204,37 +4350,50 @@ let elapsed = 0;
 function gameLoop() {
   const dt = Math.min(clock.getDelta(), 0.05);   // cap so a lag spike can't push you through walls
   elapsed += dt;
+  safe('debug', () => updateDebugHud(dt, debugContext()));
   if (killcam.active) {                          // X-ray kill cam: everything else is paused
-    updateKillcam(dt);
-    updateEffects(dt * 0.3);
-    if (nvMode > 0) { renderNightVision(elapsed); return; }
-    renderer.clear(); renderer.render(scene, camera);
+    safe('killcam', () => updateKillcam(dt));
+    safe('effects', () => updateEffects(dt * 0.3));
+    safe('render', () => {
+      if (nvMode > 0) renderNightVision(elapsed);
+      else { renderer.clear(); renderer.render(scene, camera); }
+    });
     return;
   }
   if (state === 'playing') {
-    updatePlayer(dt);
-    updateWeapon(dt);
-    updateWind(dt);
-    updateProjectiles(dt);
-    for (const e of enemies) updateEnemy(e, dt);
-    updateStealth(dt);
-    updateSpotter(dt);
-    updateObjectives(dt, elapsed);
-    updateHUD(dt);
+    debugInfo.updates++;
+    // Each part in its own safety net: one crash can't freeze the guards, bullets, HUD...
+    safe('player', () => updatePlayer(dt));
+    safe('weapon', () => updateWeapon(dt));
+    safe('wind', () => updateWind(dt));
+    safe('projectiles', () => updateProjectiles(dt));
+    for (const e of enemies) safe('enemies', () => updateEnemy(e, dt));
+    safe('stealth', () => updateStealth(dt));
+    safe('spotter', () => updateSpotter(dt));
+    safe('objectives', () => updateObjectives(dt, elapsed));
+    safe('hud', () => updateHUD(dt));
   }
-  if (killcam.active) { renderer.clear(); renderer.render(scene, camera); return; }
-  updateMateriel(dt);
-  updateEffects(dt);
-  updateTouchLayer();
-  updateTeammates(dt);
-  updatePlayerIR();
+  if (killcam.active) { safe('render', () => { renderer.clear(); renderer.render(scene, camera); }); return; }
+  safe('materiel', () => updateMateriel(dt));
+  safe('effects', () => updateEffects(dt));
+  safe('touch', () => updateTouchLayer());
+  safe('teammates', () => updateTeammates(dt));
+  safe('playerIR', () => updatePlayerIR());
   if (exitZone) exitZone.strobe.visible = nvMode > 0 && (masking.time % 1) < 0.08;   // DZ IR strobe
   // Draw the world, then the gun on top (through the night-vision filter if it's on).
-  if (nvMode > 0) { renderNightVision(elapsed); return; }
-  renderer.clear();
-  renderer.render(scene, camera);
-  renderer.clearDepth();
-  renderer.render(weaponScene, weaponCamera);
+  safe('render', () => {
+    if (nvMode > 0) { renderNightVision(elapsed); return; }
+    renderer.clear();
+    renderer.render(scene, camera);
+    renderer.clearDepth();
+    renderer.render(weaponScene, weaponCamera);
+  });
+}
+function debugContext() {
+  let alive = 0; const mix = { idle: 0, suspicious: 0, search: 0, chase: 0 };
+  for (const e of enemies) if (e.state !== 'dead') { alive++; if (e.state in mix) mix[e.state]++; }
+  return { state: state === 'start' ? 'menu' : state, locked: !!document.pointerLockElement, touch: touch.active, mission: currentMission,
+    alive, mix: `calm ${mix.idle} · suspicious ${mix.suspicious} · searching ${mix.search} · combat ${mix.chase}` };
 }
 
 // Build the level once so it shows behind the briefing screen, then start the loop.
@@ -4242,10 +4401,11 @@ applyMission(1);
 buildLevel(); resetPlayer(); resetWeapons(); resetMasking();
 renderer.setAnimationLoop(gameLoop);
 window.__gameLoaded = true;
+if (!debugInfo.on) document.getElementById('debugHud').style.display = 'none';
 // Handy for testing in the browser console (F12), e.g.  __game.SETTINGS.enemyDamage = 0
 window.__game = {
   SETTINGS, CALIBERS, WEAPONS, player, camera, startMission, switchWeapon,
-  enemies: () => enemies, state: () => state,
+  enemies: () => enemies, state: () => state, debugInfo, VERSION,
   // Debug: what would a ray from the screen centre hit right now? (nearest first)
   rayHits: () => {
     raycaster.setFromCamera(new THREE.Vector2(0, 0), camera); raycaster.far = 2000;
