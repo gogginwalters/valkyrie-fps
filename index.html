@@ -2,12 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>OPERATION: BLACK FILE — v0.5.1</title>
+<title>OPERATION: BLACK FILE — v0.5.2</title>
 <link rel="icon" href="data:,">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <!--
   =====================================================================
-  OPERATION: BLACK FILE  (v0.5.1 — semi-auto pistols, lean (Tab / E), fixed freeze at the elevator on iPad; v0.5 — real 3D soldiers, zone looks + signs, compass, map (M), radio hints, dual M1911s; v0.4.6 mission select fix for iPad, free 360° turning on iPad, retuned damage, friendly markers on your squad, sniper mission, knife, Magic Keyboard controls, iPad aim/layout fix + DEBUG readout)
+  OPERATION: BLACK FILE  (v0.5.2 — trackpad no longer spins the view (edge turn only while moving, on/off switch, swipe momentum limit); v0.5.1 — semi-auto pistols, lean (Tab / E), fixed freeze at the elevator on iPad; v0.5 — real 3D soldiers, zone looks + signs, compass, map (M), radio hints, dual M1911s; v0.4.6 mission select fix for iPad, free 360° turning on iPad, retuned damage, friendly markers on your squad, sniper mission, knife, Magic Keyboard controls, iPad aim/layout fix + DEBUG readout)
   A tiny browser first-person shooter.
   - Mission structure & spy flavour inspired by GoldenEye 007 (N64)
   - Fast, aggressive maze shooting inspired by Wolfenstein 3D
@@ -198,6 +198,8 @@
         <small>— slow-motion bullet cam + X-ray on great sniper shots (Mission 2).</small></label>
       <label class="sensRow" onclick="event.stopPropagation()">Look sensitivity: <input type="range" class="sensSlider" min="0.4" max="3" step="0.1" value="1.3"> <b class="sensVal">1.3</b>
         <small>— trackpad, swipe, edge-turn, keys and touch.</small></label>
+      <label class="edgeRow" onclick="event.stopPropagation()"><input type="checkbox" class="edgeToggle" checked> Edge turn
+        <small>— keep turning while you push the pointer into the left / right edge (iPad can't capture the trackpad).</small></label>
       <label>Graphics: <select id="optQuality"><option value="high">High (desktop)</option><option value="low">Low (iPad / older laptops)</option></select></label>
     </div>
     <div class="controls" id="controlsStart"></div>
@@ -241,7 +243,9 @@
     <h1 style="text-align:center">PAUSED</h1>
     <p id="pauseText" style="text-align:center">Click to resume the mission.</p>
     <div style="text-align:center" onclick="event.stopPropagation()"><label class="sensRow" onclick="event.stopPropagation()">Look sensitivity: <input type="range" class="sensSlider" min="0.4" max="3" step="0.1" value="1.3"> <b class="sensVal">1.3</b>
-        <small>— trackpad, swipe, edge-turn, keys and touch.</small></label></div>
+        <small>— trackpad, swipe, edge-turn, keys and touch.</small></label><br>
+      <label class="edgeRow" onclick="event.stopPropagation()"><input type="checkbox" class="edgeToggle" checked> Edge turn
+        <small>— keep turning while you push the pointer into the left / right edge.</small></label></div>
     <div class="controls" id="controlsPause"></div>
   </div>
 </div>
@@ -328,7 +332,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 // ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
 // ##  part failed and why.                                           ##
 // #####################################################################
-const VERSION = 'v0.5.1';
+const VERSION = 'v0.5.2';
 // v0.4.4: the game must only ever start ONCE per page (one canvas, one camera, one loop).
 // If this script somehow ran a second time, stop the second copy right here.
 window.__valkyrieBoots = (window.__valkyrieBoots || 0) + 1;
@@ -402,10 +406,14 @@ const SETTINGS = {
   mouseSensitivity: 1.0,     // 1 = normal, 2 = twice as fast (mouse AND trackpad). The LOOK SENSITIVITY slider sets this.
   // v0.4.5 iPad turning (Safari on iPad has NO pointer lock, so the cursor stops at the screen edge):
   fallbackLookScale: 0.0032, // radians per pixel of cursor movement when the pointer isn't captured (was 0.002)
-  edgeTurnZone: 0.12,        // cursor within this fraction of the screen width of the left/right edge = keep turning
-  edgeTurnSpeed: 2.0,        // radians/second at the very edge (x look sensitivity); smoothly less further in
-  edgePitchZone: 0.07,       // same for the top/bottom edge (look up/down)...
-  edgePitchSpeed: 1.1,       // ...but gentler
+  edgeTurn: true,            // v0.5.2: EDGE TURN on/off (start + pause screens, remembered on this device)
+  edgeTurnZone: 0.06,        // pointer within this fraction of the screen width of the left/right edge = turn (was 0.12)
+  edgeTurnSpeed: 1.4,        // radians/second at the very edge; gently less further in (was 2.0)
+  edgeTurnGrace: 0.35,       // v0.5.2: ONLY while the pointer really moves: this many seconds after the last movement it stops
+  edgePitchZone: 0.04,       // same for the top/bottom edge (look up/down)...
+  edgePitchSpeed: 0.8,       // ...but gentler
+  swipeMaxDelta: 80,         // v0.5.2: one scroll event can't turn more than this many pixels' worth
+  swipeMaxGesture: 3,        // v0.5.2: one swipe stops looking after this many seconds (no endless momentum)
   scrollLooks: true,         // no pointer lock: two-finger trackpad swipe = look (unlimited 360°)
   scrollLookScale: 0.004,    // radians per scroll pixel
   keyTurnSpeed: 1.4,         // ← → / J K: starting turn speed (radians/second)...
@@ -1852,6 +1860,7 @@ window.addEventListener('contextmenu', e => {
 }, { capture: true });
 // Scroll wheel / two-finger trackpad scroll switches weapons (a little "dead zone" so it isn't twitchy).
 let scrollAccum = 0, lastScrollSwitch = 0;
+const swipe = { start: 0, last: -1e9, prev: 0, shrink: 0, dead: false };
 window.addEventListener('wheel', e => {
   noteInput('scroll ' + Math.round(e.deltaY));
   if (state !== 'playing') return;
@@ -1864,7 +1873,18 @@ window.addEventListener('wheel', e => {
     const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1;
     const k = SETTINGS.scrollLookScale * SETTINGS.mouseSensitivity * (camera.fov / BASE_FOV) * unit;
     const scopedSniper = aiming && w.scope && w.projectile;
-    turnCamera(e.deltaX * k, scopedSniper ? 0 : e.deltaY * k);
+    // v0.5.2: a swipe is one "gesture" (events less than 150 ms apart). After you lift your fingers Safari keeps
+    // sending shrinking "momentum" events: stop looking once they've shrunk 5 events in a row, and never look
+    // for longer than swipeMaxGesture seconds per swipe. One event can't turn more than swipeMaxDelta.
+    const now = performance.now(), mag = Math.hypot(e.deltaX, e.deltaY);
+    if (now - swipe.last > 150) { swipe.start = now; swipe.shrink = 0; swipe.prev = 0; swipe.dead = false; }
+    swipe.last = now;
+    if (mag < swipe.prev * 0.97) swipe.shrink++; else if (mag > swipe.prev * 1.05) swipe.shrink = 0;
+    swipe.prev = mag;
+    if (swipe.shrink >= 5 || now - swipe.start > SETTINGS.swipeMaxGesture * 1000) swipe.dead = true;
+    if (swipe.dead) { noteInput('swipe momentum ignored'); return; }
+    const cl = v => THREE.MathUtils.clamp(v, -SETTINGS.swipeMaxDelta, SETTINGS.swipeMaxDelta);
+    turnCamera(cl(e.deltaX) * k, scopedSniper ? 0 : cl(e.deltaY) * k);
     noteInput('swipe-look ' + Math.round(e.deltaX) + ',' + Math.round(e.deltaY));
     if (!scopedSniper) return;
     if (Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
@@ -3589,6 +3609,8 @@ document.addEventListener('mousemove', () => { if (controls.isLocked && touch.ac
 // trackpad anyway, using the same maths as PointerLockControls.
 document.addEventListener('mousemove', e => {
   const prev = lastMouseXY; lastMouseXY = { x: e.clientX, y: e.clientY };
+  // Only real movement counts (iPad sends a "move" with no movement when you just touch the trackpad).
+  if ((e.movementX || 0) || (e.movementY || 0) || (prev && (prev.x !== e.clientX || prev.y !== e.clientY))) lastRealMoveAt = performance.now();
   if (state !== 'playing' || controls.isLocked || touch.active || killcam.active || cameFromTouch()) return;
   // Some browsers leave movementX/Y at 0 without pointer lock: then use the cursor's own movement.
   let mx = e.movementX || 0, my = e.movementY || 0;
@@ -3596,18 +3618,25 @@ document.addEventListener('mousemove', e => {
   if (!mx && !my) return;
   turnCamera(mx * SETTINGS.fallbackLookScale * controls.pointerSpeed, my * SETTINGS.fallbackLookScale * controls.pointerSpeed);
 });
-let lastMouseXY = null;
+let lastMouseXY = null, lastRealMoveAt = -1e9;
 // The cursor left the page (or the window lost focus): stop edge-turning.
 document.addEventListener('mouseleave', () => { lastMouseXY = null; });
 window.addEventListener('blur', () => { lastMouseXY = null; });
 // EDGE TURN (v0.4.5): Safari on iPad never captures the trackpad, so the cursor hits the edge of the
 // screen and stops. While it sits near the left/right edge, keep turning — faster the closer it is.
+// v0.5.2 FIX ("anytime I touch the trackpad it starts spinning"): it used to keep turning for as long as the
+// pointer merely SAT near an edge, and on iPad the pointer stays where you left it (e.g. after clicking the
+// pause / MAP buttons at the right edge), so touching the trackpad again = endless spin.
+// Now: only while the pointer is actually moving (+ a short grace), a thinner edge, gentler, never in a sniper scope.
 function edgeTurn(dt) {
-  if (!lastMouseXY || controls.isLocked || touch.active || killcam.active || cameFromTouch()) return;
+  debugInfo.edge = 'off';
+  if (!SETTINGS.edgeTurn || !lastMouseXY || controls.isLocked || touch.active || killcam.active || cameFromTouch()) return;
+  if (performance.now() - lastRealMoveAt > SETTINGS.edgeTurnGrace * 1000) { debugInfo.edge = 'idle'; return; }
+  if (aiming && WEAPONS[currentWeapon].scope) { debugInfo.edge = 'scoped'; return; }
   const W = window.innerWidth, H = window.innerHeight, x = lastMouseXY.x, y = lastMouseXY.y;
   const ez = W * SETTINGS.edgeTurnZone, pz = H * SETTINGS.edgePitchZone;
-  const ramp = d => { const t = THREE.MathUtils.clamp(1 - d / ez, 0, 1); return t * t * (3 - 2 * t); };   // smooth 0..1
-  const rampP = d => { const t = THREE.MathUtils.clamp(1 - d / pz, 0, 1); return t * t * (3 - 2 * t); };
+  const ramp = d => { const t = THREE.MathUtils.clamp(1 - d / ez, 0, 1); return t * t; };   // gentle 0..1 (slow at the inner edge)
+  const rampP = d => { const t = THREE.MathUtils.clamp(1 - d / pz, 0, 1); return t * t; };
   const yaw = ramp(x) - ramp(W - 1 - x);          // + = left edge, - = right edge
   const pitch = rampP(y) - rampP(H - 1 - y);      // + = top edge (look up)
   const k = SETTINGS.mouseSensitivity * (camera.fov / BASE_FOV) * dt;
@@ -5007,7 +5036,7 @@ function endKillcam() {
 const CONTROLS = [
   ['Trackpad / mouse', [
     ['Move finger', 'look around'],
-    ['Push cursor to an edge', 'keep turning (iPad: Safari can\'t capture the trackpad)'],
+    ['Push pointer into the left / right edge', 'keeps turning while you keep pushing · stops when the pointer rests · off in a sniper scope · Edge turn on/off in settings'],
     ['2-finger swipe', 'look / turn — unlimited 360° (when the trackpad isn\'t captured)'],
     ['Click (1 finger)', 'fire (pistols & rifles: one shot per click · P90 / M4 / AKM / SCAR: hold for auto)'],
     ['2-finger click', 'aim / scope (snipers: again = 2nd zoom, again = off) · dual pistols: fire LEFT gun'],
@@ -5061,6 +5090,14 @@ function setLookSensitivity(v) {
 }
 document.querySelectorAll('.sensSlider').forEach(s => s.addEventListener('input', () => setLookSensitivity(s.value)));
 { let saved = null; try { saved = localStorage.getItem('valkyrieLookSens'); } catch (err) { /* ignore */ } setLookSensitivity(saved || 1.3); }
+// EDGE TURN on/off (v0.5.2): default ON, remembered on this device.
+function setEdgeTurn(on) {
+  SETTINGS.edgeTurn = BASE_SETTINGS.edgeTurn = !!on;
+  try { localStorage.setItem('valkyrieEdgeTurn', on ? '1' : '0'); } catch (err) { /* private mode */ }
+  document.querySelectorAll('.edgeToggle').forEach(c => (c.checked = !!on));
+}
+document.querySelectorAll('.edgeToggle').forEach(c => c.addEventListener('change', () => setEdgeTurn(c.checked)));
+{ let saved = null; try { saved = localStorage.getItem('valkyrieEdgeTurn'); } catch (err) { /* ignore */ } setEdgeTurn(saved !== '0'); }
 
 
 // #####################################################################
@@ -5590,7 +5627,7 @@ window.__game = {
   lastProjectile: () => lastProjectile && { start: lastProjectile.start.toArray().map(v => +v.toFixed(2)), pos: lastProjectile.pos.toArray().map(v => +v.toFixed(2)), done: lastProjectile.done, t: +lastProjectile.t.toFixed(3), hits: lastProjectile.hitSet.size, dir0: lastProjectile.path[1] ? lastProjectile.path[1].clone().sub(lastProjectile.path[0]).normalize().toArray().map(v => +v.toFixed(4)) : null },
   shoot: () => { triggerReleased = true; pressPending = true; fireCooldown = 0; switchTimer = 0; reloadTimer = 0; tryShoot(); },
   shootEnemy: (i, zone, dist) => shootEnemy(enemies[i], WEAPONS[currentWeapon], zone, dist, enemies[i].group.position.clone().setY(1.5)),
-  toggleSuppressor, damagePlayer, touch, pauseGame, dual, toggleDual, dualActive, openMap, closeMap, navInfo: () => navInfo, currentObjective, giveHint, zoneAt, pickups: () => pickups, intel: () => intelItems, FIGURES, figuresReady, keys, edgeTurn, setLookSensitivity, lastMouse: () => lastMouseXY, setLastMouse: v => (lastMouseXY = v), aimKind: () => aimKind, startCalls: () => ({ startCalls, startBlocked, loopCount }), underCrosshair,
+  toggleSuppressor, damagePlayer, touch, pauseGame, dual, toggleDual, dualActive, openMap, closeMap, navInfo: () => navInfo, currentObjective, giveHint, zoneAt, pickups: () => pickups, intel: () => intelItems, FIGURES, figuresReady, keys, edgeTurn, setLookSensitivity, setEdgeTurn, swipe, lastRealMove: () => lastRealMoveAt, lastMouse: () => lastMouseXY, setLastMouse: v => (lastMouseXY = v), aimKind: () => aimKind, startCalls: () => ({ startCalls, startBlocked, loopCount }), underCrosshair,
   setStance, cycleNightVision, toggleIR, masking, teammates: () => teammates, generatorBackfire, sabotageGenerator,
   // Mission 2 / sniper test hooks
   selectMission: m => chooseMission(m, false),
