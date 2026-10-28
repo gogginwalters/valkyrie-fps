@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>OPERATION: BLACK FILE — v0.4.3</title>
+<title>OPERATION: BLACK FILE — v0.4.4</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <!--
   =====================================================================
-  OPERATION: BLACK FILE  (v0.4.3 — sniper mission, knife, Magic Keyboard controls, iPad aim/layout fix + DEBUG readout)
+  OPERATION: BLACK FILE  (v0.4.4 — friendly markers on your squad, sniper mission, knife, Magic Keyboard controls, iPad aim/layout fix + DEBUG readout)
   A tiny browser first-person shooter.
   - Mission structure & spy flavour inspired by GoldenEye 007 (N64)
   - Fast, aggressive maze shooting inspired by Wolfenstein 3D
@@ -90,6 +90,10 @@
   #crosshair .v { width: 2px; height: 8px; left: -1px; }
   #crosshair .l { left: -13px; } #crosshair .r { left: 5px; }
   #crosshair .t { top: -13px; } #crosshair .b { top: 5px; }
+  /* v0.4.4: crosshair turns GREEN over a teammate (don't shoot!) and RED over a guard. */
+  #crosshair.friendly div { background: #3f6; } #crosshair.enemy div { background: #f33; }
+  #friendTag { position: absolute; left: 50%; top: calc(50% + 22px); transform: translateX(-50%); color: #3f6;
+    font: bold 13px monospace; text-shadow: 0 0 3px #000, 0 0 2px #000; white-space: nowrap; pointer-events: none; display: none; }
   /* Hit marker: an X that flashes when you hit a guard */
   #hitmarker { position: absolute; left: 50%; top: 50%; opacity: 0; }
   #hitmarker div { position: absolute; width: 10px; height: 2px; background: #fff; box-shadow: 0 0 3px #f00; }
@@ -247,6 +251,7 @@
   <div id="message"></div>
   <div id="quip"></div>
   <div id="crosshair"><div class="h l"></div><div class="h r"></div><div class="v t"></div><div class="v b"></div></div>
+  <div id="friendTag"></div>
   <div id="hitmarker"><div class="a"></div><div class="b"></div><div class="c"></div><div class="d"></div></div>
 </div>
 
@@ -297,7 +302,11 @@ import { Water } from 'three/addons/objects/Water.js';
 // ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
 // ##  part failed and why.                                           ##
 // #####################################################################
-const VERSION = 'v0.4.3';
+const VERSION = 'v0.4.4';
+// v0.4.4: the game must only ever start ONCE per page (one canvas, one camera, one loop).
+// If this script somehow ran a second time, stop the second copy right here.
+window.__valkyrieBoots = (window.__valkyrieBoots || 0) + 1;
+if (window.__valkyrieBoots > 1) throw new Error('second copy of the game blocked (boot #' + window.__valkyrieBoots + ')');
 const DEBUG_ON_BY_DEFAULT = true;     // set to false once things are working on the iPad
 const debugInfo = { on: DEBUG_ON_BY_DEFAULT, lastInput: '-', lastInputAt: 0, errors: {}, lastError: null,
   fps: 0, frameCount: 0, fpsTimer: 0, updates: 0, shownAt: 0 };
@@ -338,6 +347,9 @@ function updateDebugHud(dt, ctx) {
     `view: ${ctx.view}\n` +
     `nearest guard: ${ctx.near ? ctx.near.d.toFixed(1) + ' m, ' + ctx.near.state + ', sees you: ' + (ctx.near.sees === true ? 'YES' : ctx.near.sees) : 'none'}\n` +
     `crosshair on: ${esc(ctx.under)}\n` +
+    `nearest teammate: ${ctx.mate || 'none'}\n` +
+    `instances: canvases ${document.querySelectorAll('canvas').length} · render loops ${loopCount} · startMission calls ${startCalls}${startBlocked ? ' (' + startBlocked + ' double-taps ignored)' : ''}\n` +
+    `camera drawn at x ${drawnAt.x.toFixed(1)} z ${drawnAt.z.toFixed(1)}  ·  game logic at x ${ctx.pos.x.toFixed(1)} z ${ctx.pos.z.toFixed(1)}${drawnAt.distanceTo(ctx.pos) > 0.5 ? '  <span class="err">MISMATCH!</span>' : ''}\n` +
     `last shot: ${lastShotInfo ? 'from x ' + lastShotInfo.x.toFixed(1) + ' z ' + lastShotInfo.z.toFixed(1) + ' → ' + lastShotInfo.what + (lastShotInfo.d != null ? ' @ ' + lastShotInfo.d.toFixed(1) + ' m' : '') : 'none yet'}\n` +
     `last input: ${esc(debugInfo.lastInput)} ${ago}`;
   if (debugInfo.lastError) {
@@ -689,6 +701,8 @@ renderer.autoClear = false;          // we draw the world, then the gun on top
 // flow, so if iPad Safari scrolled or resized the page the picture could slide away from the
 // crosshair — you'd see a guard under the crosshair while the game aimed somewhere else.
 Object.assign(renderer.domElement.style, { position: 'fixed', left: '0', top: '0', width: '100%', height: '100%' });
+document.querySelectorAll('canvas[data-valkyrie]').forEach(c => c.remove());   // never two 3D views
+renderer.domElement.dataset.valkyrie = '1';
 document.body.prepend(renderer.domElement);
 // The page itself must never scroll (iPad Safari sometimes does, even with overflow: hidden).
 window.addEventListener('scroll', () => { if (window.scrollX || window.scrollY) window.scrollTo(0, 0); });
@@ -1103,7 +1117,7 @@ function buildLevel() {
   for (let i = 0; i < SETTINGS.teammates; i++) {
     const a = playerStart.yaw + Math.PI + (i - 0.5) * 0.8;
     const spot = randomFloorNear(playerStart.x + Math.sin(a) * 1.5, playerStart.z + Math.cos(a) * 1.5, 0.5);
-    createTeammate(spot.x, spot.z, i === 0 ? 'Spotter' : 'Teammate ' + (i + 1));
+    createTeammate(spot.x, spot.z, i === 0 ? 'HAWK' : 'DOC');
   }
 
   // One big floor and one big ceiling covering the whole map.
@@ -1513,12 +1527,13 @@ function tryShoot() {
   raycaster.set(camera.position, shotDir);
   raycaster.far = (heightField ? 600 : 150) * (w.suppressed ? SETTINGS.suppressorRangeMult : 1);
   raycaster.far = groundHitDistance(raycaster.ray.origin, raycaster.ray.direction, raycaster.far);   // hillsides stop bullets
-  const targets = wallMeshes.concat(...enemies.filter(e => e.state !== 'dead').map(e => e.hitMeshes.filter(m => m.visible)));
+  const targets = wallMeshes.concat(...enemies.filter(e => e.state !== 'dead').map(e => e.hitMeshes.filter(m => m.visible)),
+    ...teammates.map(m => m.meshes || []));                // v0.4.4: your own squad stops bullets (no damage)
   const hits = raycaster.intersectObjects(targets, false);
   pointBlankHits(raycaster.ray, hits);          // muzzle already touching a guard? still counts
   {
     const h = hits[0], o = raycaster.ray.origin;
-    lastShotInfo = { x: o.x, z: o.z, what: !h ? 'nothing (out of range)' : h.object.userData.enemy ? 'GUARD ' + (h.object.userData.zone || '') :
+    lastShotInfo = { x: o.x, z: o.z, what: !h ? 'nothing (out of range)' : h.object.userData.teammate ? 'TEAMMATE ' + h.object.userData.teammate.name + ' (friendly, no damage)' : h.object.userData.enemy ? 'GUARD ' + (h.object.userData.zone || '') :
       h.object.userData.materiel ? 'vehicle/target' : 'wall/floor', d: h ? h.distance : null };
   }
   lastShotRay = { o: raycaster.ray.origin.toArray(), d: raycaster.ray.direction.toArray(), far: raycaster.far, hits: hits.slice(0, 4).map(h => (h.object.userData.enemy ? 'E:' + h.object.userData.zone : 'W') + '@' + h.distance.toFixed(2)) };
@@ -1528,6 +1543,7 @@ function tryShoot() {
   const alreadyHit = new Set();
   for (const hit of hits) {
     const enemy = hit.object.userData.enemy;
+    if (hit.object.userData.teammate) { friendlyHit(hit.object.userData.teammate); break; }
     if (enemy) {
       if (alreadyHit.has(enemy) || enemy.state === 'dead') continue;   // same guard, another body part
       alreadyHit.add(enemy);
@@ -1679,7 +1695,14 @@ function knifeAttack() {
   setZoom(0);
   SOUNDS.knifeSwish();
   const t = knifeTarget();
-  if (!t) return;                                                      // slashed thin air
+  if (!t) {                                                            // slashed thin air...
+    const fwd = camera.getWorldDirection(new THREE.Vector3());          // ...or at your own teammate?
+    for (const m of teammates) {
+      const p = m.group.position, d = dist2D(camera.position.x, camera.position.z, p.x, p.z);
+      if (!m.static && d < SETTINGS.knifeRange + 0.5 && ((p.x - camera.position.x) * fwd.x + (p.z - camera.position.z) * fwd.z) > 0) { friendlyHit(m, 'knife'); break; }
+    }
+    return;
+  }
   const e = t.e, chest = e.group.position.clone(); chest.y += 1.3;
   if (isBehindUnaware(e)) {
     // SILENT TAKEDOWN: instant, no alarm, no gunshot noise.
@@ -2383,14 +2406,36 @@ function rayToWall(x, z, dirX, dirZ, maxDist) {
   for (let d = 0.2; d < maxDist; d += 0.2) if (isWallAt(x + dirX * d, z + dirZ * d)) return d;
   return maxDist;
 }
-function createTeammate(x, z, name) {
+// v0.4.4: teammates used to look a lot like guards (same blocky body, similar colours), so it
+// was easy to stand at the start shooting your OWN squad — bullets went straight through them,
+// because friendlies can't be hurt. Now they wear tan Multicam + coyote plate carriers, carry a
+// floating green "▼ NAME" marker, and the crosshair turns green over them.
+const friendlyMarkerCache = {};
+function friendlyMarker(name) {
+  if (!friendlyMarkerCache[name]) {
+    const c = document.createElement('canvas'); c.width = 256; c.height = 96;
+    const g = c.getContext('2d');
+    g.font = 'bold 34px monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.lineWidth = 6; g.strokeStyle = 'rgba(0,0,0,0.8)'; g.fillStyle = '#4f6';
+    g.strokeText(name, 128, 28); g.fillText(name, 128, 28);
+    g.beginPath(); g.moveTo(108, 58); g.lineTo(148, 58); g.lineTo(128, 86); g.closePath();
+    g.stroke(); g.fill();
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+    friendlyMarkerCache[name] = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, fog: false });
+  }
+  const sp = new THREE.Sprite(friendlyMarkerCache[name]);
+  sp.scale.set(0.9, 0.34, 1); sp.position.set(0, 2.55, 0);
+  return sp;
+}
+function createTeammate(x, z, name, opts = {}) {
   const group = new THREE.Group(); group.position.set(x, 0, z);
-  const camo = new THREE.MeshStandardMaterial({ color: 0x8a7d5a, roughness: 0.9 });
-  const gear = new THREE.MeshStandardMaterial({ color: 0x4a4a3a, roughness: 0.8 });
+  const camo = new THREE.MeshStandardMaterial({ color: 0xb4a074, roughness: 0.9 });   // tan Multicam
+  const gear = new THREE.MeshStandardMaterial({ color: 0x8a7148, roughness: 0.8 });   // coyote brown plate carrier
   const black = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.6 });
   const skin = new THREE.MeshStandardMaterial({ color: 0xb08a6a, roughness: 0.8 });
+  const meshes = [];
   const add = (geo, mat, px, py, pz, parent = group, hot = true) => {
-    const m = new THREE.Mesh(geo, mat); m.position.set(px, py, pz); m.userData.hot = hot; parent.add(m); return m;
+    const m = new THREE.Mesh(geo, mat); m.position.set(px, py, pz); m.userData.hot = hot; parent.add(m); meshes.push(m); return m;
   };
   const legL = new THREE.Group(); legL.position.set(-0.15, 0.9, 0); group.add(legL);
   const legR = new THREE.Group(); legR.position.set(0.15, 0.9, 0); group.add(legR);
@@ -2402,10 +2447,24 @@ function createTeammate(x, z, name) {
   add(new THREE.BoxGeometry(0.24, 0.08, 0.1), black, 0, 1.98, 0.2, group, false); // quad NVG on the helmet
   add(new THREE.BoxGeometry(0.07, 0.1, 0.8), black, 0.22, 1.3, 0.45, group, false); // rifle
   const strobe = makeStrobe(group, 0, 2.16, -0.05);
-  const mate = { group, name, legL, legR, strobe, laser: makeIRLaser(levelGroup), yaw: 0, path: [], pathTimer: 0, pathGoal: '',
-    walkTime: 0, blinkOffset: Math.random() };
+  const marker = friendlyMarker(name); group.add(marker);
+  if (opts.noMarker) marker.visible = false;
+  const mate = { group, name, legL, legR, strobe, marker, meshes, laser: makeIRLaser(levelGroup), yaw: 0, path: [], pathTimer: 0, pathGoal: '',
+    walkTime: 0, blinkOffset: Math.random(), flinch: 0 };
+  meshes.forEach(m => (m.userData.teammate = mate));
   levelGroup.add(group);
   teammates.push(mate);
+  return mate;
+}
+// You shot (or slashed at) one of your own: no damage, but a loud reminder.
+let lastFriendlyWarn = -1e9;
+function friendlyHit(mate, how = 'shot') {
+  mate.flinch = 0.35;
+  const now = performance.now();
+  if (now - lastFriendlyWarn < 1500) return;
+  lastFriendlyWarn = now;
+  showMessage(`FRIENDLY! That's ${mate.name}, your own teammate (green ▼ marker) — ${how === 'knife' ? 'no stabbing the squad' : 'he can\'t be hurt'}. Guards wear green uniforms + black boots, deeper in the base.`, 4);
+  sayQuip && showQuip(['Check fire, Wraith! Wrong team!', 'Hey! I\'m on YOUR side!', 'Do that again and you\'re buying the beer.'][Math.floor(Math.random() * 3)]);
 }
 function updateTeammates(dt) {
   const nvOn = nvMode > 0;
@@ -2434,6 +2493,8 @@ function updateTeammates(dt) {
     const swing = Math.hypot(move.x, move.z) > 0.01 ? Math.sin(m.walkTime) * 0.6 : 0;
     m.legL.rotation.x = swing; m.legR.rotation.x = -swing;
     m.group.rotation.y = m.yaw;
+    m.flinch = Math.max(0, (m.flinch || 0) - dt);
+    m.group.rotation.x = m.static ? m.group.rotation.x : -m.flinch * 0.5;      // ducks when you shoot near him
     pos.y = groundAt(pos.x, pos.z);
     // IR strobe blinks about once a second.
     m.strobe.visible = nvOn && ((masking.time + m.blinkOffset) % 1) < 0.08;
@@ -3197,7 +3258,7 @@ function buildSniperMission() {
   // 10. Player nest, spotter, extraction LZ, a little ammo
   const N = L2W(SNIPER_LAYOUT.nest.x, SNIPER_LAYOUT.nest.z);
   playerStart = { x: N.x, z: N.z, yaw: Math.PI };                        // facing south, at the compound
-  createTeammate(N.x + 1.2, N.z - 2.3, 'Spotter');     // lies beside you (his head next to your shoulder)
+  createTeammate(N.x + 1.2, N.z - 2.3, 'GRAVEL', { noMarker: true });     // lies beside you (his head next to your shoulder)
   const spotter = teammates[teammates.length - 1];
   spotter.static = true; spotter.yaw = 0; spotter.group.rotation.order = 'YXZ'; spotter.group.rotation.x = Math.PI / 2;
   const X = L2W(SNIPER_LAYOUT.exfil.x, SNIPER_LAYOUT.exfil.z);
@@ -4328,7 +4389,13 @@ function missionStartPose() {
     camera.position.y = groundAt(camera.position.x, camera.position.z) + player.eyeY;
   }
 }
+// v0.4.4: a tap on iPad can arrive as touch + click; only the FIRST start within 0.5 s counts,
+// so the level can never be built twice on top of itself.
+let startCalls = 0, startBlocked = 0, lastStartAt = -1e9;
 function startMission() {
+  const now = performance.now();
+  if (now - lastStartAt < 500) { startBlocked++; return; }
+  lastStartAt = now; startCalls++;
   noteInput('start mission');
   // Each step in a safety net: even if one part fails on some browser, the game still
   // reaches 'playing' (and the DEBUG box says what failed) instead of sitting dead.
@@ -4344,7 +4411,7 @@ function startMission() {
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   window.scrollTo(0, 0); fitRenderer(true);   // so Space/Enter can't "press" the start button again
   state = 'playing';
-  showMessage(currentMission === 2 ? 'Operation COLD HORIZON. Lase (F), dial ([ ] or ↑ ↓), breathe (Shift), send it.' : 'Mission start. Find the intel. (V = knife)', 3);
+  showMessage(currentMission === 2 ? 'Operation COLD HORIZON. Lase (F), dial ([ ] or ↑ ↓), breathe (Shift), send it.' : 'Mission start. Find the intel. Your squad (green ▼ HAWK, DOC) follows you — guards are deeper in. (V = knife)', 3);
   if (cameFromTouch()) touch.active = true;   // started with a tap: show the touch buttons
   else lockMouse();                           // started with a click: capture mouse/trackpad
 }
@@ -4412,6 +4479,8 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) pause
 // ##  SECTION 14: GAME LOOP (runs ~60 times a second)                ##
 // #####################################################################
 const clock = new THREE.Clock();
+const drawnAt = new THREE.Vector3();   // camera position used for the last drawn frame (DEBUG)
+let loopCount = 0;                    // how many animation loops are running (must be 1)
 let elapsed = 0;
 function gameLoop() {
   const dt = Math.min(clock.getDelta(), 0.05);   // cap so a lag spike can't push you through walls
@@ -4444,17 +4513,24 @@ function gameLoop() {
   safe('materiel', () => updateMateriel(dt));
   safe('effects', () => updateEffects(dt));
   safe('touch', () => updateTouchLayer());
+  safe('crosshair', () => updateCrosshairColour());
   safe('teammates', () => updateTeammates(dt));
   safe('playerIR', () => updatePlayerIR());
   if (exitZone) exitZone.strobe.visible = nvMode > 0 && (masking.time % 1) < 0.08;   // DZ IR strobe
   // Draw the world, then the gun on top (through the night-vision filter if it's on).
   safe('render', () => {
+    camera.updateMatrixWorld(); drawnAt.setFromMatrixPosition(camera.matrixWorld);   // where the picture is drawn from (DEBUG)
     if (nvMode > 0) { renderNightVision(elapsed); return; }
     renderer.clear();
     renderer.render(scene, camera);
     renderer.clearDepth();
     renderer.render(weaponScene, weaponCamera);
   });
+}
+function nearestMateText() {
+  let best = null, bd = Infinity;
+  for (const m of teammates) { const d = dist2D(m.group.position.x, m.group.position.z, camera.position.x, camera.position.z); if (d < bd) { bd = d; best = m; } }
+  return best ? best.name + ' ' + bd.toFixed(1) + ' m (friendly)' : null;
 }
 function debugContext() {
   let alive = 0; const mix = { idle: 0, suspicious: 0, search: 0, chase: 0 };
@@ -4466,12 +4542,25 @@ function debugContext() {
   return { state: state === 'start' ? 'menu' : state, locked: !!document.pointerLockElement, touch: touch.active, mission: currentMission,
     alive, mix: `calm ${mix.idle} · suspicious ${mix.suspicious} · searching ${mix.search} · combat ${mix.chase}`,
     pos: camera.position, near: near ? { d: nd, sees, state: near.state, label: near.label } : null,
-    under: underCrosshair(), aim: aimOffset, fov: camera.fov,
+    under: state === 'playing' ? (lastUnder || underCrosshair()) : underCrosshair(), aim: aimOffset, fov: camera.fov, mate: nearestMateText(),
     view: `${fitW}x${fitH} (window ${window.innerWidth}x${window.innerHeight}, scrolled ${window.scrollX},${window.scrollY})` };
 }
 // What is under the crosshair right now? Also spots "ghost" guards: a guard model that is on
 // screen but is NOT one of the guards the game is running (that would be a bug).
 let ghostScanAt = 0, guardMeshes = [];
+// v0.4.4: what's under the crosshair, refreshed 10x a second: crosshair goes green on a teammate, red on a guard.
+let aimKind = '', aimMate = null, aimScanAt = 0, lastUnder = '';
+function updateCrosshairColour() {
+  const now = performance.now();
+  if (now - aimScanAt < 100) return;
+  aimScanAt = now;
+  lastUnder = state === 'playing' ? underCrosshair() : '';
+  if (state !== 'playing') aimKind = '';
+  const ch = document.getElementById('crosshair'), tag = document.getElementById('friendTag');
+  ch.classList.toggle('friendly', aimKind === 'friendly'); ch.classList.toggle('enemy', aimKind === 'enemy');
+  tag.style.display = aimKind === 'friendly' ? 'block' : 'none';
+  if (aimMate) tag.textContent = 'FRIENDLY · ' + aimMate.name;
+}
 function underCrosshair() {
   const now = performance.now();
   if (now - ghostScanAt > 2000) {
@@ -4479,8 +4568,11 @@ function underCrosshair() {
     if (levelGroup) levelGroup.traverse(o => { if (o.isMesh && o.userData.enemy) guardMeshes.push(o); });
   }
   raycaster.setFromCamera(updateAimOffset(), camera); raycaster.far = 300;
-  const h = raycaster.intersectObjects(wallMeshes.concat(guardMeshes.filter(m => m.visible)), false)[0];
+  const h = raycaster.intersectObjects(wallMeshes.concat(guardMeshes.filter(m => m.visible), ...teammates.map(m => m.meshes || [])), false)[0];
+  aimKind = !h ? '' : h.object.userData.teammate ? 'friendly' : (h.object.userData.enemy && h.object.userData.enemy.state !== 'dead' && enemies.includes(h.object.userData.enemy)) ? 'enemy' : '';
+  aimMate = h && h.object.userData.teammate ? h.object.userData.teammate : null;
   if (!h) return 'nothing within 300 m';
+  if (aimMate) return 'TEAMMATE ' + aimMate.name + ' (friendly — can\'t be shot) ' + h.distance.toFixed(1) + ' m';
   const e = h.object.userData.enemy;
   if (!e) return 'wall/floor ' + h.distance.toFixed(1) + ' m';
   const live = enemies.includes(e);
@@ -4490,7 +4582,7 @@ function underCrosshair() {
 // Build the level once so it shows behind the briefing screen, then start the loop.
 applyMission(1);
 buildLevel(); resetPlayer(); resetWeapons(); resetMasking();
-renderer.setAnimationLoop(gameLoop);
+if (!window.__valkyrieLoop) { window.__valkyrieLoop = true; loopCount++; renderer.setAnimationLoop(gameLoop); }
 window.__gameLoaded = true;
 if (!debugInfo.on) document.getElementById('debugHud').style.display = 'none';
 // Handy for testing in the browser console (F12), e.g.  __game.SETTINGS.enemyDamage = 0
@@ -4510,7 +4602,7 @@ window.__game = {
   lastProjectile: () => lastProjectile && { start: lastProjectile.start.toArray().map(v => +v.toFixed(2)), pos: lastProjectile.pos.toArray().map(v => +v.toFixed(2)), done: lastProjectile.done, t: +lastProjectile.t.toFixed(3), hits: lastProjectile.hitSet.size, dir0: lastProjectile.path[1] ? lastProjectile.path[1].clone().sub(lastProjectile.path[0]).normalize().toArray().map(v => +v.toFixed(4)) : null },
   shoot: () => { triggerReleased = true; fireCooldown = 0; switchTimer = 0; reloadTimer = 0; tryShoot(); },
   shootEnemy: (i, zone, dist) => shootEnemy(enemies[i], WEAPONS[currentWeapon], zone, dist, enemies[i].group.position.clone().setY(1.5)),
-  toggleSuppressor, damagePlayer, touch, pauseGame,
+  toggleSuppressor, damagePlayer, touch, pauseGame, aimKind: () => aimKind, startCalls: () => ({ startCalls, startBlocked, loopCount }), underCrosshair,
   setStance, cycleNightVision, toggleIR, masking, teammates: () => teammates, generatorBackfire, sabotageGenerator,
   // Mission 2 / sniper test hooks
   selectMission: m => { document.querySelector(`input[name="mission"][value="${m}"]`).checked = true; },
