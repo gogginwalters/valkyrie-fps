@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>OPERATION: BLACK FILE — v0.4.2</title>
+<title>OPERATION: BLACK FILE — v0.4.3</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <!--
   =====================================================================
-  OPERATION: BLACK FILE  (v0.4.2 — sniper mission, knife, Magic Keyboard controls, Safari/iPad safety net + DEBUG readout)
+  OPERATION: BLACK FILE  (v0.4.3 — sniper mission, knife, Magic Keyboard controls, iPad aim/layout fix + DEBUG readout)
   A tiny browser first-person shooter.
   - Mission structure & spy flavour inspired by GoldenEye 007 (N64)
   - Fast, aggressive maze shooting inspired by Wolfenstein 3D
@@ -297,7 +297,7 @@ import { Water } from 'three/addons/objects/Water.js';
 // ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
 // ##  part failed and why.                                           ##
 // #####################################################################
-const VERSION = 'v0.4.2';
+const VERSION = 'v0.4.3';
 const DEBUG_ON_BY_DEFAULT = true;     // set to false once things are working on the iPad
 const debugInfo = { on: DEBUG_ON_BY_DEFAULT, lastInput: '-', lastInputAt: 0, errors: {}, lastError: null,
   fps: 0, frameCount: 0, fpsTimer: 0, updates: 0, shownAt: 0 };
@@ -323,16 +323,22 @@ function esc(t) { return String(t).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': 
 function updateDebugHud(dt, ctx) {
   debugInfo.frameCount++; debugInfo.fpsTimer += dt;
   if (debugInfo.fpsTimer >= 0.5) { debugInfo.fps = debugInfo.frameCount / debugInfo.fpsTimer; debugInfo.frameCount = 0; debugInfo.fpsTimer = 0; }
-  if (!debugInfo.on) return;
+  if (!debugInfo.on || !ctx) return;
   const now = performance.now();
   if (now - debugInfo.shownAt < 250) return;
   debugInfo.shownAt = now;
+  ctx = ctx();                                   // gather the numbers only 4x a second
   const ago = debugInfo.lastInputAt ? ((now - debugInfo.lastInputAt) / 1000).toFixed(1) + 's ago' : '';
   let html = `DEBUG ${VERSION}  (\` or G hides)\n` +
     `state: ${ctx.state}   pointer locked: ${ctx.locked ? 'YES' : 'no'}   touch mode: ${ctx.touch ? 'yes' : 'no'}\n` +
     `last pointer-lock event: ${debugInfo.lockEvent || 'none yet'}\n` +
     `fps: ${debugInfo.fps.toFixed(0)}   updates: ${debugInfo.updates}   mission: ${ctx.mission}\n` +
     `guards alive: ${ctx.alive} (${ctx.mix})\n` +
+    `you: x ${ctx.pos.x.toFixed(1)}  z ${ctx.pos.z.toFixed(1)}   fov ${ctx.fov.toFixed(0)}   aim offset ${ctx.aim.x.toFixed(3)},${ctx.aim.y.toFixed(3)}\n` +
+    `view: ${ctx.view}\n` +
+    `nearest guard: ${ctx.near ? ctx.near.d.toFixed(1) + ' m, ' + ctx.near.state + ', sees you: ' + (ctx.near.sees === true ? 'YES' : ctx.near.sees) : 'none'}\n` +
+    `crosshair on: ${esc(ctx.under)}\n` +
+    `last shot: ${lastShotInfo ? 'from x ' + lastShotInfo.x.toFixed(1) + ' z ' + lastShotInfo.z.toFixed(1) + ' → ' + lastShotInfo.what + (lastShotInfo.d != null ? ' @ ' + lastShotInfo.d.toFixed(1) + ' m' : '') : 'none yet'}\n` +
     `last input: ${esc(debugInfo.lastInput)} ${ago}`;
   if (debugInfo.lastError) {
     const counts = Object.entries(debugInfo.errors).map(([k, v]) => k + '×' + v).join(' ');
@@ -675,10 +681,17 @@ const CELL = SETTINGS.cellSize;
 const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;   // soft sun shadows (Mission 2)
-renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setSize(window.innerWidth, window.innerHeight, false);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.autoClear = false;          // we draw the world, then the gun on top
-document.body.appendChild(renderer.domElement);
+// v0.4.3 (iPad fix): the 3D view is pinned to the screen exactly like the HUD and crosshair
+// (position: fixed, full screen, FIRST thing in the page). Before, it sat in the normal page
+// flow, so if iPad Safari scrolled or resized the page the picture could slide away from the
+// crosshair — you'd see a guard under the crosshair while the game aimed somewhere else.
+Object.assign(renderer.domElement.style, { position: 'fixed', left: '0', top: '0', width: '100%', height: '100%' });
+document.body.prepend(renderer.domElement);
+// The page itself must never scroll (iPad Safari sometimes does, even with overflow: hidden).
+window.addEventListener('scroll', () => { if (window.scrollX || window.scrollY) window.scrollTo(0, 0); });
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x07080a);
@@ -710,11 +723,21 @@ camera.add(muzzleLight);
 const controls = new PointerLockControls(camera, document.body);
 controls.pointerSpeed = SETTINGS.mouseSensitivity;
 
-window.addEventListener('resize', () => {
-  camera.aspect = weaponCamera.aspect = window.innerWidth / window.innerHeight;
+// Keep the drawing size = the size the 3D view really has on screen. Checked EVERY frame (cheap),
+// because iPad Safari doesn't always send 'resize' when its toolbars, split view or zoom change.
+let fitW = 0, fitH = 0;
+function fitRenderer(force = false) {
+  const c = renderer.domElement;
+  const w = c.clientWidth || window.innerWidth, h = c.clientHeight || window.innerHeight;
+  if (!force && w === fitW && h === fitH) return;
+  fitW = w; fitH = h;
+  camera.aspect = weaponCamera.aspect = w / h;
   camera.updateProjectionMatrix(); weaponCamera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-});
+  renderer.setSize(w, h, false);
+  if (typeof resizeNightVision === 'function' && nvReady) resizeNightVision();
+}
+let nvReady = false;
+window.addEventListener('resize', () => fitRenderer(true));
 // Day or night lighting (Night ops makes the base dark).
 function applyLighting() {
   if (!scene.fog || !scene.fog.isFog) scene.fog = new THREE.Fog(0x07080a, SETTINGS.fogNear, SETTINGS.fogFar);
@@ -1245,6 +1268,26 @@ function displayName(w) { return w.name + (w.suppressed ? ' (Suppressed)' : '');
 // Remember each weapon's starting suppressor so a restart puts it back.
 WEAPONS.forEach(w => (w.startSuppressed = !!w.suppressed));
 const raycaster = new THREE.Raycaster();
+// AIM = exactly where the crosshair is drawn on screen (v0.4.3). Normally that's the centre of
+// the 3D view; if a browser ever lays the page out differently, bullets still go where the
+// crosshair shows instead of where the game *thinks* the centre is. 'aimOffset' (in the
+// DEBUG box) should always read 0,0.
+const aimOffset = new THREE.Vector2();
+function updateAimOffset() {
+  const r = renderer.domElement.getBoundingClientRect(), el = document.getElementById('crosshair');
+  aimOffset.set(0, 0);
+  if (!el || !el.offsetParent || !r.width || !r.height) return aimOffset;
+  const b = el.getBoundingClientRect();                     // 0-size box: its corner IS the centre
+  const x = ((b.left - r.left) / r.width) * 2 - 1, y = -((b.top - r.top) / r.height) * 2 + 1;
+  if (Math.abs(x) < 0.9 && Math.abs(y) < 0.9) aimOffset.set(Math.abs(x) < 0.002 ? 0 : x, Math.abs(y) < 0.002 ? 0 : y);
+  return aimOffset;
+}
+function aimDirection(out = new THREE.Vector3()) {
+  raycaster.setFromCamera(updateAimOffset(), camera);
+  return out.copy(raycaster.ray.direction);
+}
+// What the last shot did (shown in the DEBUG box).
+let lastShotInfo = null;
 
 const weaponRoot = new THREE.Group();          // moves around for recoil / bob
 weaponRoot.position.set(0.28, -0.28, -0.5);
@@ -1460,7 +1503,7 @@ function tryShoot() {
   // ~2 degrees off the crosshair (a head 8 m away was missed most of the time). Now 'spread'
   // is a real angle in radians: the bullet leaves within that cone around the crosshair.
   const spreadRad = aiming ? w.spread * 0.4 : w.spread;
-  const shotDir = camera.getWorldDirection(new THREE.Vector3());
+  const shotDir = aimDirection();
   if (spreadRad > 0) {
     const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * spreadRad;
     const right = new THREE.Vector3().crossVectors(shotDir, camera.up).normalize();
@@ -1473,6 +1516,11 @@ function tryShoot() {
   const targets = wallMeshes.concat(...enemies.filter(e => e.state !== 'dead').map(e => e.hitMeshes.filter(m => m.visible)));
   const hits = raycaster.intersectObjects(targets, false);
   pointBlankHits(raycaster.ray, hits);          // muzzle already touching a guard? still counts
+  {
+    const h = hits[0], o = raycaster.ray.origin;
+    lastShotInfo = { x: o.x, z: o.z, what: !h ? 'nothing (out of range)' : h.object.userData.enemy ? 'GUARD ' + (h.object.userData.zone || '') :
+      h.object.userData.materiel ? 'vehicle/target' : 'wall/floor', d: h ? h.distance : null };
+  }
   lastShotRay = { o: raycaster.ray.origin.toArray(), d: raycaster.ray.direction.toArray(), far: raycaster.far, hits: hits.slice(0, 4).map(h => (h.object.userData.enemy ? 'E:' + h.object.userData.zone : 'W') + '@' + h.distance.toFixed(2)) };
   // Walk through everything the ray touched, nearest first. Most guns stop at the
   // first thing; guns with 'penetration' (Barrett) punch through that many walls/guards.
@@ -1900,7 +1948,7 @@ function updateEnemy(e, dt) {
   // ---- 1. DETECTION METER: seeing you fills it; full = COMBAT ----
   // Far away, crouched, prone, or standing still = it fills more slowly.
   if (e.state !== 'chase') {
-    if (canSee && (inFieldOfView(e, px, pz) || dist < 3)) {
+    if (canSee && (inFieldOfView(e, px, pz) || dist < closeSenseRange())) {
       const stance = player.stance === 'prone' ? SETTINGS.proneDetectMult : player.stance === 'crouch' ? SETTINGS.crouchDetectMult : 1;
       const v = Math.hypot(player.velocity.x, player.velocity.z);
       const motion = v > SETTINGS.playerSpeed * 1.2 ? 1.6 : v > 0.5 ? 1 : 0.6;
@@ -2031,9 +2079,12 @@ function inFieldOfView(e, x, z) {
 function guardSightRange() {
   return SETTINGS.enemySightRange * (player.stance === 'prone' ? SETTINGS.proneSightMult : 1) * (SETTINGS.nightOps ? SETTINGS.nightSightMult : 1);
 }
+// A guard "feels" someone right behind him: 3 m if you're standing, much less if you sneak
+// (crouched/prone) — so you can creep up for a silent knife takedown.
+function closeSenseRange() { return player.stance === 'prone' ? 0.8 : player.stance === 'crouch' ? 1.2 : 3; }
 function canGuardSeePlayer(e) {
   const p = e.group.position, d = dist2D(p.x, p.z, camera.position.x, camera.position.z);
-  return d < guardSightRange() && (inFieldOfView(e, camera.position.x, camera.position.z) || d < 3) &&
+  return d < guardSightRange() && (inFieldOfView(e, camera.position.x, camera.position.z) || d < closeSenseRange()) &&
     hasLineOfSight(p.x, p.z, camera.position.x, camera.position.z);
 }
 
@@ -2501,14 +2552,14 @@ const thermalTarget = new THREE.WebGLRenderTarget(256, 256);
 const hotMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false });
 const coldMaterial = new THREE.MeshBasicMaterial({ color: 0x000000, fog: false });
 function resizeNightVision() {
-  const pr = renderer.getPixelRatio(), w = window.innerWidth, h = window.innerHeight;
+  const pr = renderer.getPixelRatio(), w = fitW || window.innerWidth, h = fitH || window.innerHeight;
   composer.setSize(w, h);
   thermalTarget.setSize(Math.ceil(w * pr / 2), Math.ceil(h * pr / 2));
   nvPass.uniforms.resolution.value.set(w * pr, h * pr);
   nvPass.uniforms.aspect.value = w / h;
 }
-resizeNightVision();
-window.addEventListener('resize', resizeNightVision);
+nvReady = true;
+fitRenderer(true);
 function renderThermalMask() {
   const swapped = [], hidden = [];
   scene.traverse(o => {
@@ -2756,6 +2807,12 @@ let lastPointerType = '', lastPointerTime = -99999;
 window.addEventListener('pointerdown', e => {
   lastPointerType = e.pointerType || ''; lastPointerTime = performance.now();
   noteInput('pointer ' + (e.pointerType || '?') + ' button ' + e.button);
+  // A real mouse/trackpad press hides the touch buttons (they come back on the next finger touch).
+  if (e.pointerType === 'mouse' && touch.active) { touch.active = false; updateTouchLayer(); }
+}, { capture: true });
+// ...and so does typing on a keyboard (but not modifier keys on their own).
+window.addEventListener('keydown', e => {
+  if (touch.active && !e.metaKey && !e.ctrlKey && !/^(Shift|Alt|Meta|Control|CapsLock)/.test(e.code)) { touch.active = false; updateTouchLayer(); }
 }, { capture: true });
 function recentMousePointer() { return lastPointerType === 'mouse' && performance.now() - lastPointerTime < 800; }
 function cameFromTouch() { return !recentMousePointer() && performance.now() - lastTouchTime < 800; }
@@ -2764,25 +2821,33 @@ function cameFromTouch() { return !recentMousePointer() && performance.now() - l
 window.addEventListener('touchstart', e => {
   noteInput('touch x' + (e.touches ? e.touches.length : 1));
   if (recentMousePointer() && performance.now() - lastPointerTime < 60) return;   // trackpad pretending to be a touch
-  lastTouchTime = performance.now(); touch.active = true; if (killcam.active) endKillcam();
+  lastTouchTime = performance.now(); touch.active = true; updateTouchLayer(); if (killcam.active) endKillcam();
 }, { passive: true, capture: true });
 // Trackpad/mouse movement or a key press while the pointer is locked hides them again.
-document.addEventListener('mousemove', () => { if (controls.isLocked && touch.active) touch.active = false; });
+// Moving a real mouse/trackpad pointer also hides them (pointerType tells a finger apart).
+window.addEventListener('pointermove', e => {
+  if (touch.active && e.pointerType === 'mouse' && !cameFromTouch()) { touch.active = false; updateTouchLayer(); }
+}, { capture: true });
+document.addEventListener('mousemove', () => { if (controls.isLocked && touch.active && !cameFromTouch()) { touch.active = false; updateTouchLayer(); } });   // (not the fake mouse events a finger tap makes)
 // FALLBACK LOOK: no pointer lock (Safari refused / not yet granted)? Move the camera with the
 // trackpad anyway, using the same maths as PointerLockControls.
 document.addEventListener('mousemove', e => {
+  const prev = lastMouseXY; lastMouseXY = { x: e.clientX, y: e.clientY };
   if (state !== 'playing' || controls.isLocked || touch.active || killcam.active || cameFromTouch()) return;
-  const mx = e.movementX || 0, my = e.movementY || 0;
+  // Some browsers leave movementX/Y at 0 without pointer lock: then use the cursor's own movement.
+  let mx = e.movementX || 0, my = e.movementY || 0;
+  if (!mx && !my && prev) { mx = e.clientX - prev.x; my = e.clientY - prev.y; }
   if (!mx && !my) return;
   turnCamera(mx * 0.002 * controls.pointerSpeed, my * 0.002 * controls.pointerSpeed);
 });
+let lastMouseXY = null;
 function turnCamera(dx, dy) {
   const euler = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ');
   euler.y -= dx;
   euler.x = THREE.MathUtils.clamp(euler.x - dy, -Math.PI / 2 + 0.05, Math.PI / 2 - 0.05);
   camera.quaternion.setFromEuler(euler);
 }
-document.addEventListener('keydown', () => { if (controls.isLocked && touch.active) touch.active = false; });
+
 
 // Turn the camera from a finger drag (same maths as mouse look).
 function lookBy(dx, dy) {
@@ -3592,7 +3657,7 @@ let lastProjectile = null;   // for the automated tests
 function fireProjectile(w) {
   const cal = CALIBERS[w.caliber];
   const aim = findAimTarget();                                   // for the spotter's miss call
-  const dir = camera.getWorldDirection(new THREE.Vector3());
+  const dir = aimDirection();
   const right = new THREE.Vector3().crossVectors(dir, camera.up).normalize();
   // The dialled elevation only applies when looking through the scope. Firing from the hip /
   // without the scope uses a fixed 100 m battle zero. (BUG FIX v0.4.1: the SCAR-H has no scope
@@ -3617,7 +3682,7 @@ function fireProjectile(w) {
 function updateProjectiles(dt) {
   for (let i = projectiles.length - 1; i >= 0; i--) {
     const p = projectiles[i];
-    if (!p.done) stepProjectile(p, dt);
+    if (!p.done) { stepProjectile(p, dt); if (p.done) lastShotInfo = { x: p.start.x, z: p.start.z, what: p.what || 'nothing', d: p.pos.distanceTo(p.start) }; }
     if (p.done) {
       p.fade -= dt; p.glow.visible = false;
       tracerMaterial.opacity = 0.85;
@@ -3638,7 +3703,7 @@ function stepProjectile(p, dt) {
     if (!p.done && heightField && p.pos.y < groundAt(p.pos.x, p.pos.z)) {
       let a = prev.clone(), b = p.pos.clone();                  // find the exact spot it hit the dirt
       for (let j = 0; j < 10; j++) { const m = a.clone().lerp(b, 0.5); if (m.y < groundAt(m.x, m.z)) b = m; else a = m; }
-      p.pos.copy(b); p.done = true;
+      p.pos.copy(b); p.done = true; p.what = p.what || 'ground';
       spawnParticles(b, 0x8a7a5a, 12, 3, 0.1);                  // dust splash
       missCall(p, b);
       for (const e of enemies) if (e.state === 'idle' && e.group.position.distanceTo(b) < 8) makeSuspicious(e, b.x, b.z, 4);
@@ -3667,13 +3732,14 @@ function checkProjectileSegment(p, a, b) {
     const enemy = hit.object.userData.enemy;
     if (enemy) {
       if (p.hitSet.has(enemy) || enemy.state === 'dead') continue;
-      p.hitSet.add(enemy);
+      p.hitSet.add(enemy); if (!p.what) p.what = 'GUARD ' + (hit.object.userData.zone || '');
       projectileHitEnemy(p, enemy, hit);
       if (p.done || p.pen-- <= 0) { p.done = true; p.pos.copy(hit.point); return; }
       p.power *= 0.6; continue;
     }
     const mat = hit.object.userData.materiel;
-    if (mat) { p.done = true; p.pos.copy(hit.point); projectileHitMateriel(p, mat, hit); return; }
+    if (mat) { p.what = p.what || 'vehicle/target'; p.done = true; p.pos.copy(hit.point); projectileHitMateriel(p, mat, hit); return; }
+    if (!p.what) p.what = 'wall/building';
     const normal = hit.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld) : null;
     spawnParticles(hit.point, 0xffcc66, 6, 3, 0.05, normal);
     if (hit.object.userData.generator) { sabotageGenerator(); p.done = true; p.pos.copy(hit.point); return; }
@@ -4239,8 +4305,7 @@ function applyMission(m) {
   SETTINGS.graphicsQuality = $('optQuality').value;
   const outdoors = m === 2, high = SETTINGS.graphicsQuality === 'high';
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, high ? 1.5 : 1));
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  resizeNightVision();
+  fitRenderer(true);
   renderer.shadowMap.enabled = outdoors;
   renderer.toneMapping = outdoors ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping;
   renderer.toneMappingExposure = outdoors ? (SETTINGS.nightOps ? 0.9 : 0.8) : 1;
@@ -4276,7 +4341,8 @@ function startMission() {
   mouseDown = false; setZoom(0); knifeTimer = 0; knifeAnim = 0;
   $('startScreen').style.display = $('endScreen').style.display = $('pauseScreen').style.display = 'none';
   hud.root.style.display = 'block';
-  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();   // so Space/Enter can't "press" the start button again
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  window.scrollTo(0, 0); fitRenderer(true);   // so Space/Enter can't "press" the start button again
   state = 'playing';
   showMessage(currentMission === 2 ? 'Operation COLD HORIZON. Lase (F), dial ([ ] or ↑ ↓), breathe (Shift), send it.' : 'Mission start. Find the intel. (V = knife)', 3);
   if (cameFromTouch()) touch.active = true;   // started with a tap: show the touch buttons
@@ -4350,7 +4416,8 @@ let elapsed = 0;
 function gameLoop() {
   const dt = Math.min(clock.getDelta(), 0.05);   // cap so a lag spike can't push you through walls
   elapsed += dt;
-  safe('debug', () => updateDebugHud(dt, debugContext()));
+  safe('fit', () => fitRenderer());
+  safe('debug', () => updateDebugHud(dt, debugContext));
   if (killcam.active) {                          // X-ray kill cam: everything else is paused
     safe('killcam', () => updateKillcam(dt));
     safe('effects', () => updateEffects(dt * 0.3));
@@ -4392,8 +4459,32 @@ function gameLoop() {
 function debugContext() {
   let alive = 0; const mix = { idle: 0, suspicious: 0, search: 0, chase: 0 };
   for (const e of enemies) if (e.state !== 'dead') { alive++; if (e.state in mix) mix[e.state]++; }
+  // nearest live guard: distance + can he see you right now?
+  let near = null, nd = Infinity;
+  for (const e of enemies) if (e.state !== 'dead') { const d = e.group.position.distanceTo(camera.position); if (d < nd) { nd = d; near = e; } }
+  let sees = false; if (near) { try { sees = canGuardSeePlayer(near); } catch (err) { sees = 'error'; } }
   return { state: state === 'start' ? 'menu' : state, locked: !!document.pointerLockElement, touch: touch.active, mission: currentMission,
-    alive, mix: `calm ${mix.idle} · suspicious ${mix.suspicious} · searching ${mix.search} · combat ${mix.chase}` };
+    alive, mix: `calm ${mix.idle} · suspicious ${mix.suspicious} · searching ${mix.search} · combat ${mix.chase}`,
+    pos: camera.position, near: near ? { d: nd, sees, state: near.state, label: near.label } : null,
+    under: underCrosshair(), aim: aimOffset, fov: camera.fov,
+    view: `${fitW}x${fitH} (window ${window.innerWidth}x${window.innerHeight}, scrolled ${window.scrollX},${window.scrollY})` };
+}
+// What is under the crosshair right now? Also spots "ghost" guards: a guard model that is on
+// screen but is NOT one of the guards the game is running (that would be a bug).
+let ghostScanAt = 0, guardMeshes = [];
+function underCrosshair() {
+  const now = performance.now();
+  if (now - ghostScanAt > 2000) {
+    ghostScanAt = now; guardMeshes = [];
+    if (levelGroup) levelGroup.traverse(o => { if (o.isMesh && o.userData.enemy) guardMeshes.push(o); });
+  }
+  raycaster.setFromCamera(updateAimOffset(), camera); raycaster.far = 300;
+  const h = raycaster.intersectObjects(wallMeshes.concat(guardMeshes.filter(m => m.visible)), false)[0];
+  if (!h) return 'nothing within 300 m';
+  const e = h.object.userData.enemy;
+  if (!e) return 'wall/floor ' + h.distance.toFixed(1) + ' m';
+  const live = enemies.includes(e);
+  return (live ? (e.state === 'dead' ? 'dead guard ' : 'guard (' + e.state + ') ') : 'GHOST guard (not in game!) ') + h.distance.toFixed(1) + ' m';
 }
 
 // Build the level once so it shows behind the briefing screen, then start the loop.
@@ -4405,7 +4496,7 @@ if (!debugInfo.on) document.getElementById('debugHud').style.display = 'none';
 // Handy for testing in the browser console (F12), e.g.  __game.SETTINGS.enemyDamage = 0
 window.__game = {
   SETTINGS, CALIBERS, WEAPONS, player, camera, startMission, switchWeapon,
-  enemies: () => enemies, state: () => state, debugInfo, VERSION,
+  enemies: () => enemies, state: () => state, debugInfo, VERSION, aimOffset: () => aimOffset, lastShotInfo: () => lastShotInfo,
   // Debug: what would a ray from the screen centre hit right now? (nearest first)
   rayHits: () => {
     raycaster.setFromCamera(new THREE.Vector2(0, 0), camera); raycaster.far = 2000;
