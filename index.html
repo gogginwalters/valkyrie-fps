@@ -2,12 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>OPERATION: BLACK FILE — v0.5</title>
+<title>OPERATION: BLACK FILE — v0.5.1</title>
 <link rel="icon" href="data:,">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <!--
   =====================================================================
-  OPERATION: BLACK FILE  (v0.5 — real 3D soldiers, zone looks + signs, compass, map (M), radio hints, dual M1911s; v0.4.6 mission select fix for iPad, free 360° turning on iPad, retuned damage, friendly markers on your squad, sniper mission, knife, Magic Keyboard controls, iPad aim/layout fix + DEBUG readout)
+  OPERATION: BLACK FILE  (v0.5.1 — semi-auto pistols, lean (Tab / E), fixed freeze at the elevator on iPad; v0.5 — real 3D soldiers, zone looks + signs, compass, map (M), radio hints, dual M1911s; v0.4.6 mission select fix for iPad, free 360° turning on iPad, retuned damage, friendly markers on your squad, sniper mission, knife, Magic Keyboard controls, iPad aim/layout fix + DEBUG readout)
   A tiny browser first-person shooter.
   - Mission structure & spy flavour inspired by GoldenEye 007 (N64)
   - Fast, aggressive maze shooting inspired by Wolfenstein 3D
@@ -77,6 +77,8 @@
   #mapScreen { position: fixed; inset: 0; z-index: 60; display: none; background: rgba(0,10,0,0.92); align-items: center; justify-content: center; flex-direction: column;
     font-family: "Courier New", monospace; color: #9f9; }
   #mapScreen h2 { margin: 6px 0; letter-spacing: 3px; font-size: 18px; } #mapScreen p { margin: 4px; font-size: 13px; color: #8c8; }
+  #tLeanL { right: 300px; bottom: 30px; width: 58px; height: 40px; font-size: 11px; }
+  #tLeanR { right: 236px; bottom: 30px; width: 58px; height: 40px; font-size: 11px; }
   #tMap  { right: 72px; top: 110px; width: 48px; height: 48px; font-size: 11px; }
   #tDual { right: 300px; bottom: 190px; display: none; border-color: rgba(255,220,120,0.8); }
   #alertBox { top: 52px; left: 50%; transform: translateX(-50%); font-size: 14px; text-align: center; padding: 6px 14px; }
@@ -221,6 +223,8 @@
   <div class="tbtn" id="tNV">NV</div>
   <div class="tbtn" id="tIR">IR</div>
   <div class="tbtn" id="tMap">MAP</div>
+  <div class="tbtn" id="tLeanL">◁ LEAN</div>
+  <div class="tbtn" id="tLeanR">LEAN ▷</div>
   <div class="tbtn" id="tDual">DUAL</div>
   <div class="tbtn m2only" id="tRange">RANGE</div>
   <div class="tbtn m2only" id="tElevUp">ELEV +</div>
@@ -248,8 +252,8 @@
     <h1 id="endTitle">MISSION COMPLETE</h1>
     <h2 id="endSubtitle"></h2>
     <p id="endStats"></p>
-    <button class="startBtn" id="restartBtn">↻ CLICK TO RESTART MISSION</button>
-    <button class="startBtn" id="menuBtn" style="background:#4a4">☰ MISSION SELECT</button>
+    <button class="startBtn" id="restartBtn">↻ CLICK / TAP TO RESTART MISSION (Enter)</button>
+    <button class="startBtn" id="menuBtn" style="background:#4a4">☰ MISSION SELECT (B)</button>
   </div>
 </div>
 
@@ -324,7 +328,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 // ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
 // ##  part failed and why.                                           ##
 // #####################################################################
-const VERSION = 'v0.5';
+const VERSION = 'v0.5.1';
 // v0.4.4: the game must only ever start ONCE per page (one canvas, one camera, one loop).
 // If this script somehow ran a second time, stop the second copy right here.
 window.__valkyrieBoots = (window.__valkyrieBoots || 0) + 1;
@@ -1490,6 +1494,11 @@ document.addEventListener('keydown', e => {
   if (killcam.active) { e.preventDefault(); endKillcam(); return; }   // any key skips the kill cam
   if (e.code === 'KeyM' && (state === 'playing' || state === 'map')) { e.preventDefault(); if (!e.repeat) state === 'map' ? closeMap() : openMap(); return; }
   if (state === 'map') { e.preventDefault(); return; }                // map open: the game is frozen
+  if ((state === 'won' || state === 'lost') && !e.repeat && performance.now() - endShownAt > 700) {           // MISSION COMPLETE / FAILED screen
+    if (e.code === 'Enter' || e.code === 'Space' || e.code === 'KeyR') { e.preventDefault(); startMission(); }
+    else if (e.code === 'KeyB') { e.preventDefault(); $('menuBtn').click(); }
+    return;
+  }
   if (state !== 'playing') return;
   // While playing, the page must not react to keys: no Tab focus jumps, no Space
   // "clicking" a focused button, no arrow/space scrolling, no quick-find on ' or /.
@@ -1531,13 +1540,44 @@ function resetPlayer() {
   player.stance = 'stand'; player.eyeY = SETTINGS.eyeHeight;
   player.kills = player.shotsFired = player.shotsHit = player.headshots = 0;
   player.startTime = performance.now();
+  lean.off.set(0, 0, 0); lean.amt = 0; lean.dist = 0;
   camera.position.set(playerStart.x, SETTINGS.eyeHeight, playerStart.z);
   camera.rotation.set(0, playerStart.yaw, 0);
 }
 
+// v0.5.1 LEAN / PEEK: hold Tab (left) or E (right), or the touch LEAN buttons.
+// The eye slides up to ~0.5 m sideways and the view rolls ~12°. The slide stops short of walls.
+// The offset is taken off before you move and put back after, so leaning never moves your feet,
+// but guards, bullets and the camera all use the leaned head position.
+SETTINGS.leanDistance = 0.5; SETTINGS.leanRollDeg = 12; SETTINGS.leanHitChanceMult = 0.6;
+BASE_SETTINGS.leanDistance = 0.5; BASE_SETTINGS.leanRollDeg = 12; BASE_SETTINGS.leanHitChanceMult = 0.6;
+const lean = { amt: 0, off: new THREE.Vector3(), dist: 0, blocked: false };
+function clearLean() { camera.position.sub(lean.off); lean.off.set(0, 0, 0); lean.amt = 0; lean.dist = 0; camera.rotation.z = 0; }
+function applyLean(dt) {
+  const want = state === 'playing' ? ((keys.KeyE || touch.leanR ? 1 : 0) - (keys.Tab || touch.leanL ? 1 : 0)) : 0;
+  lean.amt += (want - lean.amt) * Math.min(1, dt * 10);
+  if (Math.abs(lean.amt) < 0.002 && !want) lean.amt = 0;
+  const yaw = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ').y;
+  const rx = Math.cos(yaw), rz = -Math.sin(yaw);                       // your right, flat on the ground
+  const full = SETTINGS.leanDistance * (player.stance === 'prone' ? 0.6 : 1) * Math.abs(lean.amt), sgn = Math.sign(lean.amt);
+  // Slide out in small steps; stop before the head (radius 0.2 m) would touch a wall.
+  let d = 0; lean.blocked = false;
+  while (d < full) {
+    const nd = Math.min(full, d + 0.04);
+    if (circleHitsWall(camera.position.x + rx * nd * sgn, camera.position.z + rz * nd * sgn, 0.2)) { lean.blocked = true; break; }
+    d = nd;
+  }
+  lean.dist = d * sgn;
+  lean.off.set(rx * lean.dist, -Math.abs(lean.amt) * 0.05, rz * lean.dist);
+  camera.position.add(lean.off);
+  camera.rotation.order = 'YXZ';
+  const e = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ');
+  e.z = -THREE.MathUtils.degToRad(SETTINGS.leanRollDeg) * lean.amt; camera.quaternion.setFromEuler(e);
+}
 const _forward = new THREE.Vector3(), _right = new THREE.Vector3();
 let keyTurnRate = 0;
 function updatePlayer(dt) {
+  camera.position.sub(lean.off); lean.off.set(0, 0, 0);   // feet first: undo last frame's lean
   // ← → turn (handy when the trackpad can't be captured).
   // v0.4.5: ← → (or J K) turn, starting gently and speeding up while held. ↑ ↓ look up/down
   // (with a sniper rifle in hand they dial the elevation turret instead).
@@ -1576,6 +1616,7 @@ function updatePlayer(dt) {
   const eyeTarget = player.stance === 'prone' ? SETTINGS.proneEyeHeight : player.stance === 'crouch' ? SETTINGS.crouchEyeHeight : SETTINGS.eyeHeight;
   player.eyeY += (eyeTarget - player.eyeY) * Math.min(1, dt * 8);       // smoothly duck / get up
   camera.position.y = groundAt(camera.position.x, camera.position.z) + player.eyeY + Math.sin(player.bobTime) * SETTINGS.headBob * Math.min(moving / 5, 1);
+  applyLean(dt);
 }
 
 function damagePlayer(amount, fromX, fromZ) {
@@ -1605,7 +1646,15 @@ let mouseDown = false, aiming = false, zoomStep = 0, triggerReleased = true;
 // The press is kept for 0.25 s of GAME time (counted down in updateWeapon), so even a slow
 // frame can't make it expire before the game has had a chance to fire it.
 let shotQueued = 0;
-function queueShot() { shotQueued = 0.25; triggerReleased = true; }
+// v0.5.1: semi-automatic guns fire ONLY on a fresh press (click, Q, 2-finger click, FIRE button).
+// Holding does nothing more; a stray "mouse up" (iPad makes one for every finger tap) can't re-arm it.
+// A press during the gun's cooldown is remembered for 0.25 s, so fast tapping still works.
+let pressPending = false, lastPressAt = -1e9;
+function queueShot() {
+  const now = performance.now();
+  if (now - lastPressAt < 45) return;            // the same press reported twice (mouse + pointer events)
+  lastPressAt = now; shotQueued = 0.25; pressPending = true; triggerReleased = true;
+}
 // zoomStep 0 = not aiming, 1 = first zoom level, 2 = second (2-step scopes only)
 function setZoom(step) { zoomStep = step; aiming = step > 0; }
 // The name shown on screen, e.g. "Colt M1911 .45 (Suppressed)".
@@ -1839,8 +1888,8 @@ window.addEventListener('wheel', e => {
 function tryShoot() {
   const w = WEAPONS[currentWeapon], s = weaponState[currentWeapon];
   if (reloadTimer > 0 || fireCooldown > 0 || switchTimer > 0) return;
-  if (!w.automatic && !triggerReleased) return;    // semi-auto: one shot per click
-  triggerReleased = false;
+  if (!w.automatic && !pressPending) return;       // semi-auto: one shot per press, never on hold
+  pressPending = false; triggerReleased = false;
   shotQueued = 0;                                  // this press has been used
   if (s.ammo <= 0) {
     SOUNDS.empty(); fireCooldown = 0.25;
@@ -2099,6 +2148,7 @@ function updateWeapon(dt) {
   fireCooldown -= dt; switchTimer = Math.max(0, switchTimer - dt);
   if (mouseDown || touch.fire || shotQueued > 0) tryShoot();
   shotQueued = Math.max(0, shotQueued - dt);
+  if (shotQueued === 0) pressPending = false;      // an old press doesn't fire seconds later
   if (reloadTimer > 0) {
     reloadTimer -= dt;
     if (reloadTimer <= 0) {
@@ -2515,6 +2565,7 @@ function enemyShoot(e, dist) {
   if (Math.hypot(player.velocity.x, player.velocity.z) > SETTINGS.playerSpeed * 1.2) chance *= 0.7; // sprinting helps
   if (player.stance === 'prone') chance *= SETTINGS.proneHitChanceMult;                          // smaller target
   else if (player.stance === 'crouch') chance *= 0.85;
+  if (Math.abs(lean.dist) > 0.2) chance *= SETTINGS.leanHitChanceMult;    // only your head and shoulder show
   const hit = Math.random() < chance;
   const to = camera.position.clone().add(new THREE.Vector3(0, -0.3, 0));
   if (!hit) to.add(new THREE.Vector3((Math.random() - 0.5) * 2, (Math.random() - 0.5), (Math.random() - 0.5) * 2));
@@ -3646,6 +3697,8 @@ touchButton('tStance', () => setStance({ stand: 'crouch', crouch: 'prone', prone
 touchButton('tNV', () => cycleNightVision());
 touchButton('tIR', () => toggleIR());
 touchButton('tMap', () => openMap());
+touchButton('tLeanL', () => { touch.leanL = true; }, () => { touch.leanL = false; });
+touchButton('tLeanR', () => { touch.leanR = true; }, () => { touch.leanR = false; });
 touchButton('tDual', () => toggleDual());
 touchButton('tRange', () => laseRange());
 touchButton('tElevUp', () => dialElevation(1));
@@ -4956,7 +5009,7 @@ const CONTROLS = [
     ['Move finger', 'look around'],
     ['Push cursor to an edge', 'keep turning (iPad: Safari can\'t capture the trackpad)'],
     ['2-finger swipe', 'look / turn — unlimited 360° (when the trackpad isn\'t captured)'],
-    ['Click (1 finger)', 'fire'],
+    ['Click (1 finger)', 'fire (pistols & rifles: one shot per click · P90 / M4 / AKM / SCAR: hold for auto)'],
     ['2-finger click', 'aim / scope (snipers: again = 2nd zoom, again = off) · dual pistols: fire LEFT gun'],
     ['Click with dual pistols', 'fire — the two guns take turns (no aiming, wider spread, 14-round shared ammo)'],
     ['2-finger scroll', 'captured trackpad / mouse wheel: switch weapon · scoped sniper: elevation'],
@@ -4970,6 +5023,7 @@ const CONTROLS = [
     ['1 – 8', 'pick weapon'],
     [', and .', 'previous / next weapon'],
     ['T', 'suppressor on / off'],
+    ['Tab / E (hold)', 'lean / peek left / right (stops at walls)'],
     ['C', 'crouch'],
     ['Z', 'go prone'],
     ['N', 'night vision (off / white / + thermal)'],
@@ -4987,6 +5041,7 @@ const CONTROLS = [
   ['Touch screen', [
     ['Left thumb', 'move'],
     ['Right thumb', 'look (drag, lift, drag again for a full 360°) · buttons for everything else'],
+    ['◁ LEAN / LEAN ▷ (hold)', 'peek around a corner'],
     ['MAP / DUAL buttons', 'open the map · two pistols on / off (AIM fires the left gun while dual)'],
   ]],
 ];
@@ -5232,13 +5287,13 @@ function lockMouse() {
     const p = req.call(el); if (p && p.catch) p.catch(() => {});
   } catch (err) { /* ignore */ }
 }
-function releaseInputs() { mouseDown = false; touch.fire = false; setZoom(0); for (const k in keys) keys[k] = false; }
+function releaseInputs() { mouseDown = false; touch.fire = false; touch.leanL = touch.leanR = false; pressPending = false; setZoom(0); for (const k in keys) keys[k] = false; }
 function pauseGame(text) {
   if (state !== 'playing') return;
   state = 'paused'; releaseInputs();
   $('pauseText').textContent = text + ' — click or tap to resume.';
   $('pauseScreen').style.display = 'flex';
-  if (controls.isLocked) controls.unlock();
+  safeUnlock();
 }
 // v0.4.2 (iPad/Safari fix): the game NEVER waits for pointer lock any more. Clicking resume
 // starts playing straight away and *asks* for the pointer; if Safari is slow, says no, or
@@ -5326,11 +5381,20 @@ function startMission() {
   if (cameFromTouch()) touch.active = true;   // started with a tap: show the touch buttons
   else lockMouse();                           // started with a click: capture mouse/trackpad
 }
+// v0.5.1 FREEZE FIX: iPad Safari has no pointer lock at all, so the old unconditional
+// controls.unlock() threw an error right here -> the game had already stopped ('won') but the
+// MISSION COMPLETE screen never appeared. That was the "freeze at the green elevator light".
+let endShownAt = 0;
+function safeUnlock() {
+  try { if (controls.isLocked && document.exitPointerLock) controls.unlock(); } catch (err) { noteError('unlock', err); }
+}
 function endGame(won) {
-  state = won ? 'won' : 'lost';
-  mouseDown = false; setZoom(0);
+  if (state === 'won' || state === 'lost') return;
+  state = won ? 'won' : 'lost'; endShownAt = performance.now();
+  mouseDown = false; touch.fire = false; pressPending = false;
+  safe('end:zoom', () => setZoom(0));
   hud.scope.style.display = 'none';
-  controls.unlock();
+  safeUnlock();
   const secs = Math.round((performance.now() - player.startTime) / 1000);
   const acc = player.shotsFired ? Math.round(player.shotsHit / player.shotsFired * 100) : 0;
   $('endTitle').textContent = won ? 'MISSION COMPLETE' : 'MISSION FAILED';
@@ -5343,7 +5407,7 @@ function endGame(won) {
   $('endStats').innerHTML = `Time: ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}<br>
     Guards neutralised: ${player.kills} / ${enemies.length}<br>Accuracy: ${acc}% &nbsp; Headshots: ${player.headshots}<br>${objLine}`;
   $('endScreen').style.display = 'flex';
-  won ? SOUNDS.win() : SOUNDS.lose();
+  safe('end:sound', () => (won ? SOUNDS.win() : SOUNDS.lose()));
 }
 
 // Start-screen checkboxes begin with whatever SETTINGS says.
@@ -5366,6 +5430,7 @@ for (const [id, m] of [['m1Card', 1], ['m2Card', 2]]) for (const ev of ['pointer
 $('menuBtn').addEventListener('click', () => { $('endScreen').style.display = 'none'; $('startScreen').style.display = 'flex'; hud.root.style.display = 'none'; state = 'start'; });
 $('startBtn').addEventListener('click', startMission);
 $('restartBtn').addEventListener('click', startMission);
+for (const id of ['restartBtn', 'menuBtn']) $(id).addEventListener('touchend', e => { e.preventDefault(); $(id).click(); }, { passive: false });
 $('pauseScreen').addEventListener('click', resumeGame);
 let lockedSince = 0;   // when pointer lock last really started (0 = not locked)
 controls.addEventListener('lock', () => {
@@ -5505,13 +5570,13 @@ loadFigures();
 // Build the level once so it shows behind the briefing screen, then start the loop.
 applyMission(chosenMission);
 buildLevel(); resetPlayer(); resetWeapons(); resetMasking(); if (chosenMission === 2) missionStartPose();
-if (!window.__valkyrieLoop) { window.__valkyrieLoop = true; loopCount++; renderer.setAnimationLoop(gameLoop); }
+if (!window.__valkyrieLoop) { window.__valkyrieLoop = true; loopCount++; renderer.setAnimationLoop(() => { try { gameLoop(); } catch (err) { noteError('loop', err); } }); }
 window.__gameLoaded = true;
 if (!debugInfo.on) document.getElementById('debugHud').style.display = 'none';
 // Handy for testing in the browser console (F12), e.g.  __game.SETTINGS.enemyDamage = 0
 window.__game = {
   SETTINGS, CALIBERS, WEAPONS, player, camera, startMission, switchWeapon,
-  enemies: () => enemies, state: () => state, weaponState: () => weaponState, renderFrame: () => { updateFigureLOD(); renderer.render(scene, camera); }, figureLOD: () => enemies.filter(e => e.fig && e.fig.lod).length, glFinish: () => renderer.getContext().finish(), debugInfo, VERSION, aimOffset: () => aimOffset, lastShotInfo: () => lastShotInfo,
+  enemies: () => enemies, state: () => state, weaponState: () => weaponState, renderFrame: () => { updateFigureLOD(); renderer.render(scene, camera); }, figureLOD: () => enemies.filter(e => e.fig && e.fig.lod).length, glFinish: () => renderer.getContext().finish(), debugInfo, VERSION, aimOffset: () => aimOffset, lastShotInfo: () => lastShotInfo, lean, safeUnlock, endGame,
   // Debug: what would a ray from the screen centre hit right now? (nearest first)
   rayHits: () => {
     raycaster.setFromCamera(new THREE.Vector2(0, 0), camera); raycaster.far = 2000;
@@ -5519,11 +5584,11 @@ window.__game = {
     return raycaster.intersectObjects(targets, false).slice(0, 6).map(h => ({ d: +h.distance.toFixed(2), enemy: !!h.object.userData.enemy, zone: h.object.userData.zone || '', name: h.object.name || h.object.type, vis: h.object.visible }));
   },
   refill: () => { weaponState.forEach((s, i) => { s.ammo = WEAPONS[i].magSize; s.reserve = WEAPONS[i].reserve; }); reloadTimer = 0; },
-  fireDebug: () => ({ mouseDown, triggerReleased, fireCooldown, switchTimer, reloadTimer, shotQueued, ammo: weaponState[currentWeapon].ammo }),
+  fireDebug: () => ({ mouseDown, pressPending, triggerReleased, fireCooldown, switchTimer, reloadTimer, shotQueued, ammo: weaponState[currentWeapon].ammo }),
   lastShotRay: () => lastShotRay,
   knife: () => { knifeTimer = 0; knifeAttack(); },
   lastProjectile: () => lastProjectile && { start: lastProjectile.start.toArray().map(v => +v.toFixed(2)), pos: lastProjectile.pos.toArray().map(v => +v.toFixed(2)), done: lastProjectile.done, t: +lastProjectile.t.toFixed(3), hits: lastProjectile.hitSet.size, dir0: lastProjectile.path[1] ? lastProjectile.path[1].clone().sub(lastProjectile.path[0]).normalize().toArray().map(v => +v.toFixed(4)) : null },
-  shoot: () => { triggerReleased = true; fireCooldown = 0; switchTimer = 0; reloadTimer = 0; tryShoot(); },
+  shoot: () => { triggerReleased = true; pressPending = true; fireCooldown = 0; switchTimer = 0; reloadTimer = 0; tryShoot(); },
   shootEnemy: (i, zone, dist) => shootEnemy(enemies[i], WEAPONS[currentWeapon], zone, dist, enemies[i].group.position.clone().setY(1.5)),
   toggleSuppressor, damagePlayer, touch, pauseGame, dual, toggleDual, dualActive, openMap, closeMap, navInfo: () => navInfo, currentObjective, giveHint, zoneAt, pickups: () => pickups, intel: () => intelItems, FIGURES, figuresReady, keys, edgeTurn, setLookSensitivity, lastMouse: () => lastMouseXY, setLastMouse: v => (lastMouseXY = v), aimKind: () => aimKind, startCalls: () => ({ startCalls, startBlocked, loopCount }), underCrosshair,
   setStance, cycleNightVision, toggleIR, masking, teammates: () => teammates, generatorBackfire, sabotageGenerator,
