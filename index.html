@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>OPERATION: BLACK FILE — v0.4.4</title>
+<title>OPERATION: BLACK FILE — v0.4.5</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <!--
   =====================================================================
-  OPERATION: BLACK FILE  (v0.4.4 — friendly markers on your squad, sniper mission, knife, Magic Keyboard controls, iPad aim/layout fix + DEBUG readout)
+  OPERATION: BLACK FILE  (v0.4.5 — free 360° turning on iPad, retuned damage, friendly markers on your squad, sniper mission, knife, Magic Keyboard controls, iPad aim/layout fix + DEBUG readout)
   A tiny browser first-person shooter.
   - Mission structure & spy flavour inspired by GoldenEye 007 (N64)
   - Fast, aggressive maze shooting inspired by Wolfenstein 3D
@@ -184,6 +184,8 @@
         <small>— lights out. Use night vision (N) and your IR laser (L). Guards see less in the dark.</small></label>
       <label><input type="checkbox" id="optXray"> X-ray kill cam
         <small>— slow-motion bullet cam + X-ray on great sniper shots (Mission 2).</small></label>
+      <label class="sensRow" onclick="event.stopPropagation()">Look sensitivity: <input type="range" class="sensSlider" min="0.4" max="3" step="0.1" value="1.3"> <b class="sensVal">1.3</b>
+        <small>— trackpad, swipe, edge-turn, keys and touch.</small></label>
       <label>Graphics: <select id="optQuality"><option value="high">High (desktop)</option><option value="low">Low (iPad / older laptops)</option></select></label>
     </div>
     <div class="controls" id="controlsStart"></div>
@@ -219,6 +221,8 @@
   <div class="dossier">
     <h1 style="text-align:center">PAUSED</h1>
     <p id="pauseText" style="text-align:center">Click to resume the mission.</p>
+    <div style="text-align:center" onclick="event.stopPropagation()"><label class="sensRow" onclick="event.stopPropagation()">Look sensitivity: <input type="range" class="sensSlider" min="0.4" max="3" step="0.1" value="1.3"> <b class="sensVal">1.3</b>
+        <small>— trackpad, swipe, edge-turn, keys and touch.</small></label></div>
     <div class="controls" id="controlsPause"></div>
   </div>
 </div>
@@ -302,7 +306,7 @@ import { Water } from 'three/addons/objects/Water.js';
 // ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
 // ##  part failed and why.                                           ##
 // #####################################################################
-const VERSION = 'v0.4.4';
+const VERSION = 'v0.4.5';
 // v0.4.4: the game must only ever start ONCE per page (one canvas, one camera, one loop).
 // If this script somehow ran a second time, stop the second copy right here.
 window.__valkyrieBoots = (window.__valkyrieBoots || 0) + 1;
@@ -340,7 +344,7 @@ function updateDebugHud(dt, ctx) {
   const ago = debugInfo.lastInputAt ? ((now - debugInfo.lastInputAt) / 1000).toFixed(1) + 's ago' : '';
   let html = `DEBUG ${VERSION}  (\` or G hides)\n` +
     `state: ${ctx.state}   pointer locked: ${ctx.locked ? 'YES' : 'no'}   touch mode: ${ctx.touch ? 'yes' : 'no'}\n` +
-    `last pointer-lock event: ${debugInfo.lockEvent || 'none yet'}\n` +
+    `last pointer-lock event: ${debugInfo.lockEvent || 'none yet'}   (supported: ${pointerLockSupported ? 'yes' : 'NO — iPad Safari'})   edge-turn: ${debugInfo.edge || 'off'}   look sens ${SETTINGS.mouseSensitivity.toFixed(1)}\n` +
     `fps: ${debugInfo.fps.toFixed(0)}   updates: ${debugInfo.updates}   mission: ${ctx.mission}\n` +
     `guards alive: ${ctx.alive} (${ctx.mix})\n` +
     `you: x ${ctx.pos.x.toFixed(1)}  z ${ctx.pos.z.toFixed(1)}   fov ${ctx.fov.toFixed(0)}   aim offset ${ctx.aim.x.toFixed(3)},${ctx.aim.y.toFixed(3)}\n` +
@@ -372,8 +376,19 @@ const SETTINGS = {
   playerRadius: 0.35,        // how "fat" the player is for wall collision
   eyeHeight: 1.6,            // camera height above the floor
   playerMaxHealth: 100,
-  mouseSensitivity: 1.0,     // 1 = normal, 2 = twice as fast (mouse AND trackpad)
-  touchLookSensitivity: 0.005, // how fast dragging a finger turns the view
+  mouseSensitivity: 1.0,     // 1 = normal, 2 = twice as fast (mouse AND trackpad). The LOOK SENSITIVITY slider sets this.
+  // v0.4.5 iPad turning (Safari on iPad has NO pointer lock, so the cursor stops at the screen edge):
+  fallbackLookScale: 0.0032, // radians per pixel of cursor movement when the pointer isn't captured (was 0.002)
+  edgeTurnZone: 0.12,        // cursor within this fraction of the screen width of the left/right edge = keep turning
+  edgeTurnSpeed: 2.0,        // radians/second at the very edge (x look sensitivity); smoothly less further in
+  edgePitchZone: 0.07,       // same for the top/bottom edge (look up/down)...
+  edgePitchSpeed: 1.1,       // ...but gentler
+  scrollLooks: true,         // no pointer lock: two-finger trackpad swipe = look (unlimited 360°)
+  scrollLookScale: 0.004,    // radians per scroll pixel
+  keyTurnSpeed: 1.4,         // ← → / J K: starting turn speed (radians/second)...
+  keyTurnMax: 3.2,           // ...speeding up to this while held
+  keyTurnAccel: 4.0,         // how quickly it speeds up (radians/second, per second)
+  touchLookSensitivity: 0.007, // how fast dragging a finger turns the view (x look sensitivity)
   scrollSwitchesWeapon: true,  // mouse wheel / two-finger trackpad scroll changes gun
   headBob: 0.05,             // how much the view bobs while walking (0 = off)
 
@@ -391,7 +406,7 @@ const SETTINGS = {
 
   // ---- Stealth (suppressors) ----
   silencedAlertRadius: 6,    // suppressed shots only alert guards this close (or who can see you)
-  suppressorDamageMult: 0.9, // a suppressor costs a little damage...
+  suppressorDamageMult: 1.0, // v0.4.5: a suppressor no longer costs damage (it never cost a real .45 a whole extra shot)...
   suppressorRangeMult: 0.85, // ...and a little range (realistic mode falloff)
   alertShoutRadius: 8,       // an alerted guard warns friends this close
 
@@ -520,12 +535,14 @@ const BASE_SETTINGS = { ...SETTINGS };   // the values above, so Mission 1 gets 
 //   velocity: muzzle velocity in m/s, drag: air drag (bigger = slows down faster).
 //            Sniper rifles fire real flying bullets that use these (SECTION 16).
 const CALIBERS = {
-  '.45 ACP':      { energy: 500,   damage: 40,  decay: 55,  velocity: 260, drag: 0.5  },
-  '9mm':          { energy: 480,   damage: 34,  decay: 60,  velocity: 370, drag: 0.5  },
-  '5.7x28':       { energy: 400,   damage: 30,  decay: 90,  velocity: 715, drag: 0.6  },
-  '5.56x45':      { energy: 1750,  damage: 55,  decay: 300, velocity: 940, drag: 0.35 },
-  '7.62x39':      { energy: 2100,  damage: 62,  decay: 250, velocity: 715, drag: 0.35 },
-  '7.62x51':      { energy: 3500,  damage: 80,  decay: 97,  velocity: 830, drag: 0.25 }, // drops under 3000 J past ~15 m (game tuning)
+  // v0.4.5 retune: dmgDecay = metres for DAMAGE to fall off (separate from the energy 'decay' that decides pink mist).
+  // Torso, close range: .45 / 9mm = 2 shots (3 past ~25 m); 5.56 / 7.62x39 = 2; 7.62x51 = 1 (2 at range).
+  '.45 ACP':      { energy: 500,   damage: 60,  dmgDecay: 150, decay: 55,  velocity: 260, drag: 0.5  },
+  '9mm':          { energy: 480,   damage: 55,  dmgDecay: 150, decay: 60,  velocity: 370, drag: 0.5  },
+  '5.7x28':       { energy: 400,   damage: 56,  dmgDecay: 200, decay: 90,  velocity: 715, drag: 0.6  },
+  '5.56x45':      { energy: 1750,  damage: 70,  dmgDecay: 400, decay: 300, velocity: 940, drag: 0.35 },
+  '7.62x39':      { energy: 2100,  damage: 75,  dmgDecay: 400, decay: 250, velocity: 715, drag: 0.35 },
+  '7.62x51':      { energy: 3500,  damage: 110, dmgDecay: 600, decay: 97,  velocity: 830, drag: 0.25 }, // energy drops under 3000 J past ~15 m (pink-mist tuning)
   '.408 CheyTac': { energy: 11000, damage: 180, decay: 400, velocity: 900, drag: 0.10 },
   '.50 BMG':      { energy: 18000, damage: 250, decay: 500, velocity: 850, drag: 0.12 },
 };
@@ -552,28 +569,28 @@ const HIT_ZONES = {
 //   color = metal colour, grip = grip/stock colour (hex numbers).
 const WEAPONS = [
   { name: 'Colt M1911 .45', caliber: '.45 ACP', model: 'pistol', magSize: 7, reserve: 35, fireDelay: 0.2, reloadTime: 1.2,
-    arcadeDamage: 45, automatic: false, spread: 0.005, zoomLevels: [55], kick: 0.018, length: 0.3, sound: 1.1,
+    arcadeDamage: 55, automatic: false, spread: 0.005, zoomLevels: [55], kick: 0.018, length: 0.3, sound: 1.1,
     color: 0x8a8d90, grip: 0x5a3820, suppressed: true, canSuppress: true },
   { name: 'Glock 17', caliber: '9mm', model: 'pistol', magSize: 17, reserve: 68, fireDelay: 0.14, reloadTime: 1.1,
-    arcadeDamage: 34, automatic: false, spread: 0.004, zoomLevels: [55], kick: 0.012, length: 0.3, sound: 1.0,
+    arcadeDamage: 52, automatic: false, spread: 0.004, zoomLevels: [55], kick: 0.012, length: 0.3, sound: 1.0,
     color: 0x242528, grip: 0x1b1b1d, suppressed: false, canSuppress: true },
   { name: 'FN P90', caliber: '5.7x28', model: 'p90', magSize: 50, reserve: 150, fireDelay: 0.067, reloadTime: 2.0,
-    arcadeDamage: 22, automatic: true, spread: 0.012, zoomLevels: [50], kick: 0.006, length: 0.5, sound: 0.8,
+    arcadeDamage: 51, automatic: true, spread: 0.012, zoomLevels: [50], kick: 0.006, length: 0.5, sound: 0.8,
     color: 0x2a2c2a, grip: 0x1c1d1c, suppressed: false, canSuppress: true },
   { name: 'M4 Carbine', caliber: '5.56x45', model: 'rifle', magSize: 30, reserve: 90, fireDelay: 0.085, reloadTime: 1.9,
-    arcadeDamage: 30, automatic: true, spread: 0.007, zoomLevels: [45], kick: 0.009, length: 0.75, sound: 1.2,
+    arcadeDamage: 55, automatic: true, spread: 0.007, zoomLevels: [45], kick: 0.009, length: 0.75, sound: 1.2,
     color: 0x2b2c2e, grip: 0x2b2c2e, suppressed: false, canSuppress: true },
   { name: 'AKM', caliber: '7.62x39', model: 'rifle', magSize: 30, reserve: 90, fireDelay: 0.1, reloadTime: 2.1,
-    arcadeDamage: 36, automatic: true, spread: 0.009, zoomLevels: [48], kick: 0.011, length: 0.8, sound: 1.3,
+    arcadeDamage: 60, automatic: true, spread: 0.009, zoomLevels: [48], kick: 0.011, length: 0.8, sound: 1.3,
     color: 0x3a3a3c, grip: 0x7a4520, curvedMag: true, suppressed: false, canSuppress: true },
   { name: 'FN SCAR-H', caliber: '7.62x51', model: 'rifle', magSize: 20, reserve: 60, fireDelay: 0.16, reloadTime: 2.2,
-    arcadeDamage: 55, automatic: true, spread: 0.006, zoomLevels: [35], kick: 0.022, length: 0.85, sound: 1.6,
+    arcadeDamage: 100, automatic: true, spread: 0.006, zoomLevels: [35], kick: 0.022, length: 0.85, sound: 1.6,
     color: 0xa58c60, grip: 0x2a2a2a, suppressed: false, canSuppress: true, projectile: true },
   { name: 'Barrett M107', caliber: '.50 BMG', model: 'sniper', magSize: 10, reserve: 30, fireDelay: 0.45, reloadTime: 2.8,
-    arcadeDamage: 150, automatic: false, spread: 0.0, zoomLevels: [8, 2.4], kick: 0.05, length: 1.15, sound: 2.0,
+    arcadeDamage: 150, alwaysKills: true, automatic: false, spread: 0.0, zoomLevels: [8, 2.4], kick: 0.05, length: 1.15, sound: 2.0,
     color: 0x3a3d36, grip: 0x222222, scope: true, muzzleBrake: true, penetration: 1, suppressed: false, canSuppress: false, projectile: true },
   { name: 'CheyTac M200 Intervention', caliber: '.408 CheyTac', model: 'sniper', magSize: 7, reserve: 21, fireDelay: 1.3, reloadTime: 3.0,
-    arcadeDamage: 140, automatic: false, spread: 0.0, zoomLevels: [6, 1.6], kick: 0.045, length: 1.2, sound: 1.9,
+    arcadeDamage: 140, alwaysKills: true, automatic: false, spread: 0.0, zoomLevels: [6, 1.6], kick: 0.045, length: 1.2, sound: 1.9,
     color: 0x4a4d40, grip: 0x30322a, scope: true, boltAction: true, suppressed: false, canSuppress: false, projectile: true },
 ];
 
@@ -1176,8 +1193,11 @@ document.addEventListener('keydown', e => {
   e.preventDefault();
   keys[e.code] = true;
   if (e.repeat) return;                                // holding a key: act once
-  if (ELEV_UP.includes(e.code)) dialElevation(1);
-  if (ELEV_DOWN.includes(e.code)) dialElevation(-1);
+  // [ ] always dial the scope; ↑ ↓ dial only with a sniper rifle in hand (with other guns they look up/down).
+  const sniperInHand = !!WEAPONS[currentWeapon].projectile;
+  const arrow = e.code === 'ArrowUp' || e.code === 'ArrowDown';
+  if (ELEV_UP.includes(e.code) && (!arrow || sniperInHand)) dialElevation(1);
+  if (ELEV_DOWN.includes(e.code) && (!arrow || sniperInHand)) dialElevation(-1);
   if (e.code === 'KeyQ') aimPress(true);
   if (e.code === 'Comma') switchWeapon((currentWeapon + WEAPONS.length - 1) % WEAPONS.length);
   if (e.code === 'Period') switchWeapon((currentWeapon + 1) % WEAPONS.length);
@@ -1212,10 +1232,17 @@ function resetPlayer() {
 }
 
 const _forward = new THREE.Vector3(), _right = new THREE.Vector3();
+let keyTurnRate = 0;
 function updatePlayer(dt) {
   // ← → turn (handy when the trackpad can't be captured).
-  const turn = (keys.ArrowLeft ? 1 : 0) - (keys.ArrowRight ? 1 : 0);
-  if (turn) turnCamera(-turn * 1.8 * dt * (camera.fov / BASE_FOV), 0);
+  // v0.4.5: ← → (or J K) turn, starting gently and speeding up while held. ↑ ↓ look up/down
+  // (with a sniper rifle in hand they dial the elevation turret instead).
+  const turn = (keys.ArrowLeft || keys.KeyJ ? 1 : 0) - (keys.ArrowRight || keys.KeyK ? 1 : 0);
+  const sniperInHand = !!WEAPONS[currentWeapon].projectile;   // sniper rifle: ↑ ↓ belong to the elevation turret
+  const pitchKey = sniperInHand ? 0 : (keys.ArrowUp ? 1 : 0) - (keys.ArrowDown ? 1 : 0);
+  keyTurnRate = (turn || pitchKey) ? Math.min(SETTINGS.keyTurnMax, (keyTurnRate || SETTINGS.keyTurnSpeed) + SETTINGS.keyTurnAccel * dt) : 0;
+  const kz = keyTurnRate * dt * (camera.fov / BASE_FOV) * SETTINGS.mouseSensitivity;
+  if (turn || pitchKey) turnCamera(-turn * kz, -pitchKey * kz * 0.35);
   // Which way is "forward" (ignoring looking up/down)?
   camera.getWorldDirection(_forward); _forward.y = 0; _forward.normalize();
   _right.crossVectors(_forward, camera.up).normalize();
@@ -1472,7 +1499,19 @@ window.addEventListener('wheel', e => {
   noteInput('scroll ' + Math.round(e.deltaY));
   if (state !== 'playing') return;
   e.preventDefault();
+  if (e.ctrlKey) return;                               // pinch-zoom gesture: ignore
   const w = WEAPONS[currentWeapon];
+  // v0.4.5: no pointer lock (iPad Safari never gives it) → two-finger swipe LOOKS, with no limit,
+  // so a full 360° is easy. (Weapons: 1–8, , . or the GUN button.) Scoped sniper: up/down still dials.
+  if (SETTINGS.scrollLooks && !controls.isLocked && !killcam.active) {
+    const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1;
+    const k = SETTINGS.scrollLookScale * SETTINGS.mouseSensitivity * (camera.fov / BASE_FOV) * unit;
+    const scopedSniper = aiming && w.scope && w.projectile;
+    turnCamera(e.deltaX * k, scopedSniper ? 0 : e.deltaY * k);
+    noteInput('swipe-look ' + Math.round(e.deltaX) + ',' + Math.round(e.deltaY));
+    if (!scopedSniper) return;
+    if (Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
+  }
   if (aiming && w.scope && w.projectile) {             // scoped: the wheel turns the elevation turret
     scrollAccum += e.deltaY;
     const now = performance.now();
@@ -1604,7 +1643,7 @@ function bulletDamage(weapon, zone, distance, power = 1) {
   if (!SETTINGS.realisticMode)                                             // ARCADE
     return weapon.arcadeDamage * (zone === 'head' ? SETTINGS.arcadeHeadshotMultiplier : 1) * suppressorDamage(weapon) * power;
   const cal = CALIBERS[weapon.caliber];                                    // REALISTIC
-  return cal.damage * Math.exp(-distance / (cal.decay * suppressorRange(weapon))) * HIT_ZONES[zone] * suppressorDamage(weapon) * power;
+  return cal.damage * Math.exp(-distance / ((cal.dmgDecay || cal.decay) * suppressorRange(weapon))) * HIT_ZONES[zone] * suppressorDamage(weapon) * power;
 }
 // Energy left in the bullet when it arrives (joules).
 function bulletEnergy(weapon, distance, power = 1) {
@@ -1624,8 +1663,9 @@ function shootEnemy(e, weapon, zone, distance, point, power = 1) {
     player.headshots++;
     popHead = headExplodes(weapon, distance, power);
     if (popHead) damage = Math.max(damage, e.health);          // no head = no guard
-    if (!SETTINGS.realisticMode) damage = Math.max(damage, e.health); // arcade: headshots always kill
+    damage = Math.max(damage, e.health);                       // v0.4.5: a headshot kills with EVERY gun, in both modes
   }
+  if (weapon.alwaysKills) damage = Math.max(damage, e.health);   // .50 BMG / .408 CheyTac: one hit, anywhere, is fatal
   if (SETTINGS.realisticMode && zone === 'limb') e.staggerTimer = SETTINGS.limbStaggerTime;
   e.health -= damage;
   e.hitFlash = 0.12;
@@ -1683,7 +1723,7 @@ function knifeTarget() {
 }
 // Are you behind him, and is he unaware of you?
 function isBehindUnaware(e) {
-  if (e.state === 'chase') return false;
+  // v0.4.5: from BEHIND it's always an instant, silent takedown (even if he's searching or in combat).
   const ep = e.group.position;
   const tx = camera.position.x - ep.x, tz = camera.position.z - ep.z, len = Math.hypot(tx, tz) || 1;
   const dot = (Math.sin(e.yaw) * tx + Math.cos(e.yaw) * tz) / len;    // 1 = he's facing you, -1 = his back
@@ -2466,6 +2506,7 @@ function friendlyHit(mate, how = 'shot') {
   showMessage(`FRIENDLY! That's ${mate.name}, your own teammate (green ▼ marker) — ${how === 'knife' ? 'no stabbing the squad' : 'he can\'t be hurt'}. Guards wear green uniforms + black boots, deeper in the base.`, 4);
   sayQuip && showQuip(['Check fire, Wraith! Wrong team!', 'Hey! I\'m on YOUR side!', 'Do that again and you\'re buying the beer.'][Math.floor(Math.random() * 3)]);
 }
+const _lof = new THREE.Vector3();
 function updateTeammates(dt) {
   const nvOn = nvMode > 0;
   teammates.forEach((m, i) => {
@@ -2485,7 +2526,22 @@ function updateTeammates(dt) {
       const look = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ').y + Math.PI;
       turnToward(m, look, dt, 3);
     }
-    const speed = SETTINGS.playerSpeed * (d > 10 ? 1.3 : 0.9);
+    // v0.4.5: a good teammate never stands in your line of fire — if he's in front of your
+    // crosshair, he side-steps out of the way (bullets stop at friendlies).
+    if (state === 'playing') {
+      camera.getWorldDirection(_lof); _lof.y = 0; _lof.normalize();
+      const rx = pos.x - camera.position.x, rz = pos.z - camera.position.z;
+      const along = rx * _lof.x + rz * _lof.z, lat = rx * -_lof.z + rz * _lof.x;
+      if (along > -0.3 && along < 25 && Math.abs(lat) < 1.1) {
+        const side = lat >= 0 ? 1 : -1;
+        let mx = -_lof.z * side - _lof.x * 0.4, mz = _lof.x * side - _lof.z * 0.4;
+        // blocked by a wall on that side? try the other side
+        if (circleHitsWall(pos.x + mx * 0.6, pos.z + mz * 0.6, 0.3)) { mx = _lof.z * side - _lof.x * 0.4; mz = -_lof.x * side - _lof.z * 0.4; }
+        const l = Math.hypot(mx, mz) || 1; move = { x: mx / l, z: mz / l };
+        m.clearing = true;
+      } else m.clearing = false;
+    }
+    const speed = SETTINGS.playerSpeed * (m.clearing ? 1.1 : d > 10 ? 1.3 : 0.9);
     if (Math.hypot(move.x, move.z) > 0.01) {
       moveWithCollision(pos, move.x * speed * dt, move.z * speed * dt, 0.3);
       m.walkTime += dt * 9;
@@ -2899,9 +2955,26 @@ document.addEventListener('mousemove', e => {
   let mx = e.movementX || 0, my = e.movementY || 0;
   if (!mx && !my && prev) { mx = e.clientX - prev.x; my = e.clientY - prev.y; }
   if (!mx && !my) return;
-  turnCamera(mx * 0.002 * controls.pointerSpeed, my * 0.002 * controls.pointerSpeed);
+  turnCamera(mx * SETTINGS.fallbackLookScale * controls.pointerSpeed, my * SETTINGS.fallbackLookScale * controls.pointerSpeed);
 });
 let lastMouseXY = null;
+// The cursor left the page (or the window lost focus): stop edge-turning.
+document.addEventListener('mouseleave', () => { lastMouseXY = null; });
+window.addEventListener('blur', () => { lastMouseXY = null; });
+// EDGE TURN (v0.4.5): Safari on iPad never captures the trackpad, so the cursor hits the edge of the
+// screen and stops. While it sits near the left/right edge, keep turning — faster the closer it is.
+function edgeTurn(dt) {
+  if (!lastMouseXY || controls.isLocked || touch.active || killcam.active || cameFromTouch()) return;
+  const W = window.innerWidth, H = window.innerHeight, x = lastMouseXY.x, y = lastMouseXY.y;
+  const ez = W * SETTINGS.edgeTurnZone, pz = H * SETTINGS.edgePitchZone;
+  const ramp = d => { const t = THREE.MathUtils.clamp(1 - d / ez, 0, 1); return t * t * (3 - 2 * t); };   // smooth 0..1
+  const rampP = d => { const t = THREE.MathUtils.clamp(1 - d / pz, 0, 1); return t * t * (3 - 2 * t); };
+  const yaw = ramp(x) - ramp(W - 1 - x);          // + = left edge, - = right edge
+  const pitch = rampP(y) - rampP(H - 1 - y);      // + = top edge (look up)
+  const k = SETTINGS.mouseSensitivity * (camera.fov / BASE_FOV) * dt;
+  if (yaw || pitch) turnCamera(-yaw * SETTINGS.edgeTurnSpeed * k, -pitch * SETTINGS.edgePitchSpeed * k);
+  debugInfo.edge = yaw || pitch ? `yaw ${yaw.toFixed(2)} pitch ${pitch.toFixed(2)}` : 'off';
+}
 function turnCamera(dx, dy) {
   const euler = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ');
   euler.y -= dx;
@@ -2913,7 +2986,7 @@ function turnCamera(dx, dy) {
 // Turn the camera from a finger drag (same maths as mouse look).
 function lookBy(dx, dy) {
   const euler = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ');
-  const s = SETTINGS.touchLookSensitivity * (camera.fov / BASE_FOV);
+  const s = SETTINGS.touchLookSensitivity * SETTINGS.mouseSensitivity * (camera.fov / BASE_FOV);
   euler.y -= dx * s;
   euler.x = THREE.MathUtils.clamp(euler.x - dy * s, -Math.PI / 2 + 0.05, Math.PI / 2 - 0.05);
   camera.quaternion.setFromEuler(euler);
@@ -4290,9 +4363,11 @@ function endKillcam() {
 const CONTROLS = [
   ['Trackpad / mouse', [
     ['Move finger', 'look around'],
+    ['Push cursor to an edge', 'keep turning (iPad: Safari can\'t capture the trackpad)'],
+    ['2-finger swipe', 'look / turn — unlimited 360° (when the trackpad isn\'t captured)'],
     ['Click (1 finger)', 'fire'],
     ['2-finger click', 'aim / scope (snipers: again = 2nd zoom, again = off)'],
-    ['2-finger scroll', 'switch weapon · while scoped: scope elevation'],
+    ['2-finger scroll', 'captured trackpad / mouse wheel: switch weapon · scoped sniper: elevation'],
   ]],
   ['Keyboard', [
     ['W A S D', 'move'],
@@ -4308,15 +4383,16 @@ const CONTROLS = [
     ['N', 'night vision (off / white / + thermal)'],
     ['L', 'IR laser + illuminator'],
     ['F', 'laser rangefinder'],
-    ['[ ]  or  ↑ ↓', 'scope elevation (sniper rifles)'],
-    ['← →', 'turn (if the trackpad isn\'t captured)'],
+    ['← →  or  J K', 'turn (hold to speed up)'],
+    ['↑ ↓', 'look up / down · sniper rifles: scope elevation'],
+    ['[ ]', 'scope elevation (sniper rifles)'],
     ['` or G', 'DEBUG readout on / off'],
     ['P', 'pause (Esc also works on keyboards that have it)'],
     ['Any key / click', 'skip the X-ray kill cam'],
   ]],
   ['Touch screen', [
     ['Left thumb', 'move'],
-    ['Right thumb', 'look · buttons for everything else'],
+    ['Right thumb', 'look (drag, lift, drag again for a full 360°) · buttons for everything else'],
   ]],
 ];
 function renderControls() {
@@ -4325,6 +4401,16 @@ function renderControls() {
   for (const id of ['controlsStart', 'controlsPause']) $(id).innerHTML = html;
 }
 renderControls();
+// LOOK SENSITIVITY slider (start + pause screens; remembered on this device).
+function setLookSensitivity(v) {
+  v = THREE.MathUtils.clamp(+v || 1.3, 0.4, 3);
+  SETTINGS.mouseSensitivity = BASE_SETTINGS.mouseSensitivity = v;
+  try { localStorage.setItem('valkyrieLookSens', String(v)); } catch (err) { /* private mode */ }
+  document.querySelectorAll('.sensSlider').forEach(s => (s.value = v));
+  document.querySelectorAll('.sensVal').forEach(b => (b.textContent = v.toFixed(1)));
+}
+document.querySelectorAll('.sensSlider').forEach(s => s.addEventListener('input', () => setLookSensitivity(s.value)));
+{ let saved = null; try { saved = localStorage.getItem('valkyrieLookSens'); } catch (err) { /* ignore */ } setLookSensitivity(saved || 1.3); }
 
 // #####################################################################
 // ##  SECTION 13: GAME STATE (start, pause, win, lose, restart)      ##
@@ -4333,8 +4419,17 @@ let state = 'start';   // 'start' | 'playing' | 'paused' | 'won' | 'lost'
 
 // Ask the browser to capture the mouse/trackpad (pointer lock). It can say no
 // (e.g. clicked too soon after pressing Esc); then 'pointerlockerror' fires below.
+// v0.4.5: Safari on iPad (iPadOS) has no pointer-lock support at all (Mac Safari does), so on the
+// iPad this always fails — that's why edge-turn, swipe-look and keyboard turning exist. We still
+// ask on every click (standard + old webkit-prefixed API), in case a future iPadOS adds it.
+const pointerLockSupported = !!(document.body.requestPointerLock || document.body.webkitRequestPointerLock);
 function lockMouse() {
-  try { const p = controls.domElement.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (err) { /* ignore */ }
+  const el = controls.domElement;
+  try {
+    const req = el.requestPointerLock || el.webkitRequestPointerLock;
+    if (!req) { noteLock('not supported by this browser'); return; }
+    const p = req.call(el); if (p && p.catch) p.catch(() => {});
+  } catch (err) { /* ignore */ }
 }
 function releaseInputs() { mouseDown = false; touch.fire = false; setZoom(0); for (const k in keys) keys[k] = false; }
 function pauseGame(text) {
@@ -4499,6 +4594,7 @@ function gameLoop() {
   if (state === 'playing') {
     debugInfo.updates++;
     // Each part in its own safety net: one crash can't freeze the guards, bullets, HUD...
+    safe('edgeTurn', () => edgeTurn(dt));
     safe('player', () => updatePlayer(dt));
     safe('weapon', () => updateWeapon(dt));
     safe('wind', () => updateWind(dt));
@@ -4602,7 +4698,7 @@ window.__game = {
   lastProjectile: () => lastProjectile && { start: lastProjectile.start.toArray().map(v => +v.toFixed(2)), pos: lastProjectile.pos.toArray().map(v => +v.toFixed(2)), done: lastProjectile.done, t: +lastProjectile.t.toFixed(3), hits: lastProjectile.hitSet.size, dir0: lastProjectile.path[1] ? lastProjectile.path[1].clone().sub(lastProjectile.path[0]).normalize().toArray().map(v => +v.toFixed(4)) : null },
   shoot: () => { triggerReleased = true; fireCooldown = 0; switchTimer = 0; reloadTimer = 0; tryShoot(); },
   shootEnemy: (i, zone, dist) => shootEnemy(enemies[i], WEAPONS[currentWeapon], zone, dist, enemies[i].group.position.clone().setY(1.5)),
-  toggleSuppressor, damagePlayer, touch, pauseGame, aimKind: () => aimKind, startCalls: () => ({ startCalls, startBlocked, loopCount }), underCrosshair,
+  toggleSuppressor, damagePlayer, touch, pauseGame, keys, edgeTurn, setLookSensitivity, lastMouse: () => lastMouseXY, setLastMouse: v => (lastMouseXY = v), aimKind: () => aimKind, startCalls: () => ({ startCalls, startBlocked, loopCount }), underCrosshair,
   setStance, cycleNightVision, toggleIR, masking, teammates: () => teammates, generatorBackfire, sabotageGenerator,
   // Mission 2 / sniper test hooks
   selectMission: m => { document.querySelector(`input[name="mission"][value="${m}"]`).checked = true; },
