@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>OPERATION: BLACK FILE — v0.6.1</title>
+<title>OPERATION: BLACK FILE — v0.6.2</title>
 <link rel="icon" href="data:,">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <!--
@@ -149,6 +149,15 @@
   #tBreath { left: 90px; top: 239px; }
   .m2only { display: none; }
   .trainonly { display: none; }
+  .equiponly { display: none; }
+  #tC4 { left: 16px; top: 165px; width: 56px; height: 48px; font-size: 11px; border-color: rgba(255,160,60,0.9); }
+  #tTimed { left: 80px; top: 165px; width: 56px; height: 48px; font-size: 10px; border-color: rgba(255,160,60,0.9); }
+  #tClack { left: 16px; top: 221px; width: 56px; height: 48px; font-size: 10px; border-color: rgba(255,80,60,0.95); }
+  #tWay { left: 80px; top: 221px; width: 56px; height: 48px; font-size: 9px; border-color: rgba(64,224,255,0.9); }
+  #dangerTag { position: absolute; bottom: 150px; left: 50%; transform: translateX(-50%); display: none; font-size: 16px; font-weight: bold; text-align: center;
+    color: #ffd080; background: rgba(30,10,0,0.75); border: 1px solid rgba(255,160,60,0.8); padding: 5px 12px; max-width: 80vw; }
+  #dangerTag.hot { color: #fff; background: rgba(160,10,10,0.85); border-color: #ff4040; animation: dangerBlink 0.6s steps(2) infinite; }
+  @keyframes dangerBlink { 50% { background: rgba(90,0,0,0.85); } }
   /* v0.6 training: CHIEF's instruction box (top centre) + training buttons */
   #trainBox { position: absolute; top: 66px; left: 50%; transform: translateX(-50%); width: min(660px, 66vw); font-size: 14px; line-height: 1.45;
     text-align: center; display: none; border: 1px solid rgba(255,210,60,0.6); background: rgba(10,14,10,0.78); padding: 7px 12px; }
@@ -249,6 +258,10 @@
   <div class="tbtn" id="tGarrote">GARROTE<br>(hold)</div>
   <div class="tbtn" id="tRadio">RADIO</div>
   <div class="tbtn trainonly" id="tSkip">SKIP</div>
+  <div class="tbtn equiponly" id="tC4">C4</div>
+  <div class="tbtn equiponly" id="tTimed">TIMED</div>
+  <div class="tbtn equiponly" id="tClack">FIRE<br>C4</div>
+  <div class="tbtn equiponly" id="tWay">WAY-<br>POINT</div>
   <div class="tbtn m2only" id="tRange">RANGE</div>
   <div class="tbtn m2only" id="tElevUp">ELEV +</div>
   <div class="tbtn m2only" id="tElevDn">ELEV −</div>
@@ -299,6 +312,7 @@
   <div class="panel" id="healthBox">HEALTH <span id="healthText">100</span><div id="healthBar"><div id="healthFill"></div></div><div id="stanceText">STANCE: STANDING</div></div>
   <div class="panel" id="ammoBox"><div id="weaponName"></div><div id="weaponExtra"></div><div id="ammoText">12 / 48</div></div>
   <div id="message"></div>
+  <div id="dangerTag"></div>
   <div id="quip"></div>
   <div id="crosshair"><div class="h l"></div><div class="h r"></div><div class="v t"></div><div class="v b"></div></div>
   <div id="friendTag"></div>
@@ -354,7 +368,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 // ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
 // ##  part failed and why.                                           ##
 // #####################################################################
-const VERSION = 'v0.6.1';
+const VERSION = 'v0.6.2';
 // v0.4.4: the game must only ever start ONCE per page (one canvas, one camera, one loop).
 // If this script somehow ran a second time, stop the second copy right here.
 window.__valkyrieBoots = (window.__valkyrieBoots || 0) + 1;
@@ -719,15 +733,15 @@ const KNIFE_QUIPS = [
 //   9. Final showdown  — corner The Conductor (and maybe unmask The Patron).
 const BRIEFINGS = {
   0: `<p><b>CAMP HALYARD — NAVAL SPECIAL WARFARE TRAINING ANNEX.</b> Before anyone hands you a Black File, CHIEF wants to see you can walk, talk and shoot without hurting yourself. Or him.</p>
-    <ul><li><b>8 stations</b> in a row: movement · look · comms · live-fire range · sniper lane · weapons locker · knife · garrote.</li>
+    <ul><li><b>10 stations</b> in a row: movement · look · comms · live-fire range · sniper lane · weapons locker · knife · garrote · <b>navigation maze</b> · <b>demolition range</b>.</li>
     <li>CHIEF's box at the top of the screen tells you exactly what to press — worded for <b>your</b> device (Magic Keyboard + trackpad, mouse, or touch).</li>
     <li>Follow the yellow <b>◆</b> on the compass and the yellow rings on the floor. Steel doors open as you finish each station.</li>
     <li>Bored? <b>0 twice</b> (or SKIP twice) skips a station. Lost? <b>O</b> (or RADIO) and CHIEF repeats himself, loudly.</li>
     <li>Nobody here can hurt you. Ammo is free. Role-players in red are <b>not</b> targets.</li></ul>
-    <p style="color:#8a8"><i>Coming in v0.6b: navigation maze, demolition range, breaching shoot house, final timed run.</i></p>`,
+    <p style="color:#8a8"><i>Coming next: breaching shoot house (flashbangs, door charges, hostages) and a final timed run.</i></p>`,
   1: `<p><b>Wraith,</b> VALKYRIE — a rogue breakaway faction of the Kantor Group mercenaries — runs a hardened facility out of an old bunker. Inside are files on their warlord, <b>THE CONDUCTOR</b>, and the Moscow money man behind him.</p>
     <ul><li>Infiltrate the Valkyrie facility.</li><li>Retrieve all <b>intel files</b> (glowing yellow folders).</li><li>Reach the <b>extraction elevator</b> (unlocks once the intel is secured).</li></ul>
-    <p>Stay hidden: crouch or go prone, shoot when a jet, artillery or the faulty generator covers the noise (your spotter will say <b>"Now!"</b>), then relocate. You start with a suppressed Colt M1911 — rumour says a <b>spare .45</b> is stashed in the <b>ARMORY</b>. New kit: the <b>garrote</b> (hold <b>H</b> right behind an unaware guard — silent, no blood) and a <b>Remington 870</b> shotgun (key <b>9</b>, loud). This message will self-destruct.</p>
+    <p>Stay hidden: crouch or go prone, shoot when a jet, artillery or the faulty generator covers the noise (your spotter will say <b>"Now!"</b>), then relocate. You start with a suppressed Colt M1911 — rumour says a <b>spare .45</b> is stashed in the <b>ARMORY</b>. New kit: the <b>garrote</b> (hold <b>H</b> right behind an unaware guard — silent, no blood) and a <b>Remington 870</b> shotgun (key <b>9</b>, loud). From training you carry <b>3 C4 charges</b>: <b>B</b> plants one, <b>Y</b> fires the clacker, <b>U</b> plants a 10-second timed charge (touch: C4 / FIRE C4 / TIMED). A blast kills anyone inside 6 m — including you — and every guard nearby comes to look. <b>I</b> toggles a waypoint light over your objective. This message will self-destruct.</p>
     <p><b>Getting around:</b> the yellow <b>◆</b> on the compass (top of the screen) points at your next objective. Each area looks different — red-brick <b>OFFICES</b>, grey <b>WAREHOUSE</b>, blue <b>COMMS</b>, caged <b>ARMORY</b>, bright <b>ELEVATOR LOBBY</b> — and wall signs + yellow floor arrows lead to the elevator. Press <b>M</b> (or MAP) for a map of everywhere you've been. Lost for a couple of minutes? HAWK or DOC will radio a hint.</p>`,
   2: `<p><b>OPERATION: COLD HORIZON.</b> <i>(The compass ◆ points at the next target.)</i> The Black File intel led us to a Valkyrie airfield in the mountains. The Conductor's section leaders are meeting there tonight — and a convoy is loading out.</p>
     <ul><li>You and your spotter <b>GRAVEL</b> are in a ridge nest about <b>1,150 m</b> north of the compound.</li>
@@ -856,7 +870,7 @@ function applyLighting() {
   const bright = currentMission === 0;
   hemiLight.intensity = SETTINGS.nightOps ? 0.03 : bright ? 1.0 : 0.55;
   ambientLight.intensity = SETTINGS.nightOps ? 0.02 : bright ? 0.35 : 0.15;
-  scene.background.set(SETTINGS.nightOps ? 0x020203 : 0x07080a);
+  scene.background.set(SETTINGS.nightOps ? 0x020203 : currentMission === 0 ? 0x6a7a8c : 0x07080a);   // v0.6.2: training = overcast sky over the open demolition yard
   scene.fog.color.set(SETTINGS.nightOps ? 0x020203 : 0x07080a);
 }
 
@@ -1143,7 +1157,7 @@ function buildLevel() {
   wallMeshes = []; enemies = []; intelItems = []; pickups = []; effects = []; decals = []; exitZone = null;
   props = []; teammates = []; masking.generator = null; lastKillBody = null; lastShotSpot = null; repeatShots = 0;
   heightField = null; materiel = []; smokers.length = 0; projectiles.length = 0; sniperWater = null; lastLase = null;
-  obstacles = []; popTargets = []; trainGates = {}; lookPanels = []; trainMarker = null; trainRP = {};
+  obstacles = []; popTargets = []; trainGates = {}; lookPanels = []; trainMarker = null; trainRP = {}; demoTargets = [];
   if (scene.environment) { scene.environment.dispose(); scene.environment = null; }
   if (currentMission === 2 || currentMission === 3) { buildSniperMission(); return; }   // the outdoor sniper map (SECTION 15); 3 = sniper lesson
   applyLighting();
@@ -1228,10 +1242,15 @@ function buildLevel() {
   floorTexture.repeat.set(cols, rows); ceilingTexture.repeat.set(cols * 2, rows * 2);
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(sizeX, sizeZ), floorMaterial);
   floor.rotation.x = -Math.PI / 2; floor.position.set(sizeX / 2, 0, sizeZ / 2);
-  const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(sizeX, sizeZ), ceilingMaterial);
-  ceiling.rotation.x = Math.PI / 2; ceiling.position.set(sizeX / 2, SETTINGS.wallHeight, sizeZ / 2);
-  floor.userData.isFloor = ceiling.userData.isFloor = true;   // bullets never go through these
-  levelGroup.add(floor, ceiling); wallMeshes.push(floor, ceiling);
+  floor.userData.isFloor = true;   // bullets never go through these
+  levelGroup.add(floor); wallMeshes.push(floor);
+  // v0.6.2: in training the DEMOLITION yard (cols 28+, rows 22+) has no roof, so the radio tower fits
+  const ceilParts = currentMission === 0 && rows > 22 ? [[0, 0, cols, 22], [0, 22, 28, rows - 22]] : [[0, 0, cols, rows]];
+  for (const [c0, r0, w, h] of ceilParts) {
+    const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(w * CELL, h * CELL), ceilingMaterial);
+    ceiling.rotation.x = Math.PI / 2; ceiling.position.set((c0 + w / 2) * CELL, SETTINGS.wallHeight, (r0 + h / 2) * CELL);
+    ceiling.userData.isFloor = true; levelGroup.add(ceiling); wallMeshes.push(ceiling);
+  }
 
   // Ceiling lamps, spread out so they don't bunch together.
   const lamps = currentMission === 0 ? trainingLamps() : [];
@@ -1587,6 +1606,10 @@ document.addEventListener('keydown', e => {
   if (e.code === 'KeyH') garrotePress();                     // v0.6: HOLD H behind an unaware guard
   if (e.code === 'KeyO') radioPressed();                     // v0.6: radio CHIEF / ask HAWK for a hint / ask GRAVEL for wind
   if (e.code === 'Digit0') skipPressed();                    // v0.6 training: 0 twice = skip this station
+  if (e.code === 'KeyB') plantCharge(false);                // v0.6.2: plant remote C4
+  if (e.code === 'KeyU') plantCharge(true);                 // v0.6.2: plant a TIMED charge (10 s)
+  if (e.code === 'KeyY') fireClacker();                     // v0.6.2: fire the clacker (all remote charges)
+  if (e.code === 'KeyI') toggleWaypoint();                  // v0.6.2: waypoint light column on/off
   if (e.code === 'KeyF') laseRange();
   if (e.code === 'KeyV') safe('knife', knifeAttack);
   if (e.code === 'KeyR') startReload();
@@ -3645,6 +3668,7 @@ function updateHUD(dt) {
   if (w.zoomLevels.length > 1) extra += ` · ZOOM ${zoomStep}/${w.zoomLevels.length}`;
   if (w.penetration) extra += ' · PENETRATES';
   if (boltTimer > 0) extra += ' · BOLT';
+  if (equip.max) extra += ` · C4 ×${c4Text()} [${devKind() === 'touch' ? 'C4 / TIMED / FIRE C4' : 'B plant · U timed · Y fire'}]`;
   hud.weaponExtra.textContent = extra;
   // Objective checklist
   let html = '<h3>MISSION OBJECTIVES</h3>';
@@ -3889,6 +3913,7 @@ touchButton('tJump', () => tryJump());
 touchButton('tGarrote', () => { touch.garrote = true; garrotePress(); }, () => { touch.garrote = false; });
 touchButton('tRadio', () => radioPressed());
 touchButton('tSkip', () => skipPressed());
+touchButton('tC4', () => plantCharge(false)); touchButton('tTimed', () => plantCharge(true)); touchButton('tClack', () => fireClacker()); touchButton('tWay', () => toggleWaypoint());
 touchButton('tPause', () => pauseGame('Paused'));
 touchButton('tStance', () => setStance({ stand: 'crouch', crouch: 'prone', prone: 'stand' }[player.stance]));
 touchButton('tNV', () => cycleNightVision());
@@ -5549,6 +5574,7 @@ function applyMission(m) {
   weaponScene.children[0].intensity = outdoors ? 1.6 : 0.7;          // brighter gun under the outdoor tone mapping
   camera.near = outdoors ? 0.1 : 0.05; camera.far = outdoors ? SETTINGS.viewDistance : 200; camera.updateProjectionMatrix();
   document.querySelectorAll('.m2only').forEach(el => (el.style.display = outdoors ? 'flex' : 'none'));
+  document.querySelectorAll('.equiponly').forEach(el => (el.style.display = m === 0 || m === 1 ? 'flex' : 'none'));   // v0.6.2 demolition kit + waypoint
   document.querySelectorAll('.trainonly').forEach(el => (el.style.display = m === 0 || (m === 3 && el.id === 'tSkip') ? 'flex' : 'none'));
   $('trainBox').style.display = m === 0 || m === 3 ? 'block' : 'none';
   for (const k of [0, 1, 2, 3]) $('m' + k + 'Card').classList.toggle('sel', m === k);
@@ -5597,6 +5623,7 @@ function startMission() {
   safe('start:audio', () => initAudio());
   safe('start:level', () => buildLevel());
   safe('start:reset', () => { resetPlayer(); resetWeapons(); resetMasking(); missionStartPose(); resetSpotter(); });
+  safe('start:demo', () => resetDemo());
   hud.killFeed.innerHTML = '';
   mouseDown = false; setZoom(0); knifeTimer = 0; knifeAnim = 0;
   $('startScreen').style.display = $('endScreen').style.display = $('pauseScreen').style.display = 'none';
@@ -5742,6 +5769,7 @@ function gameLoop() {
     safe('weapon', () => updateWeapon(dt));
     safe('garrote', () => updateGarrote(dt));
     safe('training', () => updateTraining(dt));
+    safe('demo', () => updateDemo(dt));
     safe('wind', () => updateWind(dt));
     safe('projectiles', () => updateProjectiles(dt));
     for (const e of enemies) safe('enemies', () => updateEnemy(e, dt));
@@ -5838,6 +5866,7 @@ function underCrosshair() {
 // ##  like the Mission 1 MAP; digits 1-8 are the station doors.      ##
 // ##    #  wall   .  floor   P  start   X  graduation pad           ##
 // ##    1-8  station doors (open when that station is done/skipped) ##
+// ##    a  maze exit door (station 9)  r  demolition exit (station 10)##
 // #####################################################################
 const TRAIN_MAP = [
   "########################################################",
@@ -5861,8 +5890,29 @@ const TRAIN_MAP = [
   "#.......................#.........#.........#..........#",
   "#.......................#.........#.........#..........#",
   "#.......................#.........#.........#..........#",
+  "###.##########################r#########################",
+  "#.#...#...#...............##...........................#",
+  "#.###.#.#.#########.#####.##...........................#",
+  "#...#.............#...#.#.##...........................#",
+  "#.#.#######.#####.###.#.#.##...........................#",
+  "#.#.....#.......#.#.....#.##...........................#",
+  "#.#.#####.#.#.###.#.#####.##...........................#",
+  "#.#.#.....#.......#.#.....##...........................#",
+  "#.#.#.###############.###.##...........................#",
+  "#.#.#.....#.........#...#..a...........................#",
+  "#.#.#####.#.#.#.#.#.###.#.##...........................#",
+  "#.#...............#.......##...........................#",
+  "############################...........................#",
+  "############################...........................#",
+  "############################...........................#",
+  "############################...........................#",
+  "############################...........................#",
+  "############################...........................#",
+  "############################...........................#",
+  "############################...........................#",
+  "############################...........................#",
+  "############################...........................#",
   "########################################################"
-
 ];
 // Each station area (map rectangles, like M1_ZONES). First match wins.
 const TRAIN_ZONES = [
@@ -5874,6 +5924,8 @@ const TRAIN_ZONES = [
   { id: 't_locker',  name: 'STATION 6 · WEAPONS LOCKER', c0: 44, c1: 55, r0: 11, r1: 21, color: '#ff6060', band: '#b02828', light: 0xffffff, lightPower: 6, banner: ['WEAPONS LOCKER · TRY EVERYTHING', '#2a0808', '#ff8080'] },
   { id: 't_knife',   name: 'STATION 7 · KNIFE',          c0: 34, c1: 43, r0: 11, r1: 21, color: '#e8e8e8', band: '#808890', light: 0xffffff, lightPower: 6, banner: ['STEEL · SILENCE · BEHIND', '#202428', '#e8e8e8'] },
   { id: 't_garrote', name: 'STATION 8 · GARROTE',        c0: 24, c1: 33, r0: 11, r1: 21, color: '#d89a50', band: '#8a5a20', light: 0xfff4e8, lightPower: 6, banner: ['PIANO WIRE · TWO HANDLES · NO NOISE', '#2a1a08', '#e8b070'] },
+  { id: 't_nav',     name: 'STATION 9 · NAVIGATION',     c0: 0,  c1: 27, r0: 22, r1: 33, color: '#60ff90', band: '#20a050', light: 0xf4fff6, lightPower: 6, banner: ['COMPASS · MAP · SIGNS · LANDMARKS', '#04200a', '#60ff90'] },
+  { id: 't_demo',    name: 'STATION 10 · DEMOLITION',    c0: 28, c1: 55, r0: 22, r1: 43, color: '#ffa040', band: '#c06010', light: 0xfff4e8, lightPower: 6, banner: ['C4 · CLACKER · TIMED · DANGER CLOSE', '#2a1206', '#ffa040'] },
   { id: 't_grad',    name: 'GRADUATION',                 c0: 0,  c1: 23, r0: 11, r1: 21, color: '#40ff70', band: '#20a040', light: 0xffffff, lightPower: 7, banner: ['CAMP HALYARD · GRADUATION', '#04200a', '#60ff80'] },
 ];
 // Clean training-facility look: pale painted blockwork with a coloured band per station, grey epoxy floor.
@@ -5937,8 +5989,9 @@ function createGate(ch, c, r) {
   const g = new THREE.Group(); g.position.set(x, 0, z); if (!along) g.rotation.y = Math.PI / 2;
   const door = new THREE.Mesh(new THREE.BoxGeometry(CELL, H, 0.25), trainMats.door); door.position.y = H / 2; g.add(door);
   for (const y of [0.25, H - 0.25]) { const s = new THREE.Mesh(new THREE.BoxGeometry(CELL, 0.3, 0.27), trainMats.stripe); s.position.y = y; door.add(s); s.position.y = y - H / 2; }
-  const sign = makeSign('STATION ' + ch + ' ▸ LOCKED', 2.2, 0.4, '#200808', '#ff6060'); sign.position.set(0, 1.7 - H / 2, 0.14); door.add(sign);
-  const back = makeSign('STATION ' + ch, 2.2, 0.4, '#200808', '#ff6060'); back.position.set(0, 1.7 - H / 2, -0.14); back.rotation.y = Math.PI; door.add(back);
+  const lbl = 'STATION ' + ({ a: '9', r: '10' }[ch] || ch);
+  const sign = makeSign(lbl + ' ▸ LOCKED', 2.2, 0.4, '#200808', '#ff6060'); sign.position.set(0, 1.7 - H / 2, 0.14); door.add(sign);
+  const back = makeSign(lbl, 2.2, 0.4, '#200808', '#ff6060'); back.position.set(0, 1.7 - H / 2, -0.14); back.rotation.y = Math.PI; door.add(back);
   levelGroup.add(g); wallMeshes.push(door);
   solid[r * worldCols + c] = 1;
   trainGates[ch] = { c, r, group: g, door, open: false, t: 0 };
@@ -6038,7 +6091,7 @@ function resetRolePlayer(e) {
 let trainRP = {}, trainMateSpots = [TP(22, 2), TP(23, 3)];
 function buildTraining() {
   trainGates = {}; popTargets = []; lookPanels = []; trainMarker = null; trainRP = {};
-  for (let r = 0; r < worldRows; r++) for (let c = 0; c < worldCols; c++) { const ch = grid[r][c]; if (ch >= '1' && ch <= '9') createGate(ch, c, r); }
+  for (let r = 0; r < worldRows; r++) for (let c = 0; c < worldCols; c++) { const ch = grid[r][c]; if ((ch >= '1' && ch <= '9') || ch === 'a' || ch === 'r') createGate(ch, c, r); }
   // Station 1: hurdles (r4), low bar + crawl net (r6)
   addObstacle('jump', 25.85, 26.15, 16, 20); addObstacle('jump', 13.85, 14.15, 16, 20);
   addObstacle('crouch', 9.8, 10.2, 24, 28); addObstacle('prone', 19.5, 23.5, 24, 28);
@@ -6076,11 +6129,14 @@ function buildTraining() {
     trainRP.g2 = makeRolePlayer(103, 76, Math.PI / 2, "Role-player", { x: 132, z: 76 });
     const win = box(2.4, 1.2, 0.1, new THREE.MeshBasicMaterial({ color: 0x7ab0ff }), 110, 1.7, 44.06, levelGroup); }
   // Graduation hall: what's coming in the next update
-  addTrainSign('DEMOLITION · BREACHING · FINAL RUN — OPENING IN v0.6b', 12, 11, 12, 10, 2.5, 4.2, 0.5, '#1a1a1a', '#ffd23a');
+  addTrainSign('BREACHING · FINAL RUN — OPENING SOON (v0.6.3)', 12, 11, 12, 10, 2.5, 4.2, 0.5, '#1a1a1a', '#ffd23a');
+  addTrainSign('▼ STATION 9 · NAVIGATION MAZE', 3, 21, 3, 22, 2.6, 3.2, 0.45, '#04200a', '#60ff80');
+  // v0.6.2: Station 9 maze + Station 10 demolition range (SECTION 21)
+  safe('maze', () => buildMaze()); safe('demoRange', () => buildDemoRange());
 }
 // Fewer, well-placed lights for the big training hall (one or more per station).
 function trainingLamps() {
-  return [[5, 2], [14, 3], [22, 3], [32, 3], [41, 3], [50, 3], [8, 8], [27, 9], [46, 9], [49, 15], [39, 15], [29, 15], [12, 15], [4, 18]].map(([c, r]) => ({ c, r }));
+  return [[5, 2], [14, 3], [22, 3], [32, 3], [41, 3], [50, 3], [8, 8], [27, 9], [46, 9], [49, 15], [39, 15], [29, 15], [12, 15], [4, 18], [11, 24], [19, 28], [5, 30]].map(([c, r]) => ({ c, r }));
 }
 // ---- CHIEF's stations. Each step: text (what to do), optional 'at' (marker / compass target),
 //      start / tick helpers, and check() = true when it's done. 'say' = CHIEF's reaction. ----
@@ -6109,6 +6165,9 @@ function lookPanelTick(S, dt, end) {
   S.h = aimingAt(p.pos, 0.17) ? S.h + dt : 0;
   if (S.h > 0.25) { p.mesh.material = trainMats.panelDone; SOUNDS.pickup(); S.k++; S.h = 0; if (S.k < end) panelOn(S.k); }
 }
+// v0.6.2 station 9/10 spots (used inside STATIONS, so they must come first)
+const NAV = { entry: [3, 22], A: TP(8, 28), lamp: TP(13, 30), exit: TP(26, 30) };
+const DEMO_AT = { jeep: { x: 143, z: 100 }, safe: { x: 122.5, z: 112 }, door: { x: 145.5, z: 146 }, wall: { x: 167, z: 160 }, chain: { x: 163.6, z: 103 }, tower: { x: 199.5, z: 150 }, gen: { x: 201.5, z: 118 } };
 const STATIONS = [
   { id: 'move', zone: 't_move', gate: '1', entry: [1, 1], name: 'MOVEMENT',
     intro: 'Morning, Wraith. Welcome to Camp Halyard. I\'m Chief. I\'ve buried better recruits than you. Mostly figuratively. Let\'s start with walking.',
@@ -6196,14 +6255,56 @@ const STATIONS = [
     ] },
   { id: 'garrote', zone: 't_garrote', gate: '8', entry: [33, 15], name: 'GARROTE',
     intro: 'The garrote: piano wire between two wooden handles. No noise, no blood, no second chances.',
-    outro: 'Quiet, tidy, deeply unpleasant. Graduation is through that door.',
+    outro: 'Quiet, tidy, deeply unpleasant. Next: the maze, through the graduation hall. Follow the ◆.',
     steps: [
       { text: () => `Get right behind the role-player at the window and ${K('garrote')} for about 2 seconds, until he goes limp. You can't move while you hold him. Let go early and he breaks free.`,
         at: () => rpAt(trainRP.g1), label: 'ROLE-PLAYER', check: () => !!(trainRP.g1 && trainRP.g1.garroteKill), say: 'Textbook. Horrible, horrible textbook.' },
       { text: () => 'Now the patrol. Same again. If anyone sees you mid-strangle, it\'s over.', at: () => rpAt(trainRP.g2), label: 'PATROL',
         start: () => resetRolePlayer(trainRP.g2), check: () => !!(trainRP.g2 && trainRP.g2.garroteKill) },
     ] },
+  // ---- v0.6.2: Station 9 NAVIGATION (the maze) and Station 10 DEMOLITION (SECTION 21 has the kit) ----
+  { id: 'nav', zone: 't_nav', gate: 'a', entry: [3, 22], name: 'NAVIGATION',
+    intro: 'The maze. Real buildings don\'t come with a yellow line on the floor. Today you learn to find your own way out.',
+    outro: 'Out. The demolition range is through that door. Mind your eyebrows.',
+    steps: [
+      { text: () => 'COMPASS — the yellow <b>◆</b> at the top of the screen points at your objective and shows how far. Walls get in the way, so pick the corridor that heads the right way. Follow it to <b>CHECKPOINT A</b> (the red barrels).',
+        at: NAV.A, label: 'CHECKPOINT A', check: () => nearP(NAV.A, 2.4), say: 'Checkpoint A. The compass gives you the direction; the corridors get a vote too.' },
+      { text: () => `MAP — ${K('map')} shows everywhere you've been (the game pauses), so you never try the same dead end twice. ${K('map')} again or ${tapWord()} to close it.`,
+        check: () => ev('mapOpen') > 0 && state === 'playing' },
+      { text: () => 'SIGNS & LANDMARKS — no ◆ this time. Find the <b>GREEN LAMP</b> (a post with a glowing green globe). At every junction a <b>green arrow</b> on the floor points toward the exit — the lamp is on that route.',
+        at: NAV.lamp, label: 'GREEN LAMP', noCompass: true, noRing: true, check: () => nearP(NAV.lamp, 2.6), say: 'Green lamp. Landmarks: notice them on the way in, use them on the way out.' },
+      { text: () => `TEAMMATE HINT — lost? Ask HAWK: ${K('radio')}. He'll tell you which way to head and how far it is.`, radio: true, check: () => ev('radio') > 0, after: () => navHint(NAV.exit) },
+      { text: S => `WAYPOINT — ${K('waypoint')} puts a tall <b>BLUE</b> light over your objective that you can see through walls. Turn it on, find it, then turn it off. ${S.on ? '✔ on ' : ''}${S.on && !waypoint.on ? '✔ off' : ''}`,
+        at: NAV.exit, label: 'EXIT', noCompass: true, noRing: true, start: S => { S.on = 0; }, tick: S => { if (waypoint.on) S.on = 1; }, check: S => S.on && !waypoint.on,
+        say: 'Handy. Also handy for anyone watching for a big blue light. Use it when you\'re properly lost.' },
+      { text: S => `TIMED RUN — back to the start. Find the <b>EXIT</b> door on the east side in <b>${Math.max(0, Math.ceil(S.left))} s</b>. No ◆ (the waypoint still works if you're desperate): green arrows, landmarks, map.${S.tries ? ' · attempt ' + (S.tries + 1) : ''}`,
+        at: NAV.exit, label: 'EXIT', noCompass: true, noRing: true,
+        start: S => { S.left = SETTINGS.navTime; S.tries = 0; waypoint.on = false; teleportTo(...NAV.entry); },
+        tick: (S, dt) => { S.left -= dt; if (S.left <= 0) { S.tries++; S.left = SETTINGS.navTime; teleportTo(...NAV.entry); radioSay('CHIEF', 'Time. Back to the start. Again. The arrows are green for a reason.', 5); } },
+        check: () => nearP(NAV.exit, 2.6), after: () => radioSay('CHIEF', `Out in ${Math.round(SETTINGS.navTime - TRAIN.S.left)} seconds${waypoint.on ? ', with the waypoint on. Cheeky' : ''}.`, 5) },
+    ] },
+  { id: 'demo', zone: 't_demo', gate: 'r', entry: [28, 30], name: 'DEMOLITION',
+    intro: 'Demolition. You carry plastic explosive — C4 — a remote clacker and timed fuses. C4 is very stable until it very much isn\'t. Count your fingers now, for comparison.',
+    get outro() { return `Demolition: done. Score ${demoScore.pts}${demoScore.close ? ', and ' + demoScore.close + ' danger-close. I\'ve seen tidier funerals' : ', and nobody danger-close. Lovely'}. You carry the kit into Black File: three charges. The exit is back through the garrote room.`; },
+    steps: [
+      { text: () => `REMOTE C4 — walk up to the <b>JEEP</b>, face it and plant a charge: ${K('c4')}. A <b>RED</b> ring appears on the floor: that's the blast radius (${SETTINGS.c4Radius} m). Inside the <b>ORANGE</b> ring (${SETTINGS.c4Radius * 1.5} m) is DANGER CLOSE.${demoLine()}`,
+        at: DEMO_AT.jeep, label: 'JEEP', check: () => ev('plant:jeep') > 0 || dT('jeep'), say: 'Charge set. Now leave. Briskly.' },
+      { text: () => `GET CLEAR — walk back behind the <b>SAFE LINE</b> (yellow line, sandbags), outside the orange ring. Then fire the clacker: ${K('clacker')}. Watch the fuel drums next to it.${demoLine()}`,
+        at: DEMO_AT.safe, label: 'SAFE LINE', check: () => dT('jeep'), say: 'And the drums went with it. Fuel is generous like that.' },
+      { text: () => `TIMED CHARGE — plant one on the <b>STEEL DOOR</b> with ${K('timed')}: a ${SETTINGS.c4Fuse}-second fuse that beeps faster as it runs down. No clacker — just get out of the ring before it goes.${demoLine()}`,
+        at: DEMO_AT.door, label: 'STEEL DOOR', check: () => dT('door'), say: 'Door: opened. Hinges: optional.' },
+      { text: () => `WALL SECTION — blow a man-sized hole in the <b>BRICK WALL</b>. Remote (${K('c4')} then ${K('clacker')}) or timed (${K('timed')}), your call.${demoLine()}`,
+        at: DEMO_AT.wall, label: 'BRICK WALL', check: () => dT('wall'), say: 'New door. The architect will be thrilled.' },
+      { text: () => `CHAIN REACTION — put <b>ONE</b> charge on the <b>FIRST</b> fuel drum in the line. The fire walks drum to drum into the <b>WEAPONS CACHE</b>. Then stay well back: the ammo cooks off.${demoLine()}`,
+        at: DEMO_AT.chain, label: 'FUEL DRUMS', check: () => dT('cache'), say: 'One charge, five bangs. That\'s called efficiency.' },
+      { text: S => `TWO TARGETS, ONE CLACK — plant remote charges on the <b>RADIO TOWER</b> and the <b>GENERATOR</b> (${S.t ? '✔' : '☐'} tower · ${S.g ? '✔' : '☐'} generator), get clear of both rings, and drop them with one ${K('clacker')}.${demoLine()}`,
+        at: S => (S.t && !dT('gen') ? DEMO_AT.gen : DEMO_AT.tower), label: 'TARGET',
+        start: S => { S.t = dT('tower'); S.g = dT('gen'); }, tick: S => { if (ev('plant:tower')) S.t = 1; if (ev('plant:gen')) S.g = 1; },
+        check: () => dT('tower') && dT('gen') },
+    ] },
 ];
+const dT = id => { const t = demoTargets.find(q => q.id === id); return !!t && t.destroyed; };
+function demoLine() { return `<br><span class="tstep">Demolition score: ${demoScore.pts}${demoScore.chain ? ' · chain reactions ×' + demoScore.chain : ''}${demoScore.close ? ' · danger-close ×' + demoScore.close + ' (−50 each)' : ''}</span>`; }
 // ---- The station engine (also runs GRAVEL's SNIPER LESSON, mission 3) ----
 var TRAIN = null;
 function ST() { return currentMission === 3 ? LESSON : STATIONS; }          // the list of stations / lessons
@@ -6231,7 +6332,7 @@ function beginStation() {
 function startStep() {
   const st = curStep(); TRAIN.ev = {}; TRAIN.S = {}; TRAIN.stepT = 0; TRAIN.idle = 0;
   if (st.start) st.start(TRAIN.S);
-  setMarker(st.at && typeof st.at === 'object' ? st.at : null);
+  setMarker(st.at && typeof st.at === 'object' && !st.noRing ? st.at : null);
   noteProgress();
 }
 function finishStep() {
@@ -6289,6 +6390,7 @@ function trainingObjective() {
   if (!s) return exitZone ? { x: exitZone.x, z: exitZone.z, label: 'GRADUATION' } : null;
   if (!TRAIN.begun) { const p = TP(...s.entry); return { x: p.x, z: p.z, label: 'STATION ' + (TRAIN.i + 1) }; }
   const st = curStep(); if (!st || !st.at) return null;
+  if (st.noCompass && !waypoint.on) return null;                 // v0.6.2 maze: find it yourself (unless the waypoint is on)
   const p = typeof st.at === 'function' ? st.at(TRAIN.S) : st.at;
   return p ? { x: p.x, z: p.z, label: st.label || 'MARKER' } : null;
 }
@@ -6483,6 +6585,387 @@ const arrowMaterialGo = new THREE.MeshStandardMaterial({ map: arrowTextureGo, tr
 // Weapons you actually carry: Mission 2 = the two sniper rifles; elsewhere the 870 is a training/Black File extra.
 function weaponOwned(i) { return currentMission === 2 || currentMission === 3 ? i < 8 : true; }
 function cycleWeapon(dir) { for (let k = 1; k <= WEAPONS.length; k++) { const n = (currentWeapon + dir * k + WEAPONS.length * 2) % WEAPONS.length; if (weaponOwned(n)) { switchWeapon(n); return; } } }
+
+// #####################################################################
+// ##  SECTION 21: DEMOLITION KIT, NAVIGATION MAZE & WAYPOINT (v0.6.2)##
+// ##  C4: B plants a remote charge on whatever you're facing (or at   ##
+// ##  your feet), Y fires the clacker (every remote charge at once),  ##
+// ##  U plants a TIMED charge (10-second fuse). The red ring on the  ##
+// ##  floor is the blast radius; inside 1.5x of it = DANGER CLOSE.    ##
+// ##  I toggles the WAYPOINT: a tall light over your objective.       ##
+// ##  Training: unlimited C4, can't hurt you. Black File: 3 charges,  ##
+// ##  they kill guards (and you) and every guard nearby comes to look.##
+// #####################################################################
+SETTINGS.c4Radius = 6; SETTINGS.c4Fuse = 10; SETTINGS.c4BlackFile = 3; SETTINGS.navTime = 75;
+Object.assign(PROMPTS, { c4: ['C4', 'B'], timed: ['TIMED', 'U'], clacker: ['FIRE C4', 'Y'], waypoint: ['WAYPOINT', 'I'] });
+const equip = { c4: 0, max: 0 };
+let charges = [], demoTargets = [], demoTimers = [], demoFires = [];
+const waypoint = { on: false, mesh: null }, shake = { amp: 0, x: 0, y: 0 }, demoScore = { pts: 0, close: 0, chain: 0, blasts: 0 };
+let dangerLast = '';
+const demoMats = {
+  c4: new THREE.MeshStandardMaterial({ color: 0xd8d0a8, roughness: 0.9 }), tape: new THREE.MeshStandardMaterial({ color: 0x30343a, roughness: 0.7 }),
+  led: new THREE.MeshBasicMaterial({ color: 0xff2020 }), ledOff: new THREE.MeshBasicMaterial({ color: 0x3a0c0c }),
+  ring: new THREE.MeshBasicMaterial({ color: 0xff3030, transparent: true, opacity: 0.5, side: THREE.DoubleSide, depthWrite: false }),
+  ringOuter: new THREE.MeshBasicMaterial({ color: 0xffa020, transparent: true, opacity: 0.25, side: THREE.DoubleSide, depthWrite: false }),
+  jeep: new THREE.MeshStandardMaterial({ color: 0x4f5e34, roughness: 0.75, metalness: 0.2 }), char: new THREE.MeshStandardMaterial({ color: 0x17140f, roughness: 1 }),
+  tyre: new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 }), glass: new THREE.MeshStandardMaterial({ color: 0x5a7a90, roughness: 0.1, metalness: 0.6 }),
+  barrel: new THREE.MeshStandardMaterial({ color: 0xb8301c, roughness: 0.45, metalness: 0.5 }), fuel: new THREE.MeshStandardMaterial({ color: 0x2c5ea8, roughness: 0.45, metalness: 0.5 }),
+  gen: new THREE.MeshStandardMaterial({ color: 0xd0a020, roughness: 0.5, metalness: 0.4 }), lampOn: new THREE.MeshBasicMaterial({ color: 0xfff2c0 }),
+  lampOff: new THREE.MeshStandardMaterial({ color: 0x303030, roughness: 0.6 }),
+  beam: new THREE.MeshBasicMaterial({ color: 0xfff0b0, transparent: true, opacity: 0.12, depthWrite: false, side: THREE.DoubleSide }),
+  scorch: new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.6, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3 }),
+  flame: [0xfff0a0, 0xffb040, 0xff6a10, 0x802000].map(c => new THREE.MeshBasicMaterial({ color: c })),
+  smoke: new THREE.MeshBasicMaterial({ color: 0x303030 }), spark: new THREE.MeshBasicMaterial({ color: 0xffe070 }),
+  rust: new THREE.MeshStandardMaterial({ color: 0x8a3a1a, roughness: 0.6, metalness: 0.5 }), olive: new THREE.MeshStandardMaterial({ color: 0x3e4a2a, roughness: 0.8 }),
+  waypoint: new THREE.MeshBasicMaterial({ color: 0x40e0ff, transparent: true, opacity: 0.28, depthTest: false, depthWrite: false, side: THREE.DoubleSide }),
+  green: new THREE.MeshBasicMaterial({ color: 0x30ff60 }),
+};
+const fireLight = new THREE.PointLight(0xff7a30, 0, 30, 1.6); scene.add(fireLight);   // one shared light for burning wrecks (adding lights at runtime would stutter)
+function later(sec, fn) { demoTimers.push({ at: elapsed + sec, fn, m: currentMission }); }
+function equipFor(m) { return m === 0 ? Infinity : m === 1 ? SETTINGS.c4BlackFile : 0; }
+function resetDemo() {
+  charges = []; demoTimers = []; demoFires = []; equip.c4 = equip.max = equipFor(currentMission);
+  Object.assign(demoScore, { pts: 0, close: 0, chain: 0, blasts: 0 }); shake.amp = 0; shake.x = shake.y = 0; fireLight.intensity = 0;
+  waypoint.on = false; if (waypoint.mesh) waypoint.mesh.visible = false; dangerLast = ''; const el = $('dangerTag'); if (el) el.style.display = 'none';
+}
+function c4Text() { return equip.max === Infinity ? '∞' : String(equip.c4); }
+// ---- Camera shake: random offsets that die away; applied as a change to the camera each frame ----
+function addShake(a) { shake.amp = Math.min(0.09, Math.max(shake.amp, a)); }
+function updateShake(dt) {
+  shake.amp *= Math.exp(-dt * 4.5); if (shake.amp < 0.0005) shake.amp = 0;
+  const nx = (Math.random() - 0.5) * 2 * shake.amp, ny = (Math.random() - 0.5) * 2 * shake.amp;
+  if (!nx && !ny && !shake.x && !shake.y) return;
+  const e = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ');
+  e.y += nx - shake.x; e.x += ny - shake.y; camera.quaternion.setFromEuler(e);
+  shake.x = nx; shake.y = ny;
+}
+// ---- Effects: flying debris, fire, sparks ----
+function spawnDebris(center, n, mat, size, speed, push = null) {
+  for (let i = 0; i < n; i++) {
+    const m = new THREE.Mesh(particleGeometry, mat);
+    m.scale.set(size * (0.5 + Math.random()), size * (0.3 + Math.random() * 0.6), size * (0.5 + Math.random()));
+    m.position.copy(center).add(new THREE.Vector3((Math.random() - 0.5) * 0.6, Math.random() * 0.5, (Math.random() - 0.5) * 0.6));
+    const v = new THREE.Vector3(Math.random() - 0.5, Math.random() * 0.9 + 0.3, Math.random() - 0.5).normalize().multiplyScalar(speed * (0.4 + Math.random() * 0.8));
+    if (push) v.addScaledVector(push, speed * 0.7);
+    const spin = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(14);
+    levelGroup.add(m);
+    effects.push({ obj: m, life: 5 + Math.random() * 2, max: 7, update(dt) {
+      if (v.lengthSq() < 0.01 && m.position.y <= size) return;
+      v.y -= 9.8 * dt; m.position.addScaledVector(v, dt); m.rotation.x += spin.x * dt; m.rotation.y += spin.y * dt; m.rotation.z += spin.z * dt;
+      if (m.position.y < size * 0.3) { m.position.y = size * 0.3; v.y = -v.y * 0.3; v.x *= 0.6; v.z *= 0.6; spin.multiplyScalar(0.5); }
+      if (m.position.y > SETTINGS.wallHeight - 0.1 && zoneAtXZ(m.position.x, m.position.z).id !== 't_demo') { m.position.y = SETTINGS.wallHeight - 0.1; v.y = -Math.abs(v.y) * 0.3; }
+    } });
+  }
+}
+function flameAt(p, size) {
+  const m = new THREE.Mesh(particleGeometry, demoMats.flame[Math.floor(Math.random() * 3)]);
+  m.position.set(p.x + (Math.random() - 0.5) * size, p.y, p.z + (Math.random() - 0.5) * size); const s0 = size * (0.25 + Math.random() * 0.3); m.scale.setScalar(s0);
+  levelGroup.add(m);
+  effects.push({ obj: m, life: 0.7, max: 0.7, update(dt, fx) { m.position.y += dt * 2.2; m.scale.setScalar(s0 * fx.life / fx.max); m.rotation.y += dt * 3; if (fx.life < 0.25) m.material = demoMats.flame[3]; } });
+}
+function smokeAt(p, size) {
+  const m = new THREE.Mesh(particleGeometry, demoMats.smoke); m.position.set(p.x + (Math.random() - 0.5) * size, p.y + 0.4, p.z + (Math.random() - 0.5) * size);
+  const s0 = size * (0.3 + Math.random() * 0.3); levelGroup.add(m);
+  effects.push({ obj: m, life: 2.5, max: 2.5, update(dt, fx) { m.position.y += dt * 1.6; m.position.x += dt * 0.4; m.scale.setScalar(s0 * (1 + 1.5 * (1 - fx.life / fx.max))); } });
+}
+function addFire(p, seconds, size) { demoFires.push({ p: p.clone ? p.clone() : new THREE.Vector3(p.x, p.y, p.z), until: elapsed + seconds, size, sparks: false }); }
+function addSparks(p, seconds) { demoFires.push({ p: p.clone(), until: elapsed + seconds, size: 0.3, sparks: true }); }
+function updateFires(dt) {
+  let best = null;
+  for (let i = demoFires.length - 1; i >= 0; i--) {
+    const f = demoFires[i]; if (elapsed > f.until) { demoFires.splice(i, 1); continue; }
+    if (f.sparks) { if (Math.random() < dt * 5) { spawnParticles(f.p, 0xffe070, 6, 4, 0.03); playTone(3000 + Math.random() * 2000, 1500, 0.05, 0.05 * volumeFar(f.p.x, f.p.z), 'square'); } continue; }
+    if (Math.random() < dt * 14 * f.size) flameAt(f.p, f.size);
+    if (Math.random() < dt * 3 * f.size) smokeAt(f.p, f.size);
+    const d = dist2D(f.p.x, f.p.z, camera.position.x, camera.position.z); if (!best || d < best.d) best = { f, d };
+  }
+  if (best) { fireLight.position.set(best.f.p.x, best.f.p.y + 1, best.f.p.z); fireLight.intensity = 30 * best.f.size * (0.8 + Math.random() * 0.4); }
+  else fireLight.intensity = 0;
+}
+// ---- The bang ----
+function demoBlast(center, radius, o = {}) {
+  demoScore.blasts++;
+  const d = dist2D(camera.position.x, camera.position.z, center.x, center.z);
+  // sound arrives a moment later when far; very close = louder
+  const vol = Math.min(1.3, volumeFar(center.x, center.z) * (o.small ? 0.6 : 1.1));
+  SOUNDS.boom(vol); if (!o.small) playTone(40, 18, 2.2, 0.5 * vol);
+  const fire = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), new THREE.MeshBasicMaterial({ color: 0xffc060, transparent: true, opacity: 1, depthWrite: false }));
+  fire.position.copy(center); levelGroup.add(fire);
+  effects.push({ obj: fire, life: 0.55, max: 0.55, update(dt, fx) { const t = 1 - fx.life / fx.max; fire.scale.setScalar(0.5 + Math.sqrt(t) * radius * 0.8); fire.material.opacity = 1 - t; fire.material.color.setRGB(1, 0.8 - t * 0.5, 0.4 - t * 0.35); } });
+  const smoke = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), new THREE.MeshBasicMaterial({ color: 0x2c2a28, transparent: true, opacity: 0.7, depthWrite: false }));
+  smoke.position.copy(center); levelGroup.add(smoke);
+  effects.push({ obj: smoke, life: 5, max: 5, update(dt, fx) { const t = 1 - fx.life / fx.max; smoke.scale.set(1.5 + t * radius * 0.9, 1 + t * radius * 0.6, 1.5 + t * radius * 0.9); smoke.position.y += dt * 1.2; smoke.material.opacity = 0.7 * (1 - t); } });
+  spawnParticles(center, 0xffd070, o.small ? 14 : 34, radius * 1.1, 0.16);
+  spawnDebris(center, o.small ? 6 : 14, demoMats.char, 0.18, radius * 1.5);
+  const sc = new THREE.Mesh(new THREE.CircleGeometry(radius * 0.4, 20), demoMats.scorch); sc.rotation.x = -Math.PI / 2; sc.position.set(center.x, 0.025, center.z); levelGroup.add(sc); decals.push(sc);
+  explosionLight.position.copy(center); explosionLight.intensity = o.small ? 200 : 500;
+  addShake(THREE.MathUtils.clamp((o.small ? 0.5 : 1) * radius * 0.012 / Math.max(1, d / 6), 0.004, 0.09));
+  // You: DANGER CLOSE inside 1.5x the blast radius of your own charge
+  if (o.charge && d < radius * 1.5) {
+    demoScore.close++; if (currentMission === 0) demoScore.pts -= 50;
+    hud.damageAlpha = Math.max(hud.damageAlpha, 0.7); playNoise(1.6, 0.25, 4000);    // ears ringing
+    showMessage(`DANGER CLOSE! You were ${d.toFixed(1)} m from the charge — blast radius ${radius} m. ${currentMission === 0 ? 'In real life: dead. (−50)' : ''}`, 3.5);
+    trainEvent('dangerClose');
+  }
+  if (currentMission !== 0 && d < radius * 1.5) damagePlayer(140 * (1 - d / (radius * 1.5)), center.x, center.z);   // at your feet = dead; at the red ring ≈ 45
+  // Guards (not in training)
+  if (currentMission !== 0) {
+    for (const e of enemies) {
+      if (e.state === 'dead' || e.roleplayer) continue;
+      const de = e.group.position.distanceTo(new THREE.Vector3(center.x, e.group.position.y, center.z));
+      if (de < radius) { lastHit = { zone: 'explosion', distance: d }; e.health = 0; killEnemy(e, false); trainEvent('c4Kill'); }
+      else if (de < radius * 2) e.staggerTimer = 1.2;
+    }
+    investigateNoise(center.x, center.z, 140);
+    if (o.charge) addKillFeed('C4 detonated, ' + fmtDist(d));
+  }
+  // Targets in the blast: soft ones (barrels, vehicles, crates, generator) go up nearby; hard ones (steel door, wall, tower) need a charge ON them
+  for (const t of demoTargets) {
+    if (t.destroyed || t.pending) continue;
+    const dd = dist2D(t.x, t.z, center.x, center.z) - t.r;
+    const onIt = o.charge && o.charge.target === t;
+    const reach = t.hard ? (onIt ? 99 : o.small ? -1 : 0.6) : radius * (o.small ? 0.75 : 0.85);
+    if (onIt || dd < reach) { t.pending = true; const chained = !o.charge || (!!o.charge.target && !onIt); later(onIt ? 0 : 0.18 + Math.max(0, dd) * 0.05, () => destroyTarget(t, center, chained)); }
+  }
+  // Other charges close by go off too (sympathetic detonation)
+  for (const c of charges) if (!c.done && c.pos.distanceTo(center) < radius * 0.6) later(0.08, () => detonate(c));
+}
+function detonate(c) {
+  if (c.done) return; c.done = true; levelGroup.remove(c.group); levelGroup.remove(c.ring);
+  demoBlast(new THREE.Vector3(c.pos.x, Math.max(0.35, c.pos.y), c.pos.z), SETTINGS.c4Radius, { charge: c });
+  trainEvent('blast'); if (c.target) trainEvent('blast:' + c.target.id);
+}
+// ---- Planting ----
+const plantRay = new THREE.Raycaster();
+function plantCharge(timed) {
+  if (state !== 'playing') return;
+  if (!equip.max) { showMessage('No demolition kit on this op.', 2); return; }
+  if (equip.c4 <= 0) { showMessage('Out of C4.', 2); return; }
+  if (charges.filter(c => !c.done).length >= 8) { showMessage('That\'s enough charges for one bang. Fire them first (' + plain(K('clacker')) + ').', 2.5); return; }
+  plantRay.setFromCamera({ x: 0, y: 0 }, camera); plantRay.far = 3.2;
+  const objs = wallMeshes.concat(...demoTargets.filter(t => !t.destroyed).map(t => t.meshes));
+  const hit = plantRay.intersectObjects(objs, false)[0];
+  let pos, normal, target = null;
+  if (hit && !(hit.object.userData.isFloor && hit.point.y > 1)) {
+    pos = hit.point.clone(); normal = hit.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld) : new THREE.Vector3(0, 1, 0);
+    target = hit.object.userData.demoTarget || null;
+  } else {
+    const f = camera.getWorldDirection(new THREE.Vector3()); f.y = 0; f.normalize();
+    pos = new THREE.Vector3(camera.position.x + f.x * 0.8, 0.03, camera.position.z + f.z * 0.8); normal = new THREE.Vector3(0, 1, 0);
+  }
+  if (!target) { let bd = 1e9; for (const t of demoTargets) { if (t.destroyed) continue; const dd = dist2D(t.x, t.z, pos.x, pos.z) - t.r; if (dd < 1.4 && dd < bd) { bd = dd; target = t; } } }
+  const g = new THREE.Group(); g.position.copy(pos).addScaledVector(normal, 0.035); g.lookAt(g.position.clone().add(normal));
+  box(0.28, 0.16, 0.06, demoMats.c4, 0, 0, 0, g); box(0.29, 0.03, 0.065, demoMats.tape, 0, 0.04, 0, g); box(0.29, 0.03, 0.065, demoMats.tape, 0, -0.04, 0, g);
+  const det = box(0.07, 0.05, 0.04, timed ? demoMats.gen : demoMats.tape, 0.06, 0, 0.045, g); const led = box(0.025, 0.025, 0.02, demoMats.led, -0.06, 0.02, 0.04, g);
+  levelGroup.add(g);
+  const R = SETTINGS.c4Radius, ring = new THREE.Group(); ring.position.set(pos.x, 0.04, pos.z);
+  const r1 = new THREE.Mesh(new THREE.RingGeometry(R - 0.18, R, 56), demoMats.ring); r1.rotation.x = -Math.PI / 2; ring.add(r1);
+  const r2 = new THREE.Mesh(new THREE.RingGeometry(R * 1.5 - 0.1, R * 1.5, 56), demoMats.ringOuter); r2.rotation.x = -Math.PI / 2; ring.add(r2);
+  levelGroup.add(ring);
+  const c = { pos: g.position.clone(), group: g, ring, led, timed, t: timed ? SETTINGS.c4Fuse : 0, beepAt: 0, target, done: false };
+  charges.push(c); if (equip.c4 !== Infinity) equip.c4--;
+  playTone(1200, 1200, 0.04, 0.15, 'square'); playTone(1600, 1600, 0.04, 0.15, 'square', 0.08); playNoise(0.12, 0.08, 2000);
+  const on = target ? ' on the ' + target.name : '';
+  showMessage(timed ? `TIMED CHARGE${on} — ${SETTINGS.c4Fuse} s. MOVE! Get outside the red ring.` : `C4 placed${on}. Get outside the red ring (${R} m), then fire it: ${plain(K('clacker'))}.${equip.max !== Infinity ? ' (' + equip.c4 + ' left)' : ''}`, 3);
+  trainEvent(timed ? 'timed' : 'plant'); if (target) trainEvent('plant:' + target.id);
+  return c;
+}
+function fireClacker() {
+  if (state !== 'playing') return;
+  if (!equip.max) { showMessage('No demolition kit on this op.', 2); return; }
+  playTone(220, 140, 0.05, 0.35, 'square'); playNoise(0.05, 0.25, 3500); playTone(200, 130, 0.05, 0.3, 'square', 0.12); playNoise(0.05, 0.22, 3500, 0.12);   // clack-clack
+  const live = charges.filter(c => !c.done && !c.timed);
+  trainEvent('clack');
+  if (!live.length) { showMessage('Clack, clack… nothing. No remote charges planted (' + plain(K('c4')) + ').', 2); return; }
+  live.forEach((c, i) => later(0.25 + i * 0.12, () => detonate(c)));
+}
+// ---- Waypoint marker ----
+function toggleWaypoint() {
+  if (state !== 'playing') return;
+  if (currentMission !== 0 && currentMission !== 1) { showMessage('Waypoint: follow the yellow ◆ on the compass out here.', 2); return; }
+  waypoint.on = !waypoint.on; trainEvent('waypoint');
+  playTone(waypoint.on ? 900 : 600, waypoint.on ? 1300 : 400, 0.1, 0.12, 'sine');
+  showMessage('WAYPOINT ' + (waypoint.on ? 'ON — the blue light column marks your objective, even through walls.' : 'OFF'), 2);
+}
+function updateWaypoint() {
+  if (!waypoint.mesh) { waypoint.mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 60, 16, 1, true), demoMats.waypoint); waypoint.mesh.renderOrder = 20; waypoint.mesh.visible = false; scene.add(waypoint.mesh); }
+  const o = waypoint.on && state === 'playing' ? currentObjective() : null;
+  waypoint.mesh.visible = !!o; if (o) waypoint.mesh.position.set(o.x, 30, o.z);
+}
+// ---- Per frame ----
+function updateDemo(dt) {
+  if (state !== 'playing') return;
+  for (let i = demoTimers.length - 1; i >= 0; i--) { const t = demoTimers[i]; if (t.m !== currentMission) { demoTimers.splice(i, 1); continue; } if (elapsed >= t.at) { demoTimers.splice(i, 1); safe('demoTimer', t.fn); } }
+  updateShake(dt); updateFires(dt); updateWaypoint();
+  for (const t of demoTargets) if (t.anim) t.anim(dt);
+  let warn = '', R = SETTINGS.c4Radius;
+  for (const c of charges) {
+    if (c.done) continue;
+    const d = dist2D(c.pos.x, c.pos.z, camera.position.x, camera.position.z);
+    if (c.timed) {
+      c.t -= dt; c.beepAt -= dt;
+      if (c.beepAt <= 0) { c.beepAt = c.t > 5 ? 1 : c.t > 2 ? 0.5 : 0.18; playTone(2400, 2400, 0.05, 0.2 * Math.max(0.15, 1 - d / 50), 'square'); c.led.material = demoMats.led; }
+      else if (c.beepAt < 0.1) c.led.material = demoMats.ledOff;
+      if (c.t <= 0) { detonate(c); continue; }
+      warn = `⏱ TIMED CHARGE: ${Math.ceil(c.t)} s` + (d < R * 1.5 ? ` — ⚠ DANGER CLOSE (${d.toFixed(0)} m). GET ${Math.ceil(R * 1.5 - d)} m FURTHER AWAY!` : ` — you're ${d.toFixed(0)} m away: clear.`);
+    } else {
+      c.led.material = (elapsed % 1) < 0.15 ? demoMats.led : demoMats.ledOff;
+      if (d < R * 1.5 && !warn) warn = `⚠ DANGER CLOSE — you're ${d.toFixed(0)} m from your charge. Blast radius ${R} m: back off past the orange ring (${R * 1.5} m) before you fire.`;
+    }
+  }
+  const el = $('dangerTag');
+  if (warn !== dangerLast) { dangerLast = warn; el.textContent = warn; el.style.display = warn ? 'block' : 'none'; el.className = /DANGER/.test(warn) ? 'hot' : ''; }
+}
+// ---- Demolition targets (the range, mission 0) ----
+function addDemoTarget(kind, id, name, x, z, r, build) {
+  const g = new THREE.Group(); g.position.set(x, 0, z); levelGroup.add(g);
+  const t = { kind, id, name, x, z, r, group: g, meshes: [], destroyed: false, pending: false, hard: ['door', 'wall', 'tower'].includes(kind), props: [] };
+  build(t, g, (w, h, d, mat, px, py, pz, parent = g) => box(w, h, d, mat, px, py, pz, parent));
+  g.traverse(o => { if (o.isMesh) { o.userData.demoTarget = t; t.meshes.push(o); } });
+  demoTargets.push(t); return t;
+}
+function addTargetProp(t, x, z, r) { const p = { x, z, r }; props.push(p); t.props.push(p); }
+function dropTargetProps(t) { for (const p of t.props) { const k = props.indexOf(p); if (k >= 0) props.splice(k, 1); } t.props = []; }
+function destroyTarget(t, from, chained) {
+  if (t.destroyed) return; t.destroyed = true;
+  const pts = chained ? 150 : 100; if (currentMission === 0) demoScore.pts += pts;
+  if (chained) { demoScore.chain++; showMessage(`CHAIN REACTION! ${t.name} went up too (+${pts})`, 2.5); }
+  trainEvent('destroyed'); trainEvent('destroyed:' + t.id);
+  const c = new THREE.Vector3(t.x, 1, t.z), away = new THREE.Vector3(t.x - from.x, 0, t.z - from.z); if (away.lengthSq() < 0.01) away.set(1, 0, 0); away.normalize();
+  ({
+    jeep: () => {   // the fuel tank goes, the jeep jumps and burns
+      t.meshes.forEach(m => { if (m.material !== demoMats.tyre) m.material = demoMats.char; });
+      let v = 5, rz = 0; const spinZ = (Math.random() - 0.5) * 1.2;
+      t.anim = dt => { if (t.group.position.y <= 0 && v < 0) { t.group.position.y = 0; t.anim = null; return; } v -= 9.8 * dt; t.group.position.y = Math.max(0, t.group.position.y + v * dt); rz += spinZ * dt; t.group.rotation.z = rz; t.group.rotation.x += away.z * dt * 0.3; };
+      demoBlast(c, 5, { small: true }); spawnDebris(c, 12, demoMats.char, 0.3, 7); addFire(new THREE.Vector3(t.x, 1.2, t.z), 30, 1.6);
+    },
+    barrel: () => { t.group.visible = false; dropTargetProps(t); demoBlast(new THREE.Vector3(t.x, 0.6, t.z), 4.5, { small: true }); spawnDebris(c, 6, t.meshes[0].material, 0.25, 9); addFire(new THREE.Vector3(t.x, 0.2, t.z), 12, 0.8); },
+    door: () => {   // the steel door blows off its hinges and cartwheels away
+      const door = t.door, wp = new THREE.Vector3(); door.getWorldPosition(wp); t.group.remove(door); levelGroup.add(door); door.position.copy(wp); door.rotation.y = t.group.rotation.y;
+      const v = away.clone().multiplyScalar(11).add(new THREE.Vector3(0, 4, 0)), spin = new THREE.Vector3(Math.random() * 4, Math.random() * 6, 3 + Math.random() * 3);
+      t.anim = dt => { v.y -= 9.8 * dt; door.position.addScaledVector(v, dt); door.rotation.x += spin.x * dt; door.rotation.z += spin.z * dt;
+        if (door.position.y < 0.08) { door.position.y = 0.08; v.multiplyScalar(0.5); v.y = Math.abs(v.y) * 0.3; spin.multiplyScalar(0.4); if (v.length() < 0.6) { door.rotation.set(-Math.PI / 2, door.rotation.y, 0); t.anim = null; playNoise(0.4, 0.3, 900); } } };
+      dropTargetProps(t); spawnDebris(new THREE.Vector3(t.x, 1.2, t.z), 18, concreteMaterial, 0.18, 6, away); spawnParticles(new THREE.Vector3(t.x, 1.2, t.z), 0xffe0a0, 20, 7, 0.04);
+      playTone(300, 120, 0.6, 0.4, 'sawtooth');
+    },
+    wall: () => {   // brick wall section: a hole and a shower of bricks
+      t.whole.visible = false; t.broken.forEach(m => (m.visible = true)); dropTargetProps(t); t.props = [];
+      for (const s of [-1, 1]) addTargetProp(t, t.x, t.z + s * 2.4, 0.7);
+      spawnDebris(new THREE.Vector3(t.x, 1.4, t.z), 34, brickMaterial, 0.28, 8, away); spawnDebris(new THREE.Vector3(t.x, 0.6, t.z), 12, concreteMaterial, 0.2, 4, away);
+      smokeAt(new THREE.Vector3(t.x, 1, t.z), 3); smokeAt(new THREE.Vector3(t.x, 1, t.z), 3);
+    },
+    tower: () => {   // radio tower: a leg goes, it groans, then topples away from the blast
+      const axis = new THREE.Vector3(away.z, 0, -away.x); let ang = 0, w = 0.05;
+      playTone(90, 60, 1.6, 0.35, 'sawtooth'); spawnParticles(new THREE.Vector3(t.x, 0.5, t.z), 0xffe070, 30, 6, 0.04);
+      t.anim = dt => { w += dt * 1.1; ang = Math.min(Math.PI / 2 - 0.06, ang + w * dt); t.pivot.quaternion.setFromAxisAngle(axis, ang);
+        if (ang >= Math.PI / 2 - 0.06) { t.anim = null; const tip = new THREE.Vector3(t.x, 0.5, t.z).addScaledVector(away, 7);
+          SOUNDS.boom(volumeFar(tip.x, tip.z) * 0.5); addShake(0.02 / Math.max(1, dist2D(tip.x, tip.z, camera.position.x, camera.position.z) / 10));
+          spawnDebris(tip, 14, demoMats.rust, 0.2, 5); for (let i = 0; i < 4; i++) smokeAt(new THREE.Vector3(t.x, 0.2, t.z).addScaledVector(away, 2 + i * 2.5), 2.5); trainEvent('towerDown'); } };
+      dropTargetProps(t);
+    },
+    generator: () => {   // generator: sparks, smoke, and the floodlight it powers goes dark
+      t.meshes.forEach(m => { if (m.material === demoMats.gen) m.material = demoMats.char; });
+      if (t.lamp) { t.lamp.material = demoMats.lampOff; t.beam.visible = false; }
+      demoBlast(new THREE.Vector3(t.x, 0.8, t.z), 3.5, { small: true }); addSparks(new THREE.Vector3(t.x, 1.3, t.z), 8); addFire(new THREE.Vector3(t.x, 1.1, t.z), 10, 0.7);
+      playTone(120, 40, 1.2, 0.3, 'sawtooth');
+    },
+    cache: () => {   // weapons cache: crates burn and the ammo cooks off for a few seconds
+      t.meshes.forEach(m => (m.material = demoMats.char));
+      demoBlast(new THREE.Vector3(t.x, 0.8, t.z), 5, { small: true }); addFire(new THREE.Vector3(t.x, 0.9, t.z), 20, 1.3);
+      for (let i = 0; i < 12; i++) later(0.4 + i * 0.35 + Math.random() * 0.3, () => {
+        const p = new THREE.Vector3(t.x + (Math.random() - 0.5) * 2, 0.8 + Math.random(), t.z + (Math.random() - 0.5) * 2);
+        spawnParticles(p, 0xffe070, 10, 9, 0.035); playNoise(0.08, 0.35 * volumeFar(p.x, p.z), 2500); playTone(900, 300, 0.06, 0.12, 'square');
+        if (i === 7) { demoBlast(p, 3.5, { small: true }); spawnDebris(p, 8, propMat.crate, 0.25, 8); }
+      });
+    },
+  })[t.kind]();
+}
+function buildDemoRange() {
+  demoTargets = [];
+  const b = (w, h, d, mat, x, y, z) => box(w, h, d, mat, x, y, z, levelGroup);
+  // Safe line with a sandbag blast wall, and the range rules board
+  const line = b(0.15, 0.02, 30, trainMats.marker, 128, 0.02, 128); line.material = new THREE.MeshBasicMaterial({ color: 0xffd23a });
+  for (let z = 118; z <= 138; z += 1.2) b(0.7, 1.1, 1.1, demoMats.olive, 125.5, 0.55, z);
+  for (let z = 118; z <= 138; z += 2.4) props.push({ x: 125.5, z, r: 0.7 });
+  const sl = makeSign('SAFE LINE · STAY BEHIND HERE TO FIRE', 2.8, 0.35, '#1a1a1a', '#ffd23a'); sl.position.set(125.0, 1.5, 128); sl.rotation.y = -Math.PI / 2; levelGroup.add(sl);
+  // 1. Jeep with two fuel barrels beside it
+  addDemoTarget('jeep', 'jeep', 'JEEP', 146, 100, 1.6, (t, g, bx) => {
+    bx(4.0, 0.8, 1.9, demoMats.jeep, 0, 0.85, 0); bx(1.6, 0.5, 1.8, demoMats.jeep, 1.0, 1.4, 0); bx(0.06, 0.6, 1.7, demoMats.glass, 0.15, 1.55, 0);
+    bx(1.6, 0.06, 1.9, demoMats.jeep, -0.9, 1.9, 0); bx(0.6, 0.5, 0.6, demoMats.olive, -1.7, 1.5, 0.4);
+    for (const [wx, wz] of [[1.3, 0.95], [1.3, -0.95], [-1.3, 0.95], [-1.3, -0.95]]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.3, 14), demoMats.tyre); w.rotation.x = Math.PI / 2; w.position.set(wx, 0.42, wz); g.add(w); }
+    g.rotation.y = 0.35; addTargetProp(t, 146 - 1.2, 100, 1.1); addTargetProp(t, 146 + 1.2, 100, 1.1);
+  });
+  for (const [i, x, z] of [[1, 147.5, 97.8], [2, 148.6, 98.5]]) addDemoTarget('barrel', 'jb' + i, 'FUEL DRUM', x, z, 0.35, (t, g, bx) => { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.9, 14), demoMats.fuel); c.position.y = 0.45; g.add(c); addTargetProp(t, x, z, 0.35); });
+  // 2. Steel door in a concrete frame (faces the safe line)
+  addDemoTarget('door', 'door', 'STEEL DOOR', 148, 146, 0.8, (t, g, bx) => {
+    bx(0.5, 3.2, 3.0, concreteMaterial, 0, 1.6, -2.1); bx(0.5, 3.2, 3.0, concreteMaterial, 0, 1.6, 2.1); bx(0.5, 1.0, 1.2, concreteMaterial, 0, 2.7, 0);
+    t.door = bx(0.12, 2.2, 1.2, propMat.steelDoor, -0.05, 1.1, 0); bx(0.04, 0.06, 0.3, propMat.dark, -0.12, 1.0, 0.4, t.door);
+    for (const zz of [-3.0, -1.6, 0, 1.6, 3.0]) addTargetProp(t, 148, 146 + zz, 0.6);
+  });
+  { const s = makeSign('STEEL DOOR · TIMED CHARGE', 1.8, 0.3, '#1a1a1a', '#ffd23a'); s.position.set(147.7, 2.65, 143.6); s.rotation.y = -Math.PI / 2; levelGroup.add(s); }
+  // 3. Brick wall section
+  addDemoTarget('wall', 'wall', 'BRICK WALL', 170, 160, 1.2, (t, g, bx) => {
+    t.whole = bx(0.5, 3.0, 6.0, brickMaterial, 0, 1.5, 0);
+    t.broken = [bx(0.5, 3.0, 1.6, brickMaterial, 0, 1.5, -2.2), bx(0.5, 3.0, 1.6, brickMaterial, 0, 1.5, 2.2), bx(0.5, 0.5, 2.8, brickMaterial, 0, 2.75, 0), bx(1.6, 0.35, 2.4, brickMaterial, 0.4, 0.17, 0)];
+    t.broken.forEach(m => (m.visible = false));
+    for (const zz of [-2.4, -0.8, 0.8, 2.4]) addTargetProp(t, 170, 160 + zz, 0.7);
+  });
+  // 4. A line of fuel barrels running into the weapons cache
+  [[166, 103], [169.2, 104], [172.4, 105], [175.6, 106]].forEach(([x, z], i) => addDemoTarget('barrel', 'cb' + i, 'FUEL DRUM', x, z, 0.35, (t, g) => {
+    const c = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.9, 14), i % 2 ? demoMats.fuel : demoMats.barrel); c.position.y = 0.45; g.add(c); addTargetProp(t, x, z, 0.35); }));
+  addDemoTarget('cache', 'cache', 'WEAPONS CACHE', 179.5, 107, 1.3, (t, g, bx) => {
+    bx(1.4, 0.8, 0.9, propMat.crate, 0, 0.4, -0.6); bx(1.4, 0.8, 0.9, propMat.crate, 0, 0.4, 0.5); bx(1.3, 0.7, 0.85, propMat.crate, 0.05, 1.15, 0); bx(0.9, 0.4, 0.5, demoMats.olive, 1.2, 0.2, 0.9); bx(0.9, 0.4, 0.5, demoMats.olive, 1.2, 0.6, 0.9);
+    const s = makeSign('AMMO · EXPLOSIVES', 1.2, 0.25, '#2a2a10', '#ffd23a', false); s.position.set(-0.71, 0.55, -0.6); s.rotation.y = -Math.PI / 2; g.add(s);
+    addTargetProp(t, 179.5, 107, 1.3);
+  });
+  // 5. Radio tower + generator with a floodlight
+  addDemoTarget('tower', 'tower', 'RADIO TOWER', 202, 150, 1.0, (t, g, bx) => {
+    const p = new THREE.Group(); g.add(p); t.pivot = p; const H = 13;
+    for (const [lx, lz] of [[-0.8, -0.8], [0.8, -0.8], [-0.8, 0.8], [0.8, 0.8]]) bx(0.12, H, 0.12, demoMats.rust, lx, H / 2, lz, p);
+    for (let y = 1; y < H; y += 1.4) { bx(1.7, 0.06, 0.06, demoMats.rust, 0, y, -0.8, p); bx(1.7, 0.06, 0.06, demoMats.rust, 0, y, 0.8, p); bx(0.06, 0.06, 1.7, demoMats.rust, -0.8, y, 0, p); bx(0.06, 0.06, 1.7, demoMats.rust, 0.8, y, 0, p); }
+    bx(0.08, 3, 0.08, propMat.metal, 0, H + 1.5, 0, p); bx(1.2, 0.8, 0.1, propMat.metal, 0.3, H - 1, 0.86, p); t.tip = bx(0.25, 0.25, 0.25, demoMats.led, 0, H + 3, 0, p);
+    addTargetProp(t, 202, 150, 1.2);
+  });
+  addDemoTarget('generator', 'gen', 'GENERATOR', 204, 118, 1.0, (t, g, bx) => {
+    bx(2.2, 1.3, 1.2, demoMats.gen, 0, 0.75, 0); bx(2.3, 0.15, 1.3, propMat.dark, 0, 0.07, 0); bx(0.5, 0.6, 0.05, propMat.dark, 0.6, 0.9, 0.62); bx(0.1, 0.7, 0.1, propMat.metal, -0.8, 1.6, 0.3);
+    addTargetProp(t, 204, 118, 1.2);
+  });
+  { const pole = box(0.15, 5, 0.15, propMat.metal, 207.5, 2.5, 121.5, levelGroup); props.push({ x: 207.5, z: 121.5, r: 0.3 });
+    const gen = demoTargets[demoTargets.length - 1]; gen.lamp = box(0.9, 0.4, 0.4, demoMats.lampOn, 207.0, 5.0, 121.5, levelGroup);
+    gen.beam = new THREE.Mesh(new THREE.ConeGeometry(4, 5, 20, 1, true), demoMats.beam); gen.beam.position.set(205, 2.6, 121.5); levelGroup.add(gen.beam);
+    const cable = box(3.0, 0.05, 0.05, propMat.dark, 205.8, 0.03, 120, levelGroup); cable.rotation.y = 0.9; }
+  // Labels on the floor in front of each target
+  for (const [txt, x, z] of [['1 · JEEP', 140, 100], ['2 · STEEL DOOR', 143, 146], ['3 · WALL', 165, 160], ['4 · CHAIN → CACHE', 162, 103], ['5 · TOWER', 197, 150], ['5 · GENERATOR', 199, 118]]) {
+    const s = makeSign(txt, 2.2, 0.4, '#1a1a1a', '#ffd23a'); s.position.set(x, 0.03, z); s.rotation.set(-Math.PI / 2, 0, -Math.PI / 2); levelGroup.add(s); }
+}
+// ---- The maze (mission 0): floor arrows at junctions, two landmarks, an entry board ----
+function buildMaze() {
+  const toExit = gridDistances(26, 30), geo = new THREE.PlaneGeometry(1.4, 1.4); geo.rotateX(-Math.PI / 2);
+  const mat = new THREE.MeshStandardMaterial({ map: arrowTextureGo, transparent: true, depthWrite: false, roughness: 0.8, emissive: 0x003311, color: 0x60ff90, polygonOffset: true, polygonOffsetFactor: -2 });
+  for (let r = 22; r <= 32; r++) for (let c = 1; c <= 26; c++) {
+    const k = toExit[r * worldCols + c]; if (k <= 0) continue;
+    const open = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dc, dr]) => !isWall(c + dc, r + dr) && zoneAt(c + dc, r + dr).id === 't_nav');
+    if (open.length < 3 && !(c === NAV.entry[0] && r === NAV.entry[1])) continue;
+    const next = open.find(([dc, dr]) => toExit[(r + dr) * worldCols + c + dc] === k - 1); if (!next) continue;
+    const a = new THREE.Mesh(geo, mat); a.position.set(c * CELL + CELL / 2, 0.013, r * CELL + CELL / 2); a.rotation.y = Math.atan2(-next[0], -next[1]); levelGroup.add(a);
+  }
+  // Checkpoint A: red barrels. The GREEN LAMP: a post with a glowing green globe.
+  for (const [dx, dz] of [[-1.1, -1.1], [-0.4, -1.3], [-1.3, -0.4]]) { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.9, 12), demoMats.barrel); c.position.set(NAV.A.x + dx, 0.45, NAV.A.z + dz); levelGroup.add(c); }
+  props.push({ x: NAV.A.x - 1.0, z: NAV.A.z - 1.0, r: 0.6 });
+  box(0.12, 2.6, 0.12, propMat.metal, NAV.lamp.x + 1.3, 1.3, NAV.lamp.z - 1.3, levelGroup); props.push({ x: NAV.lamp.x + 1.3, z: NAV.lamp.z - 1.3, r: 0.25 });
+  const globe = new THREE.Mesh(new THREE.SphereGeometry(0.35, 14, 10), demoMats.green); globe.position.set(NAV.lamp.x + 1.3, 2.85, NAV.lamp.z - 1.3); levelGroup.add(globe);
+  addTrainSign('MAZE · FIND THE EXIT (EAST SIDE) · GREEN ARROWS POINT THE WAY', 3, 20, 3, 21, 2.5, 4.4, 0.5, '#04200a', '#60ff80');
+  addTrainSign('◀ CHECKPOINT A', 8, 28, 8, 27, 2.3, 2.0, 0.4, '#2a0808', '#ff8080');
+  addTrainSign('EXIT ▶ DEMOLITION', 26, 30, 26, 29, 2.4, 2.4, 0.4, '#04200a', '#60ff80');
+  addTrainSign('DEMOLITION RANGE · CHARGES LIVE · EARS ON', 28, 30, 27, 30, 2.5, 3.6, 0.5, '#2a0e06', '#ffa040');
+}
+function navHint(target) {
+  const [sc, sr] = cellOf(camera.position.x, camera.position.z), [tc, tr] = cellOf(target.x, target.z);
+  const path = findPath(sc, sr, tc, tr), step = path[Math.min(2, path.length - 1)] || [tc, tr];
+  const a = Math.atan2(step[0] * CELL + CELL / 2 - camera.position.x, -(step[1] * CELL + CELL / 2 - camera.position.z));
+  const word = COMPASS_WORDS[((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8];
+  radioSay('HAWK', `Wraith, from where you are head ${word}. About ${Math.round(path.length * CELL)} m of corridor to the exit on the east side. At junctions, follow the green arrows.`, 8);
+}
 
 // #####################################################################
 // ##  SECTION 20: SNIPER LESSON — GRAVEL'S RANGE DAY (v0.6)          ##
@@ -6742,6 +7225,7 @@ window.__game = {
   spotterText: () => hud.spotter.textContent, alertText: () => hud.alertText.textContent, lastKillBody: () => lastKillBody,
   // v0.6 training / garrote hooks
   training: () => TRAIN, STATIONS, LESSON, lessonTargets: () => lessonTargets, lessonCall: () => TRAIN && TRAIN.lastCall, setLessonWind, windHold, lessonClear, lessonLead: id => lead(id), skipStation, skipPressed, beginStation, popTargets: () => popTargets, trainRP: () => trainRP, garrote, garrotePress, updateGarrote, tryJump,
+  demo: () => ({ charges, demoTargets, equip, demoScore, waypoint, shake, demoFires, demoTimers }), plantCharge, fireClacker, toggleWaypoint, detonate, demoBlast, NAV, DEMO_AT, findPath, isWall, cellOf,
   radioPressed, trainingOverview, teleportTo, curStep, trainGates: () => trainGates, obstacles: () => obstacles, chooseMission, currentWeapon: () => currentWeapon, aiming: () => aiming,
   aimAt: (x, y, z) => { const d = new THREE.Vector3(x, y, z).sub(camera.position); camera.rotation.set(Math.asin(THREE.MathUtils.clamp(d.y / d.length(), -1, 1)), Math.atan2(-d.x, -d.z), 0, 'YXZ'); },
   onPlayerShotNoise, nvMode: () => nvMode, lastShot: () => ({ lastShotSpot, repeatShots }), setZoom, weapon: () => WEAPONS[currentWeapon], zoomStep: () => zoomStep,
