@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>OPERATION: BLACK FILE — v0.6.3</title>
+<title>OPERATION: BLACK FILE — v0.6.4</title>
 <link rel="icon" href="data:,">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <!--
@@ -155,6 +155,7 @@
   #tClack { left: 16px; top: 221px; width: 56px; height: 48px; font-size: 10px; border-color: rgba(255,80,60,0.95); }
   #tFlash { left: 144px; top: 165px; width: 56px; height: 48px; font-size: 10px; border-color: rgba(255,255,255,0.9); }
   #flashWhite { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 6; }
+  #tCover { left: 144px; top: 221px; width: 56px; height: 48px; font-size: 10px; border-color: rgba(96,208,255,0.9); }
   #tWay { left: 80px; top: 221px; width: 56px; height: 48px; font-size: 9px; border-color: rgba(64,224,255,0.9); }
   #dangerTag { position: absolute; bottom: 150px; left: 50%; transform: translateX(-50%); display: none; font-size: 16px; font-weight: bold; text-align: center;
     color: #ffd080; background: rgba(30,10,0,0.75); border: 1px solid rgba(255,160,60,0.8); padding: 5px 12px; max-width: 80vw; }
@@ -265,6 +266,7 @@
   <div class="tbtn equiponly" id="tClack">FIRE<br>C4</div>
   <div class="tbtn equiponly" id="tWay">WAY-<br>POINT</div>
   <div class="tbtn equiponly" id="tFlash">FLASH</div>
+  <div class="tbtn equiponly" id="tCover">COVER</div>
   <div class="tbtn m2only" id="tRange">RANGE</div>
   <div class="tbtn m2only" id="tElevUp">ELEV +</div>
   <div class="tbtn m2only" id="tElevDn">ELEV −</div>
@@ -372,7 +374,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 // ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
 // ##  part failed and why.                                           ##
 // #####################################################################
-const VERSION = 'v0.6.3';
+const VERSION = 'v0.6.4';
 // v0.4.4: the game must only ever start ONCE per page (one canvas, one camera, one loop).
 // If this script somehow ran a second time, stop the second copy right here.
 window.__valkyrieBoots = (window.__valkyrieBoots || 0) + 1;
@@ -737,14 +739,14 @@ const KNIFE_QUIPS = [
 //   9. Final showdown  — corner The Conductor (and maybe unmask The Patron).
 const BRIEFINGS = {
   0: `<p><b>CAMP HALYARD — NAVAL SPECIAL WARFARE TRAINING ANNEX.</b> Before anyone hands you a Black File, CHIEF wants to see you can walk, talk and shoot without hurting yourself. Or him.</p>
-    <ul><li><b>11 stations</b> in a row: movement · look · comms · live-fire range · sniper lane · weapons locker · knife · garrote · <b>navigation maze</b> · <b>demolition range</b> · <b>breaching shoot house</b> (door charge, shotgun, ram, torch, wall charge, flashbangs, team stack, hostages).</li>
+    <ul><li><b>13 stations</b> in a row: movement · look · comms · live-fire range · sniper lane · weapons locker · knife · garrote · <b>navigation maze</b> · <b>demolition range</b> · <b>breaching shoot house</b> (door charge, shotgun, ram, torch, wall charge, flashbangs, team stack, hostages) · <b>signals</b> (bug a phone line, intercept a transmission, cut a jammer and a junction box, order HAWK to cover a door) · and a timed <b>FINAL RUN</b> that uses all of it, then graduation.</li>
     <li>CHIEF's box at the top of the screen tells you exactly what to press — worded for <b>your</b> device (Magic Keyboard + trackpad, mouse, or touch).</li>
     <li>Follow the yellow <b>◆</b> on the compass and the yellow rings on the floor. Steel doors open as you finish each station.</li>
     <li>Bored? <b>0 twice</b> (or SKIP twice) skips a station. Lost? <b>O</b> (or RADIO) and CHIEF repeats himself, loudly.</li>
     <li>Nobody here can hurt you. Ammo is free. Role-players in red are <b>not</b> targets.</li></ul>
-    <p style="color:#8a8"><i>Coming next: comms tradecraft and a final timed run.</i></p>`,
+`,
   1: `<p><b>Wraith,</b> VALKYRIE — a rogue breakaway faction of the Kantor Group mercenaries — runs a hardened facility out of an old bunker. Inside are files on their warlord, <b>THE CONDUCTOR</b>, and the Moscow money man behind him.</p>
-    <ul><li>Infiltrate the Valkyrie facility.</li><li>Retrieve all <b>intel files</b> (glowing yellow folders).</li><li>Reach the <b>extraction elevator</b> (unlocks once the intel is secured).</li></ul>
+    <ul><li>Infiltrate the Valkyrie facility.</li><li>Retrieve all <b>intel files</b> (glowing yellow folders).</li><li>Reach the <b>extraction elevator</b> (unlocks once the intel is secured).</li><li>HAWK and DOC are with you. Aim at a doorway and press <b>;</b> (or COVER): HAWK holds it and drops any guard who comes through. <b>;</b> again calls him back.</li></ul>
     <p>Stay hidden: crouch or go prone, shoot when a jet, artillery or the faulty generator covers the noise (your spotter will say <b>"Now!"</b>), then relocate. You start with a suppressed Colt M1911 — rumour says a <b>spare .45</b> is stashed in the <b>ARMORY</b>. New kit: the <b>garrote</b> (hold <b>H</b> right behind an unaware guard — silent, no blood) and a <b>Remington 870</b> shotgun (key <b>9</b>, loud). From training you carry <b>3 C4 charges</b>: <b>B</b> plants one, <b>Y</b> fires the clacker, <b>U</b> plants a 10-second timed charge (touch: C4 / FIRE C4 / TIMED). A blast kills anyone inside 6 m — including you — and every guard nearby comes to look. Also <b>2 door charges</b> (B on a door — the ARMORY has a steel one; the 870 on its hinges or the ram, V, work too) and <b>3 flashbangs</b> (<b>G</b>: guards that see the bang are stunned for 4 s). <b>I</b> toggles a waypoint light over your objective. This message will self-destruct.</p>
     <p><b>Getting around:</b> the yellow <b>◆</b> on the compass (top of the screen) points at your next objective. Each area looks different — red-brick <b>OFFICES</b>, grey <b>WAREHOUSE</b>, blue <b>COMMS</b>, caged <b>ARMORY</b>, bright <b>ELEVATOR LOBBY</b> — and wall signs + yellow floor arrows lead to the elevator. Press <b>M</b> (or MAP) for a map of everywhere you've been. Lost for a couple of minutes? HAWK or DOC will radio a hint.</p>`,
   2: `<p><b>OPERATION: COLD HORIZON.</b> <i>(The compass ◆ points at the next target.)</i> The Black File intel led us to a Valkyrie airfield in the mountains. The Conductor's section leaders are meeting there tonight — and a convoy is loading out.</p>
@@ -1276,6 +1278,7 @@ function buildLevel() {
     levelGroup.add(lamp, light);
   }
   safe('zones', () => decorateZones());
+  safe('signalsReset', () => resetSignals());                        // v0.6.4 SECTION 23
   if (currentMission === 0) safe('training', () => buildTraining());   // v0.6 stations, doors, targets, role-players
   if (currentMission === 0 || currentMission === 1) safe('breachDoors', () => buildBreachDoors());   // v0.6.3 breach doors (d s h w S on the map)
   finalizeTargets();
@@ -1615,6 +1618,7 @@ document.addEventListener('keydown', e => {
   if (e.code === 'KeyU') plantCharge(true);                 // v0.6.2: plant a TIMED charge (10 s)
   if (e.code === 'KeyY') fireClacker();                     // v0.6.2: fire the clacker (all remote charges)
   if (e.code === 'KeyI') toggleWaypoint();                  // v0.6.2: waypoint light column on/off
+  if (e.code === 'Semicolon') orderCover();                 // v0.6.4: HAWK, cover that door
   if (e.code === 'KeyG') throwFlash();                      // v0.6.3: throw a flashbang
   if (e.code === 'KeyF') laseRange();
   if (e.code === 'KeyV') safe('knife', knifeAttack);
@@ -2111,6 +2115,7 @@ function tryShoot() {
       const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
       spawnParticles(hit.point, 0xffcc66, 6, 3, 0.04, normal);
       if (hit.object.userData.generator) { sabotageGenerator(); break; }   // sabotage!
+      if (hit.object.userData.jammer) cutJammer('shot');                                     // v0.6.4
       if (hit.object.userData.hinge !== undefined) breachHinge(hit.object, w, hit.distance);   // v0.6.3 shotgun breach
       addBulletHole(hit.point, normal);
       if (hit.object.userData.isFloor) break;
@@ -3369,6 +3374,7 @@ function updateTeammates(dt) {
     const len = rayToWall(from.x, from.z, dirX, dirZ, 40);
     setLaser(m.laser, from, new THREE.Vector3(from.x + dirX * len, 1.1, from.z + dirZ * len), nvOn && SETTINGS.teammateLasers);
   });
+  updateCover(dt);                                         // v0.6.4: HAWK covering a door shoots what comes through (SECTION 23)
 }
 
 // #####################################################################
@@ -3925,7 +3931,7 @@ touchButton('tJump', () => tryJump());
 touchButton('tGarrote', () => { touch.garrote = true; garrotePress(); }, () => { touch.garrote = false; });
 touchButton('tRadio', () => radioPressed());
 touchButton('tSkip', () => skipPressed());
-touchButton('tC4', () => plantCharge(false)); touchButton('tTimed', () => plantCharge(true)); touchButton('tClack', () => fireClacker()); touchButton('tWay', () => toggleWaypoint()); touchButton('tFlash', () => throwFlash());
+touchButton('tC4', () => plantCharge(false)); touchButton('tTimed', () => plantCharge(true)); touchButton('tClack', () => fireClacker()); touchButton('tWay', () => toggleWaypoint()); touchButton('tFlash', () => throwFlash()); touchButton('tCover', () => orderCover());
 touchButton('tPause', () => pauseGame('Paused'));
 touchButton('tStance', () => setStance({ stand: 'crouch', crouch: 'prone', prone: 'stand' }[player.stance]));
 touchButton('tNV', () => cycleNightVision());
@@ -5280,6 +5286,8 @@ const CONTROLS = [
     ['[ ]  or  ↑ ↓', 'scope elevation (sniper rifles)'],
     ['B / Y / U', 'plant C4 or a door charge (on a door) · fire the clacker · plant a 10-second timed charge'],
     ['G', 'throw a flashbang (look away!)'],
+    ['; (semicolon)', 'HAWK: cover the door you\'re looking at (again = come back to me)'],
+    ['H (hold) at a box', 'bug a phone line · work the scanner · cut a jammer or a junction box'],
     ['V at a door', 'swing the ram (3 hits) · the 870 on both hinges also opens doors · hold H at a padlock = torch'],
     ['I', 'waypoint light column over your objective'],
     ['`', 'DEBUG readout on / off'],
@@ -5682,6 +5690,7 @@ function endGame(won) {
       + '<br><b>Press Enter (or tap CONTINUE) for MISSION 02 — COLD HORIZON</b> · R = run the lesson again'
     : currentMission === 0
     ? 'Stations: ' + TRAIN.done.filter(Boolean).length + ' / ' + STATIONS.length + (TRAIN.skipped.some(Boolean) ? ' (skipped: ' + STATIONS.filter((s, i) => TRAIN.skipped[i]).map(s => s.name).join(', ') + ')' : ' — none skipped')
+      + (FR.done ? '<br>FINAL RUN: <b>' + fmtClock(FR.total) + ' — ' + FR.medal + '</b>' + (FR.best && FR.best < FR.total ? ' (best ' + fmtClock(FR.best) + ')' : '') : '')
       + '<br><b>Press Enter (or tap CONTINUE) for MISSION 01 — BLACK FILE</b> · R = run training again'
     : currentMission === 2
     ? sniperObjectives().map(o => (o.done ? '☑ ' : '☐ ') + o.text).join('<br>')
@@ -5930,6 +5939,27 @@ const TRAIN_MAP = [
   "#............#########.....#...........................#",
   "#............#.......h.....#...........................#",
   "#............#.......#.....#...........................#",
+  "######f#################################################",
+  "#.........#..........#.....###############.............#",
+  "#....................#.....###############.............#",
+  "#.........#................#...........................#",
+  "#.........#..........#.....#...........................#",
+  "######################.....g...........................#",
+  "######################.....###############.............#",
+  "######################.....#########.#####.............#",
+  "####################################.#############k#####",
+  "############################...........................#",
+  "############################...........................#",
+  "############################...........................#",
+  "############################...........................#",
+  "##################################S#####################",
+  "############################.............#.............#",
+  "############################.............#.............#",
+  "############################.............q.............#",
+  "############################.............#.............#",
+  "##########################################.............#",
+  "#......................................................#",
+  "#......................................................#",
   "########################################################"
 ];
 // Each station area (map rectangles, like M1_ZONES). First match wins.
@@ -5945,6 +5975,8 @@ const TRAIN_ZONES = [
   { id: 't_nav',     name: 'STATION 9 · NAVIGATION',     c0: 0,  c1: 27, r0: 22, r1: 33, color: '#60ff90', band: '#20a050', light: 0xf4fff6, lightPower: 6, banner: ['COMPASS · MAP · SIGNS · LANDMARKS', '#04200a', '#60ff90'] },
   { id: 't_demo',    name: 'STATION 10 · DEMOLITION',    c0: 28, c1: 55, r0: 22, r1: 43, color: '#ffa040', band: '#c06010', light: 0xfff4e8, lightPower: 6, banner: ['C4 · CLACKER · TIMED · DANGER CLOSE', '#2a1206', '#ffa040'] },
   { id: 't_breach',  name: 'STATION 11 · BREACHING',     c0: 0,  c1: 27, r0: 34, r1: 43, color: '#ff7060', band: '#b03020', light: 0xfff0e8, lightPower: 6, banner: ['STACK · BREACH · BANG · CLEAR', '#2a0a06', '#ff9070'] },
+  { id: 't_sig',     name: 'STATION 12 · SIGNALS',       c0: 0,  c1: 27, r0: 44, r1: 51, color: '#60d0ff', band: '#2080c0', light: 0xf0f8ff, lightPower: 6, banner: ['BUG · INTERCEPT · JAM · CUT · COVER', '#04182a', '#60d0ff'] },
+  { id: 't_final',   name: 'STATION 13 · FINAL RUN',     c0: 0,  c1: 55, r0: 44, r1: 64, color: '#ffe040', band: '#c0a010', light: 0xfffbe8, lightPower: 6, banner: ['FINAL RUN · EVERYTHING · AGAINST THE CLOCK', '#2a2004', '#ffe040'] },
   { id: 't_grad',    name: 'GRADUATION',                 c0: 0,  c1: 23, r0: 11, r1: 21, color: '#40ff70', band: '#20a040', light: 0xffffff, lightPower: 7, banner: ['CAMP HALYARD · GRADUATION', '#04200a', '#60ff80'] },
 ];
 // Clean training-facility look: pale painted blockwork with a coloured band per station, grey epoxy floor.
@@ -6008,7 +6040,7 @@ function createGate(ch, c, r) {
   const g = new THREE.Group(); g.position.set(x, 0, z); if (!along) g.rotation.y = Math.PI / 2;
   const door = new THREE.Mesh(new THREE.BoxGeometry(CELL, H, 0.25), trainMats.door); door.position.y = H / 2; g.add(door);
   for (const y of [0.25, H - 0.25]) { const s = new THREE.Mesh(new THREE.BoxGeometry(CELL, 0.3, 0.27), trainMats.stripe); s.position.y = y; door.add(s); s.position.y = y - H / 2; }
-  const lbl = 'STATION ' + ({ a: '9', r: '10', b: '10', e: '11' }[ch] || ch);
+  const lbl = ch === 'k' ? 'MAGLOCK' : ch === 'q' ? 'ROOM EXIT' : 'STATION ' + ({ a: '9', r: '10', b: '10', e: '11', f: '12', g: '13' }[ch] || ch);
   const sign = makeSign(lbl + ' ▸ LOCKED', 2.2, 0.4, '#200808', '#ff6060'); sign.position.set(0, 1.7 - H / 2, 0.14); door.add(sign);
   const back = makeSign(lbl, 2.2, 0.4, '#200808', '#ff6060'); back.position.set(0, 1.7 - H / 2, -0.14); back.rotation.y = Math.PI; door.add(back);
   levelGroup.add(g); wallMeshes.push(door);
@@ -6110,7 +6142,7 @@ function resetRolePlayer(e) {
 let trainRP = {}, trainMateSpots = [TP(22, 2), TP(23, 3)];
 function buildTraining() {
   trainGates = {}; popTargets = []; lookPanels = []; trainMarker = null; trainRP = {};
-  for (let r = 0; r < worldRows; r++) for (let c = 0; c < worldCols; c++) { const ch = grid[r][c]; if ((ch >= '1' && ch <= '9') || ch === 'a' || ch === 'r' || ch === 'b' || ch === 'e') createGate(ch, c, r); }
+  for (let r = 0; r < worldRows; r++) for (let c = 0; c < worldCols; c++) { const ch = grid[r][c]; if ((ch >= '1' && ch <= '9') || ch === 'a' || ch === 'r' || ch === 'b' || ch === 'e' || ch === 'f' || ch === 'g' || ch === 'k' || ch === 'q') createGate(ch, c, r); }
   // Station 1: hurdles (r4), low bar + crawl net (r6)
   addObstacle('jump', 25.85, 26.15, 16, 20); addObstacle('jump', 13.85, 14.15, 16, 20);
   addObstacle('crouch', 9.8, 10.2, 24, 28); addObstacle('prone', 19.5, 23.5, 24, 28);
@@ -6148,15 +6180,16 @@ function buildTraining() {
     trainRP.g2 = makeRolePlayer(103, 76, Math.PI / 2, "Role-player", { x: 132, z: 76 });
     const win = box(2.4, 1.2, 0.1, new THREE.MeshBasicMaterial({ color: 0x7ab0ff }), 110, 1.7, 44.06, levelGroup); }
   // Graduation hall: what's coming in the next update
-  addTrainSign('FINAL RUN — OPENING SOON', 12, 11, 12, 10, 2.5, 4.2, 0.5, '#1a1a1a', '#ffd23a');
+  addTrainSign('FINAL RUN ▸ STATION 13 (AFTER SIGNALS)', 12, 11, 12, 10, 2.5, 4.2, 0.5, '#1a1a1a', '#ffd23a');
   addTrainSign('▼ STATION 9 · NAVIGATION MAZE', 3, 21, 3, 22, 2.6, 3.2, 0.45, '#04200a', '#60ff80');
   // v0.6.2: Station 9 maze + Station 10 demolition range (SECTION 21)
   safe('maze', () => buildMaze()); safe('demoRange', () => buildDemoRange());
-  safe('shootHouse', () => buildShootHouse());   // v0.6.3 station 11 (SECTION 22)
+  safe('shootHouse', () => buildShootHouse());
+  safe('signals', () => buildSignals()); safe('finalRun', () => buildFinalRun());   // v0.6.4 stations 12 + 13 (SECTION 23)   // v0.6.3 station 11 (SECTION 22)
 }
 // Fewer, well-placed lights for the big training hall (one or more per station).
 function trainingLamps() {
-  return [[5, 2], [14, 3], [22, 3], [32, 3], [41, 3], [50, 3], [8, 8], [27, 9], [46, 9], [49, 15], [39, 15], [29, 15], [12, 15], [4, 18], [11, 24], [19, 28], [5, 30], [17, 38], [6, 40]].map(([c, r]) => ({ c, r }));
+  return [[5, 2], [14, 3], [22, 3], [32, 3], [41, 3], [50, 3], [8, 8], [27, 9], [46, 9], [49, 15], [39, 15], [29, 15], [12, 15], [4, 18], [11, 24], [19, 28], [5, 30], [17, 38], [6, 40], [5, 45], [15, 45], [24, 47], [10, 62], [24, 62]].map(([c, r]) => ({ c, r }));
 }
 // ---- CHIEF's stations. Each step: text (what to do), optional 'at' (marker / compass target),
 //      start / tick helpers, and check() = true when it's done. 'say' = CHIEF's reaction. ----
@@ -6193,6 +6226,10 @@ const SH = {
 };
 const NAV = { entry: [3, 22], A: TP(8, 28), lamp: TP(13, 30), exit: TP(26, 30) };
 const DEMO_AT = { jeep: { x: 143, z: 100 }, safe: { x: 122.5, z: 112 }, door: { x: 145.5, z: 146 }, wall: { x: 167, z: 160 }, chain: { x: 163.6, z: 103 }, tower: { x: 199.5, z: 150 }, gen: { x: 201.5, z: 118 } };
+// v0.6.4 SECTION 23 spots: SIGNALS room (station 12) and the FINAL RUN (station 13)
+const SIGAT = { phone: { x: 4.25, y: 1.3, z: 182 }, door: { x: 42, z: 182 }, c1: { x: 47.5, z: 182 }, scanner: { x: 62, y: 1.05, z: 177.3 }, jammer: { x: 74, z: 186 }, junction: { x: 107.75, y: 1.4, z: 182 } };
+const FRAT = { start: { x: 114, z: 190 }, bay: { x: 172, z: 190 }, jbox: { x: 219.75, y: 1.4, z: 190 }, guard: { x: 162, z: 214 }, closet: { x: 146, z: 206 }, door: { x: 138, z: 226 }, stack: { x: 133.5, z: 221.5 },
+  jeep: { x: 204, z: 236 }, plate: { x: 14, z: 252 }, shoot: { x: 172, z: 252 }, pad: { x: 214, z: 252 } };
 const STATIONS = [
   { id: 'move', zone: 't_move', gate: '1', entry: [1, 1], name: 'MOVEMENT',
     intro: 'Morning, Wraith. Welcome to Camp Halyard. I\'m Chief. I\'ve buried better recruits than you. Mostly figuratively. Let\'s start with walking.',
@@ -6328,9 +6365,9 @@ const STATIONS = [
         check: () => dT('tower') && dT('gen') },
     ] },
   // ---- v0.6.3: Station 11 BREACHING (SECTION 22 has the doors, flashbangs, torch and the shoot house) ----
-  { id: 'breach', zone: 't_breach', gate: 'e', entry: [24, 38], name: 'BREACHING',
+  { id: 'breach', zone: 't_breach', gate: 'ef', entry: [24, 38], name: 'BREACHING',
     intro: 'The shoot house. Doors are where people die, Wraith — mostly the people standing in front of them. Four ways through: a charge, a shotgun, a ram, and a hole where there wasn\'t one.',
-    get outro() { return `Shoot house: clear. Breach score ${breachScore.pts}${breachScore.hostages ? ', and ' + breachScore.hostages + ' hostage hit. We\'ll talk about that' : ', no hostages hurt. Lovely'}. Door charges and flashbangs go with you into Black File. Out through the north door and the maze.`; },
+    get outro() { return `Shoot house: clear. Breach score ${breachScore.pts}${breachScore.hostages ? ', and ' + breachScore.hostages + ' hostage hit. We\'ll talk about that' : ', no hostages hurt. Lovely'}. Door charges and flashbangs go with you into Black File. Station 12, SIGNALS, is through the new door in the kill house's south wall.`; },
     steps: [
       { text: () => `DOOR CHARGE — face DOOR 1 and plant a breaching charge: ${K('c4')}. It's small (${SETTINGS.doorChargeRadius} m) but it's still a bomb: stand on the yellow STACK mark BESIDE the door, never in front of it. Then ${K('clacker')}.${breachLine()}`,
         at: SH.doorD, label: 'DOOR 1', check: () => bOpen('bd21_35'), say: 'Door: gone. Now the people behind it.' },
@@ -6358,6 +6395,58 @@ const STATIONS = [
         start: S => { S.t = 0; for (const t of popTargets) if (KH.includes(t.id) || KQ.includes(t.id)) t.hits = 0; raiseTargets(KH.concat(KQ), 0); },
         tick: (S, dt) => { S.t += dt; hostageCheck(S, KH, KQ); }, check: () => popDown(KH),
         after: () => { dropTargets(KQ); const bonus = Math.max(0, 300 - Math.round(TRAIN.S.t) * 3); breachScore.pts += 300 + bonus; radioSay('HAWK', `Kill house clear! ${Math.round(TRAIN.S.t)} seconds.${bonus ? ' Speed bonus +' + bonus + '.' : ''}`, 4); } },
+    ] },
+  // ---- v0.6.4: Station 12 SIGNALS (SECTION 23: phone bug, scanner, jammer, junction box, HAWK covers a door) ----
+  { id: 'sig', zone: 't_sig', gate: 'g', entry: [6, 44], name: 'SIGNALS',
+    intro: 'Signals. Ears and wires, Wraith. Half of every op is listening to people who think nobody is. The other half is making sure they can\'t call for help.',
+    outro: 'Signals: done. You can listen in, go deaf on purpose and turn their lights off. Last one: the FINAL RUN, through the east door. It\'s timed. Everything you\'ve learned, in one go.',
+    steps: [
+      { text: () => `COVER — you're about to turn your back on that east doorway. Aim at it and order HAWK to cover it: ${K('cover')}. (${K('cover')} again calls him back to you.)`,
+        at: SIGAT.door, label: 'DOORWAY', noRing: true, check: () => coverOn(SIGAT.door), say: 'Good. Never work with your back to an open door unless someone\'s watching it.' },
+      { text: () => `BUG THE PHONE LINE — face the grey phone box on the west wall and ${K('use')} (${SETTINGS.bugTime} s) to clip the bug on. HAWK's got the door: anything that pops up there, he drops.`,
+        at: SIGAT.phone, label: 'PHONE BOX', start: S => { S.pop = false; },
+        tick: S => { if (!S.pop && SIG.phone && SIG.phone.t > 1) { S.pop = true; raiseTargets(['c1'], 0); } },
+        check: () => !!SIG.phone && SIG.phone.done && popDown(['c1']),
+        after: () => { radioSay('BUG · LINE 2', '"…yeah, the jammer\'s up, nobody calls out tonight. And tell Petrov the power room\'s on that junction box — if it goes, the east door goes with it."', 8); } },
+      { text: () => `INTERCEPT — the scanner on the north wall of the radio room (next door). Face it and ${K('use')}: it sweeps the bands, locks on and records. Keep holding until it's done (${SETTINGS.interceptTime} s). Let go and it starts again.`,
+        at: SIGAT.scanner, label: 'SCANNER', check: () => !!SIG.scanner && SIG.scanner.done,
+        after: () => radioSay('INTERCEPT 142.650', '"Valkyrie Two, Valkyrie Two… package moves at zero-four-hundred, north gate. Jammer stays up. Out."', 8) },
+      { text: () => `JAMMER — they've just switched it on. Press ${K('radio')}: static. Cut its cable (${K('use')} on the jammer, ${SETTINGS.cutTime} s) — or just shoot it. Then radio check: ${K('radio')}.${SIG.jammer && SIG.jammer.cut ? ' <b>✔ jammer dead — now ' + K('radio') + '</b>' : ''}`,
+        at: SIGAT.jammer, label: 'JAMMER', start: () => { SIG.jamOn = true; }, check: () => !!SIG.jammer && SIG.jammer.cut && ev('radio') > 0,
+        after: () => radioSay('CHIEF', 'Loud and clear again. Jammers are just boxes with a cable. Cables cut.', 5) },
+      { text: () => `JUNCTION BOX — the power room, east. Face the yellow-labelled junction box and ${K('use')} (${SETTINGS.junctionTime} s) to cut the power. The lights die and the maglock on the east door drops. In the dark: night vision, ${K('nv')}.`,
+        at: SIGAT.junction, label: 'JUNCTION BOX', check: () => !!SIG.junction && SIG.junction.done },
+    ] },
+  // ---- v0.6.4: Station 13 FINAL RUN (timed; SECTION 23) ----
+  { id: 'final', zone: 't_final', gate: '', entry: [29, 47], name: 'FINAL RUN',
+    intro: 'Final run. The clock starts NOW. Run, shoot, cut, sneak, breach, blow, snipe, exfil. Hostage hits cost ten seconds. Go!',
+    get outro() { return `FINAL RUN: ${fmtClock(FR.total)} — ${FR.medal}${FR.hostages ? ' (' + FR.hostages + ' hostage hit — I saw that)' : ''}. That\'s it, Wraith. You\'re done. Graduation.`; },
+    steps: [
+      { text: () => `GO! Sprint the lane (${K('sprint')}): hurdle — ${K('jump')}, low bar — ${K('crouch')}, crawl net — ${K('prone')}. Into the bay.${frLine()}`,
+        at: FRAT.bay, label: 'BAY', start: () => { if (!FR.on && !FR.done) { FR.on = true; FR.t = 0; FR.pen = 0; FR.hostages = 0; } }, check: () => camera.position.x > 169 && camera.position.z < 205 },
+      { text: () => `BAY — drop the 4 steel targets. The white one is a <b>HOSTAGE</b>: hit it and it's +10 s and they all pop back up. (${popCount(FB)}/4)${frLine()}`,
+        start: () => raiseTargets(FB.concat(['fbq']), 0), tick: S => frHostage(S, FB, ['fbq']), check: () => popDown(FB), after: () => dropTargets(['fbq']) },
+      { text: () => `MAGLOCK — cut the junction box on the east wall: ${K('use')} (${SETTINGS.junctionTime} s). The south door rolls up.${frLine()}`,
+        at: FRAT.jbox, label: 'JUNCTION BOX', check: () => !!SIG.jbox2 && SIG.jbox2.done },
+      { text: () => `TAKEDOWN — a guard below has his back to you. Get behind him (${K('crouch')} is quieter) and take him silently: knife ${K('knife')} or garrote ${K('garrote')}. Spotted = +5 s; a gunshot = +10 s.${frLine()}`,
+        at: () => rpAt(trainRP.fr), label: 'GUARD', start: () => resetRolePlayer(trainRP.fr),
+        check: S => { const e = trainRP.fr; if (!e) return true; if (e.state !== 'dead') return false; if (!S.pl && !ev('rpKnife') && !e.garroteKill) { S.pl = 1; frPenalty(10, 'loud takedown'); } return true; } },
+      { text: () => `COVER — the dark doorway on the north wall is a threat. Aim at it and order HAWK to cover it: ${K('cover')}.${frLine()}`,
+        at: FRAT.closet, label: 'DOORWAY', noRing: true, check: () => coverOn(FRAT.closet) },
+      { text: () => `BREACH — door-charge the steel door (${K('c4')}), step onto the yellow STACK mark beside it, then ${K('clacker')}. HAWK watches your back.${frLine()}`,
+        at: FRAT.door, label: 'STEEL DOOR', start: S => { S.pop = false; },
+        tick: S => { if (!S.pop && charges.some(c => !c.done && c.door)) { S.pop = true; later(1.0, () => { if (onStep('final', 5)) raiseTargets(['fc1'], 0); }); } },
+        check: () => bOpen('bd34_56') && popDown(['fc1']) },
+      { text: () => `FLASH & CLEAR — flashbang in (${K('flash')}), then shoot the 2 hostiles. One <b>HOSTAGE</b> (white): +10 s. (${popCount(FRM)}/2)${frLine()}`,
+        start: () => raiseTargets(FRM.concat(['frq']), 0), tick: S => frHostage(S, FRM, ['frq']), check: () => popDown(FRM),
+        after: () => { dropTargets(['frq']); openGate('q'); radioSay('HAWK', 'Room clear! East door\'s open.', 3); } },
+      { text: S => `DEMOLITION — C4 on the enemy jeep in the yard (${K('c4')}), get OUTSIDE the red ring, ${K('clacker')}. Inside the ring when it goes = +5 s.${frLine()}`,
+        at: FRAT.jeep, label: 'JEEP', start: S => { S.c0 = demoScore.close; },
+        tick: S => { if (demoScore.close > S.c0) { frPenalty(5 * (demoScore.close - S.c0), 'danger close'); S.c0 = demoScore.close; } }, check: () => dT('fjeep') },
+      { text: () => `LONG SHOT — a steel plate down the west lane, about 160 m. CheyTac (${KW(7)}), scope in (${K('aim')}), hold your breath (${K('breath')}), squeeze. (Dialled for 100 m: aim at the top half of the gong.)${frLine()}`,
+        at: FRAT.shoot, label: 'SNIPER SPOT', start: () => raiseTargets(['fplate'], 0), check: () => popDown(['fplate']) },
+      { text: () => `EXFIL — sprint to the green pad at the east end of the yard!${frLine()}`,
+        at: FRAT.pad, label: 'EXFIL', check: () => nearP(FRAT.pad, 1.8), after: () => frFinish() },
     ] },
 ];
 const dT = id => { const t = demoTargets.find(q => q.id === id); return !!t && t.destroyed; };
@@ -6411,6 +6500,8 @@ function completeStation(skipped, lastSay = '') {
   if (s.gate) for (const ch of s.gate) openGate(ch);   // v0.6.3: a station can open more than one door
   setMarker(null);
   if (s.id === 'comms') teammates.forEach(m => { m.hold = false; });
+  teammates.forEach(q => { if (q.cover) { q.cover = null; q.goal = null; } });   // v0.6.4: HAWK stops covering when the station ends
+  if (s.id === 'final') { FR.on = false; if (!skipped) { const mm = currentMission; setTimeout(() => { if (state === 'playing' && currentMission === mm) endGame(true); }, 6500); } }
   const m = currentMission, who = coach();
   if (!skipped) setTimeout(() => { if (state === 'playing' && currentMission === m) radioSay(who, (lastSay ? lastSay + ' ' : '') + s.outro, 7); }, s.id === 'comms' ? 4500 : m === 3 && (s.id === 'drop' || s.id === 'rifles') ? 0 : 300);
   TRAIN.i++; TRAIN.begun = false; TRAIN.step = 0;
@@ -6466,6 +6557,7 @@ function radioPressed() {
     return;
   }
   if (currentMission === 0 && TRAIN) {
+    if (sigJammed()) { jammedRadio(); return; }                     // v0.6.4 station 12: jammed
     const st = curStep(); trainEvent('radio');
     if (st && st.radio) return;                                    // the step was waiting for exactly this
     const s = curStation();
@@ -6477,12 +6569,12 @@ function radioPressed() {
 }
 function updateTraining(dt) {
   if (!trainLike() || !TRAIN) return;
-  updateGates(dt); updatePopTargets(dt);
+  updateGates(dt); updatePopTargets(dt); updateSignals(dt);
   if (currentMission === 3) updateLessonTargets(dt);
   if (trainRP.beacon) trainRP.beacon.userData.lamp.visible = (elapsed % 1) < 0.5;
-  for (const e of [trainRP.k1, trainRP.g1, trainRP.g2]) {
+  for (const e of [trainRP.k1, trainRP.g1, trainRP.g2, trainRP.fr]) {
     if (!e || e.state === 'dead') continue;
-    if (e.state === 'chase') { if (!e.spottedAt) { e.spottedAt = elapsed; radioSay('CHIEF', CHIEF_SPOTTED[Math.floor(Math.random() * CHIEF_SPOTTED.length)], 4); } else if (elapsed - e.spottedAt > 2.2) { resetRolePlayer(e); e.spottedAt = 0; } }
+    if (e.state === 'chase') { if (!e.spottedAt) { e.spottedAt = elapsed; if (e === trainRP.fr) frPenalty(5, 'spotted'); radioSay('CHIEF', CHIEF_SPOTTED[Math.floor(Math.random() * CHIEF_SPOTTED.length)], 4); } else if (elapsed - e.spottedAt > 2.2) { resetRolePlayer(e); e.spottedAt = 0; } }
   }
   weaponState.forEach((s, i) => { if (s.reserve < WEAPONS[i].magSize * 2) s.reserve = WEAPONS[i].reserve; });   // training ammo never runs out
   if (state !== 'playing') return;
@@ -6568,6 +6660,7 @@ function garroteTarget() {
 }
 function garrotePress() {
   if (state !== 'playing' || garrote.active || garrote.cooldown > 0 || killcam.active) return;
+  if (hjobAhead()) return;                           // v0.6.4: hold H on a phone box / scanner / jammer / junction box (SECTION 23)
   if (torchAhead()) return;                          // v0.6.3: holding H at the padlock = the torch (SECTION 22)
   const e = garroteTarget();
   if (!e) { showMessage('Garrote: get right behind an unaware guard, then ' + plain(K('garrote')) + '.', 2); return; }
@@ -7303,6 +7396,222 @@ function hostageCheck(S, ids, hostages) {   // a hostage got shot: penalty, rese
   trainEvent('hostageHit');
 }
 function breachLine() { return `<br><span class="tstep">Breach score: ${breachScore.pts}${breachScore.hostages ? ' · hostages hit ×' + breachScore.hostages + ' (−100 each)' : ''}</span>`; }
+// #####################################################################
+// ##  SECTION 23: SIGNALS + FINAL RUN (v0.6.4)                       ##
+// ##  Hold H on a "job" (phone box, scanner, jammer, junction box):  ##
+// ##  bug a phone line, intercept a transmission, cut a jammer,      ##
+// ##  cut the power. ; (semicolon) or COVER: HAWK covers the door    ##
+// ##  you're looking at and drops anything that comes through it     ##
+// ##  (training pop-ups; real guards in Black File). Then the timed  ##
+// ##  FINAL RUN (station 13) and graduation.                         ##
+// #####################################################################
+SETTINGS.bugTime = 3; SETTINGS.interceptTime = 5; SETTINGS.cutTime = 2; SETTINGS.junctionTime = 2.5;
+SETTINGS.coverRange = 22; SETTINGS.coverReact = 0.6; SETTINGS.finalPar = 240; SETTINGS.finalGold = 180;
+Object.assign(PROMPTS, { use: ['hold GARROTE', 'hold H'], cover: ['COVER', '; (semicolon)'], nv: ['NV', 'N'] });
+var SIG = { jobs: [], phone: null, scanner: null, jammer: null, junction: null, jbox2: null, jamOn: false, msgAt: 0, roomLights: [] };
+var FR = { t: 0, on: false, pen: 0, hostages: 0, total: 0, medal: '', done: false };
+const sigMats = {
+  box: new THREE.MeshStandardMaterial({ color: 0x8a9098, roughness: 0.5, metalness: 0.6 }), green: new THREE.MeshStandardMaterial({ color: 0x3a5a3a, roughness: 0.6, metalness: 0.3 }),
+  ledR: new THREE.MeshBasicMaterial({ color: 0xff2020 }), ledG: new THREE.MeshBasicMaterial({ color: 0x30ff60 }), ledOff: new THREE.MeshBasicMaterial({ color: 0x302020 }),
+  screen: new THREE.MeshBasicMaterial({ color: 0x40ff90 }), cable: new THREE.MeshStandardMaterial({ color: 0x101010, roughness: 0.8 }), pad: new THREE.MeshBasicMaterial({ color: 0x30ff60, transparent: true, opacity: 0.55 }),
+};
+function resetSignals() {
+  SIG.jobs = []; SIG.phone = SIG.scanner = SIG.jammer = SIG.junction = SIG.jbox2 = null; SIG.jamOn = false; SIG.roomLights = [];
+  Object.assign(FR, { t: 0, on: false, pen: 0, hostages: 0, total: 0, medal: '', done: false });
+}
+const onStep = (id, k) => { const s = curStation(); return !!s && s.id === id && TRAIN.begun && TRAIN.step === k; };
+function addHJob(o) { const j = { t: 0, done: false, near: 1.9, tol: 0.6, ...o }; SIG.jobs.push(j); return j; }
+function hjobAhead() {
+  if (currentMission !== 0) return null;
+  for (const j of SIG.jobs) if (!j.done && (!j.enabled || j.enabled()) && nearP(j.pos, j.near) && aimingAt(j.pos, j.tol)) return j;
+  return null;
+}
+function updateHJobs(dt) {
+  if (!SIG.jobs.length || state !== 'playing') return;
+  const j = (keys.KeyH || touch.garrote) ? hjobAhead() : null;
+  if (!j) { for (const q of SIG.jobs) if (!q.done && q.reset) q.t = 0; return; }
+  j.t += dt;
+  if (j.tick) j.tick(j, dt);
+  if (elapsed - SIG.msgAt > 0.3) { SIG.msgAt = elapsed; showMessage(j.msg(j), 0.6); }
+  if (j.t >= j.time) { j.done = true; playTone(1200, 1500, 0.12, 0.2, 'triangle'); j.onDone(j); trainEvent('job:' + j.id); }
+}
+const pct = j => Math.min(100, Math.round(j.t / j.time * 100));
+// ---- the SIGNALS room (station 12) ----
+function buildSignals() {
+  const A = SIGAT;
+  // phone box (west wall of the phone room)
+  { const g = new THREE.Group(); g.position.set(A.phone.x - 0.12, 0, A.phone.z); g.rotation.y = Math.PI / 2; levelGroup.add(g);
+    box(0.6, 0.8, 0.22, sigMats.box, 0, A.phone.y, 0, g); box(0.5, 0.05, 0.02, sigMats.cable, 0, A.phone.y + 0.25, 0.12, g);
+    box(0.04, 1.6, 0.04, sigMats.cable, -0.2, A.phone.y + 1.2, -0.05, g); box(0.04, 1.6, 0.04, sigMats.cable, 0.2, A.phone.y + 1.2, -0.05, g);
+    const led = box(0.05, 0.05, 0.02, sigMats.ledOff, 0.2, A.phone.y + 0.3, 0.12, g);
+    const sg = makeSign('TELEPHONE JUNCTION · LINE 2', 1.6, 0.26, '#1a1a1a', '#e0e0e0'); sg.position.set(0, A.phone.y + 0.65, 0.12); g.add(sg);
+    SIG.phone = addHJob({ id: 'bug', pos: new THREE.Vector3(A.phone.x, A.phone.y, A.phone.z), time: SETTINGS.bugTime, enabled: () => onStep('sig', 1),
+      msg: j => `BUGGING THE LINE… clip on, splice in: ${pct(j)}%`, tick: () => { if (Math.random() < 0.15) playNoise(0.03, 0.04, 3000); },
+      onDone: () => { led.material = sigMats.ledG; showMessage('Line 2 bugged. You\'re listening.', 2.5); } }); }
+  // scanner (north wall of the radio room)
+  { const g = new THREE.Group(); g.position.set(A.scanner.x, 0, A.scanner.z - 0.6); levelGroup.add(g);
+    box(1.8, 0.06, 0.8, propMat.desk, 0, 0.76, 0, g); box(0.06, 0.74, 0.7, propMat.metal, -0.85, 0.37, 0, g); box(0.06, 0.74, 0.7, propMat.metal, 0.85, 0.37, 0, g);
+    box(0.9, 0.32, 0.45, sigMats.green, 0, 0.95, 0.05, g); const scr = box(0.4, 0.14, 0.02, sigMats.ledOff, -0.15, 0.98, 0.29, g);
+    box(0.03, 1.4, 0.03, propMat.metal, 0.35, 1.8, 0, g); box(0.25, 0.25, 0.04, propMat.metal, 0.35, 2.5, 0, g);
+    const sg = makeSign('INTERCEPT SET · SCANNER', 1.6, 0.26, '#081a10', '#40ff90'); sg.position.set(0, 2.1, -0.38); g.add(sg);
+    SIG.scanner = addHJob({ id: 'intercept', pos: new THREE.Vector3(A.scanner.x, A.scanner.y, A.scanner.z), time: SETTINGS.interceptTime, enabled: () => onStep('sig', 2), reset: true,
+      msg: j => j.t < j.time * 0.4 ? `SCANNING ${(140 + ((j.t * 7.3) % 12)).toFixed(3)} MHz… keep holding` : `LOCKED 142.650 MHz · RECORDING ${pct(j)}% — keep holding`,
+      tick: j => { scr.material = sigMats.screen; if (Math.random() < 0.4) playNoise(0.04, 0.03, j.t < j.time * 0.4 ? 6000 : 1500); },
+      onDone: () => { showMessage('Transmission recorded. Playing it back…', 2.5); } }); }
+  // jammer (middle of the radio room) — hold H to cut the cable, or shoot it
+  { const g = new THREE.Group(); g.position.set(A.jammer.x, 0, A.jammer.z); levelGroup.add(g);
+    const body = box(0.9, 0.6, 0.6, sigMats.green, 0, 0.3, 0, g); body.userData.jammer = true; wallMeshes.push(body);
+    for (const x of [-0.3, 0, 0.3]) box(0.03, 0.9, 0.03, propMat.metal, x, 1.05, 0, g);
+    const led = box(0.08, 0.08, 0.02, sigMats.ledOff, 0.3, 0.5, 0.31, g); const cable = box(0.05, 0.05, 1.4, sigMats.cable, -0.3, 0.05, 1.0, g);
+    const sg = makeSign('JAMMER', 0.8, 0.22, '#2a0808', '#ff6060'); sg.position.set(0, 0.68, 0.31); g.add(sg);
+    SIG.jammer = { group: g, body, led, cable, cut: false };
+    SIG.jammerJob = addHJob({ id: 'jammer', pos: new THREE.Vector3(A.jammer.x, 0.5, A.jammer.z), near: 2.2, tol: 0.8, time: SETTINGS.cutTime, enabled: () => onStep('sig', 3) && !SIG.jammer.cut,
+      msg: j => `WIRE CUTTERS on the jammer's cable: ${pct(j)}%`, onDone: () => cutJammer('cut') }); }
+  // junction box (east wall of the power room)
+  SIG.junction = addJunctionBox('junction', A.junction, 'POWER · ROOM 12', () => onStep('sig', 4), () => {
+    for (const l of SIG.roomLights) l.intensity = 0;
+    showMessage('Power OFF — the lights die and the maglock drops. Night vision: ' + plain(K('nv')), 3);
+  });
+  // collect the ceiling lights of the power room (they go out when you cut it)
+  levelGroup.children.forEach(o => { if (o.isPointLight && o.position.x > 88 && o.position.x < 108 && o.position.z > 176 && o.position.z < 204) SIG.roomLights.push(o); });
+  // the target that comes through the doorway HAWK is covering
+  createPopTarget('c1', SIGAT.c1.x, SIGAT.c1.z, faceYaw(SIGAT.c1.x, SIGAT.c1.z, 20, SIGAT.c1.z), { up: false, autoReset: 0 });
+  addTrainSign('SIGNALS · BUG · INTERCEPT · JAM · CUT · COVER', 6, 44, 6, 43, 2.6, 3.6, 0.42, '#04182a', '#60d0ff');
+}
+function addJunctionBox(id, p, label, enabled, onDone) {
+  const g = new THREE.Group(); g.position.set(p.x + 0.12, 0, p.z); g.rotation.y = -Math.PI / 2; levelGroup.add(g);
+  box(0.7, 0.9, 0.25, sigMats.box, 0, p.y, 0, g); box(0.08, 1.2, 0.08, sigMats.cable, 0, p.y + 1.0, -0.05, g); box(0.08, 1.2, 0.08, sigMats.cable, 0.2, p.y - 0.9, -0.05, g);
+  const led = box(0.06, 0.06, 0.02, sigMats.ledR, 0.22, p.y + 0.32, 0.13, g);
+  const sg = makeSign('⚡ ' + label, 1.2, 0.24, '#ffd23a', '#101010', false); sg.position.set(0, p.y + 0.62, 0.13); g.add(sg);
+  return addHJob({ id, pos: new THREE.Vector3(p.x, p.y, p.z), time: SETTINGS.junctionTime, enabled,
+    msg: j => `CUTTING THE POWER — insulated cutters on the feed: ${pct(j)}%`, tick: () => { if (Math.random() < 0.2) spawnParticles(new THREE.Vector3(p.x - 0.2, p.y, p.z), 0x80c0ff, 2, 2, 0.02); },
+    onDone: () => { led.material = sigMats.ledOff; spawnParticles(new THREE.Vector3(p.x - 0.2, p.y, p.z), 0xffffff, 14, 4, 0.03); playNoise(0.3, 0.3, 4000); playTone(120, 40, 0.6, 0.3, 'sawtooth'); onDone(); } });
+}
+function cutJammer(how) {
+  const J = SIG.jammer; if (!J || J.cut) return;
+  J.cut = true; J.led.material = sigMats.ledOff; J.cable.visible = how !== 'cut' ? J.cable.visible : false;
+  if (SIG.jammerJob) SIG.jammerJob.done = true;
+  spawnParticles(new THREE.Vector3(J.group.position.x, 0.6, J.group.position.z), 0x80c0ff, 12, 3, 0.03); playTone(500, 80, 0.4, 0.25, 'square');
+  showMessage(how === 'shot' ? 'Jammer shot to bits. Loud, but it works. Radio check: ' + plain(K('radio')) : 'Cable cut — jammer dead. Radio check: ' + plain(K('radio')), 3);
+  trainEvent('jammerCut');
+}
+function sigJammed() { return currentMission === 0 && SIG.jamOn && SIG.jammer && !SIG.jammer.cut && zoneAtXZ(camera.position.x, camera.position.z).id === 't_sig'; }
+function jammedRadio() {
+  playNoise(0.8, 0.25, 1800); trainEvent('radioJammed');
+  showMessage('📻 kssshhhhh… STATIC. You\'re being JAMMED. Cut the jammer (' + plain(K('use')) + ' on it), or shoot it.', 3);
+}
+// ---- HAWK: "cover that door" ----
+function hawk() { return teammates.find(m => !m.static && m.name === 'HAWK') || teammates.find(m => !m.static); }
+const COVER_SPOTS = () => currentMission === 0 ? [{ door: SIGAT.door, spot: { x: 30, z: 183.2 } }, { door: FRAT.closet, spot: { x: 146.5, z: 215.5 } }] : [];
+function orderCover() {
+  if (state !== 'playing') return;
+  const m = hawk();
+  if (!m) { showMessage('Nobody to order around on this op.', 2); return; }
+  if (m.cover) { m.cover = null; m.goal = null; radioSay('HAWK', 'Coming back to you.', 2.5); trainEvent('coverOff'); return; }
+  const f = camera.getWorldDirection(new THREE.Vector3()); f.y = 0; if (f.lengthSq() < 1e-6) return; f.normalize();
+  const cx = camera.position.x, cz = camera.position.z, len = Math.max(2, rayToWall(cx, cz, f.x, f.z, 30));
+  let tx = cx + f.x * len, tz = cz + f.z * len, sx, sz;
+  const known = COVER_SPOTS().find(k => segDist(k.door.x, k.door.z, cx, cz, tx, tz) < 2.5);
+  if (known) { sx = known.spot.x; sz = known.spot.z; tx = known.door.x; tz = known.door.z; }
+  else {
+    sx = cx - f.z * 1.3 - f.x * 0.5; sz = cz + f.x * 1.3 - f.z * 0.5;
+    if (circleHitsWall(sx, sz, 0.4)) { sx = cx + f.z * 1.3 - f.x * 0.5; sz = cz - f.x * 1.3 - f.z * 0.5; }
+    if (circleHitsWall(sx, sz, 0.4)) { sx = cx - f.x; sz = cz - f.z; }
+  }
+  m.cover = { x: tx, z: tz, target: null, react: 0 };
+  m.goal = { x: sx, z: sz, yaw: Math.atan2(tx - sx, tz - sz) };
+  radioSay('HAWK', ['Covering. Nothing comes through that door.', 'Got it. I\'m on the door.', 'Eyes on. Go do your thing.'][Math.floor(Math.random() * 3)], 3);
+  playTone(700, 700, 0.05, 0.12, 'square'); trainEvent('cover');
+}
+function segDist(px, pz, ax, az, bx, bz) {
+  const vx = bx - ax, vz = bz - az, l2 = vx * vx + vz * vz; let t = l2 ? ((px - ax) * vx + (pz - az) * vz) / l2 : 0; t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (ax + vx * t), pz - (az + vz * t));
+}
+function coverOn(p) { const m = hawk(); return !!m && !!m.cover && !!m.goal && segDist(p.x, p.z, m.goal.x, m.goal.z, m.cover.x, m.cover.z) < 2.5; }
+function inCover(p, yaw, x, z) {
+  const d = dist2D(p.x, p.z, x, z); if (d > SETTINGS.coverRange || d < 0.6) return false;
+  let a = Math.atan2(x - p.x, z - p.z) - yaw; a = Math.atan2(Math.sin(a), Math.cos(a));
+  return Math.abs(a) < 0.65 && hasLineOfSight(p.x, p.z, x, z);
+}
+function updateCover(dt) {
+  for (const m of teammates) {
+    const c = m.cover; if (!c) continue;
+    if (!m.goal) { m.cover = null; continue; }
+    if (state !== 'playing') continue;
+    const p = m.group.position; if (dist2D(p.x, p.z, m.goal.x, m.goal.z) > 0.6) continue;     // still getting there
+    let tgt = null;
+    if (currentMission === 0) { for (const t of popTargets) if (t.up && t.raise > 0.7 && !t.hostage && inCover(p, m.goal.yaw, t.x, t.z)) { tgt = t; break; } }
+    else for (const e of enemies) { if (e.state === 'dead' || e.roleplayer || e.dummy) continue; const q = e.group.position; if (inCover(p, m.goal.yaw, q.x, q.z)) { tgt = e; break; } }
+    if (tgt !== c.target) { c.target = tgt; c.react = SETTINGS.coverReact; }
+    if (!tgt) continue;
+    c.react -= dt; if (c.react > 0) continue;
+    mateShoot(m, tgt); c.react = 0.8;
+  }
+}
+function mateShoot(m, tgt) {
+  const p = m.group.position;
+  playNoise(0.07, 0.3 * volumeAt(p.x, p.z), 2600); playTone(160, 60, 0.08, 0.2 * volumeAt(p.x, p.z), 'square');
+  spawnParticles(new THREE.Vector3(p.x + Math.sin(m.yaw) * 0.9, 1.35, p.z + Math.cos(m.yaw) * 0.9), 0xffd080, 4, 2, 0.04);
+  if (tgt.pivot) {                                     // training pop-up target
+    if (!tgt.up) return; tgt.up = false; tgt.downTimer = tgt.autoReset; tgt.hits++;
+    spawnParticles(new THREE.Vector3(tgt.x, 1.2, tgt.z), 0xffe0a0, 8, 3, 0.04); playTone(2300, 2150, 0.25, 0.22, 'triangle');
+    radioSay(m.name, ['Contact — down!', 'Tango down at the door.', 'Got him. Door\'s still clear.'][Math.floor(Math.random() * 3)], 2.5); trainEvent('mateKill', { id: tgt.id });
+  } else {
+    tgt.health = 0; lastHit = null; killEnemy(tgt, false, {}); addKillFeed(m.name + ': ' + (tgt.label || 'guard') + ', at the door');
+    radioSay(m.name, ['Contact at the door — down.', 'One came through. Not any more.', 'Door\'s held.'][Math.floor(Math.random() * 3)], 2.5);
+  }
+}
+// ---- FINAL RUN (station 13) ----
+const FB = ['fb1', 'fb2', 'fb3', 'fb4'], FRM = ['fr1', 'fr2'];
+const fmtClock = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+function frLine() { return `<br><span class="tstep">⏱ ${fmtClock(FR.t)}${FR.pen ? ' + ' + FR.pen + ' s penalties' : ''} · par ${fmtClock(SETTINGS.finalPar)} · gold ${fmtClock(SETTINGS.finalGold)}</span>`; }
+function frPenalty(s, why) { if (!FR.on) return; FR.pen += s; showMessage(`+${s} s — ${why}`, 2); playTone(300, 200, 0.3, 0.25, 'sawtooth'); }
+function frHostage(S, ids, hostages) {
+  const hit = hostages.some(id => { const t = popTargets.find(q => q.id === id); return t && t.hits > 0 && !t.up; });
+  if (!hit) return;
+  FR.hostages++; frPenalty(10, 'HOSTAGE HIT');
+  for (const t of popTargets) if (ids.includes(t.id) || hostages.includes(t.id)) t.hits = 0;
+  raiseTargets(ids.concat(hostages), 0); hud.damageAlpha = 0.6;
+  radioSay('CHIEF', 'NO-SHOOT! That was a hostage. Ten seconds on your clock, and they all pop back up.', 5); trainEvent('hostageHit');
+}
+function frFinish() {
+  FR.on = false; FR.done = true; FR.total = Math.round(FR.t + FR.pen);
+  FR.medal = FR.total <= SETTINGS.finalGold ? 'GOLD' : FR.total <= SETTINGS.finalPar ? 'SILVER' : 'BRONZE';
+  let best = 0; try { best = +localStorage.getItem('valkyrieFinalRunBest') || 0; if (!best || FR.total < best) localStorage.setItem('valkyrieFinalRunBest', String(FR.total)); } catch (err) {}
+  FR.best = best && best < FR.total ? best : FR.total;
+  showMessage(`FINAL RUN: ${fmtClock(FR.total)} — ${FR.medal}${FR.total === FR.best && best ? ' · NEW BEST' : ''}`, 5);
+}
+function buildFinalRun() {
+  const T = (id, x, z, vx, vz, o = {}) => createPopTarget(id, x, z, faceYaw(x, z, vx, vz), { up: false, autoReset: 0, ...o });
+  // corridor: hurdle, low bar, crawl net (only YOU bump into these)
+  addObstacle('jump', 123.85, 124.15, 184, 196); addObstacle('crouch', 135.8, 136.2, 184, 196); addObstacle('prone', 146, 150, 184, 196);
+  // bay: 4 steel + 1 hostage
+  T('fb1', 196, 180, 170, 190); T('fb2', 205, 190, 170, 190); T('fb3', 212, 199, 170, 190); T('fb4', 190, 200, 170, 190); T('fbq', 208, 183.5, 170, 190, { hostage: true });
+  SIG.jbox2 = addJunctionBox('jbox2', FRAT.jbox, 'MAGLOCK · SOUTH DOOR', () => onStep('final', 2), () => { openGate('k'); showMessage('Maglock dead — the south door rolls up.', 2.5); });
+  // compound guard (back to you), the closet target HAWK takes, the breach room, the jeep, the plate
+  trainRP.fr = makeRolePlayer(FRAT.guard.x, FRAT.guard.z, -Math.PI / 2, 'Role-player', null);
+  T('fc1', FRAT.closet.x, FRAT.closet.z - 3.6, FRAT.closet.x, 216);
+  T('fr1', 118, 236, 138, 226); T('fr2', 156, 240, 138, 226); T('frq', 128, 241.5, 138, 226, { hostage: true });
+  addDemoTarget('jeep', 'fjeep', 'ENEMY JEEP', FRAT.jeep.x, FRAT.jeep.z, 1.6, (t, g, bx) => {
+    bx(4.0, 0.8, 1.9, demoMats.jeep, 0, 0.85, 0); bx(1.6, 0.5, 1.8, demoMats.jeep, 1.0, 1.4, 0); bx(0.06, 0.6, 1.7, demoMats.glass, 0.15, 1.55, 0);
+    for (const [wx, wz] of [[1.3, 0.95], [1.3, -0.95], [-1.3, 0.95], [-1.3, -0.95]]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.3, 14), demoMats.tyre); w.rotation.x = Math.PI / 2; w.position.set(wx, 0.42, wz); g.add(w); }
+    g.rotation.y = -0.4; addTargetProp(t, FRAT.jeep.x - 1.2, FRAT.jeep.z, 1.1); addTargetProp(t, FRAT.jeep.x + 1.2, FRAT.jeep.z, 1.1);
+  });
+  T('fplate', FRAT.plate.x, FRAT.plate.z, FRAT.shoot.x, FRAT.shoot.z).group.scale.setScalar(1.5);   // a big steel gong: it's 160 m away
+  // exfil pad
+  { const pad = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 3.2), sigMats.pad); pad.rotation.x = -Math.PI / 2; pad.position.set(FRAT.pad.x, 0.03, FRAT.pad.z); levelGroup.add(pad);
+    const s = makeSign('EXFIL · FINISH', 1.6, 0.36, '#04200a', '#60ff80'); s.position.set(FRAT.pad.x, 2.6, FRAT.pad.z); s.rotation.y = -Math.PI / 2; levelGroup.add(s); }
+  for (const p of [FRAT.stack]) { const s = makeSign('STACK HERE', 1.2, 0.3, '#1a1a1a', '#ffd23a'); s.position.set(p.x, 0.03, p.z); s.rotation.set(-Math.PI / 2, 0, 0); levelGroup.add(s); }
+  { const s = makeSign('START ▸ FINAL RUN', 1.8, 0.34, '#2a2004', '#ffe040'); s.position.set(FRAT.start.x + 1, 0.03, FRAT.start.z); s.rotation.set(-Math.PI / 2, 0, -Math.PI / 2); levelGroup.add(s); }
+  addTrainSign('FINAL RUN · THE CLOCK IS RUNNING', 29, 46, 29, 45, 2.6, 3.2, 0.42, '#2a2004', '#ffe040');
+  addTrainSign('LONG SHOT ◂ 160 M', 42, 62, 42, 61, 2.4, 2.4, 0.4, '#2a2004', '#ffe040');
+}
+function updateSignals(dt) {
+  if (currentMission !== 0) return;
+  updateHJobs(dt);
+  if (FR.on && state === 'playing') FR.t += dt;
+  if (SIG.jammer && !SIG.jammer.cut && SIG.jamOn) SIG.jammer.led.material = (elapsed % 0.6) < 0.3 ? sigMats.ledR : sigMats.ledOff;
+}
 
 // #####################################################################
 // ##  SECTION 20: SNIPER LESSON — GRAVEL'S RANGE DAY (v0.6)          ##
@@ -7534,6 +7843,7 @@ window.__gameLoaded = true;
 if (!debugInfo.on) document.getElementById('debugHud').style.display = 'none';
 // Handy for testing in the browser console (F12), e.g.  __game.SETTINGS.enemyDamage = 0
 window.__game = {
+  sig: () => SIG, fr: () => FR, orderCover, hjobAhead, coverOn, hawk, SIGAT, FRAT, cutJammer,
   SETTINGS, CALIBERS, WEAPONS, player, camera, startMission, switchWeapon,
   enemies: () => enemies, state: () => state, weaponState: () => weaponState, renderFrame: () => { updateFigureLOD(); renderer.render(scene, camera); }, figureLOD: () => enemies.filter(e => e.fig && e.fig.lod).length, glFinish: () => renderer.getContext().finish(), debugInfo, VERSION, aimOffset: () => aimOffset, lastShotInfo: () => lastShotInfo, lean, safeUnlock, endGame,
   // Debug: what would a ray from the screen centre hit right now? (nearest first)
