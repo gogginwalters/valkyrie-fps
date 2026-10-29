@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>OPERATION: BLACK FILE — v0.6a</title>
+<title>OPERATION: BLACK FILE — v0.6.1</title>
 <link rel="icon" href="data:,">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <!--
@@ -138,9 +138,9 @@
     background: radial-gradient(ellipse at center, rgba(40,90,200,0.0) 40%, rgba(10,30,90,0.65) 100%); mix-blend-mode: screen; }
   /* mission select on the start screen */
   .missions { display: flex; gap: 10px; margin: 10px 0 12px; }
-  .missions label { flex: 1; border: 1px solid #4a4; padding: 8px 10px; cursor: pointer; font-size: 13px; }
+  .missions label { flex: 1; border: 1px solid #4a4; padding: 7px 9px; cursor: pointer; font-size: 12px; line-height: 1.3; }
   .missions label.sel { background: rgba(80,255,80,0.22); border: 2px solid #9f9; box-shadow: 0 0 12px rgba(120,255,120,0.55); }
-  .missions label.sel b::after { content: '  ✔ SELECTED'; color: #cfc; }
+  .missions label.sel b::after { content: ' ✔'; color: #cfc; }
   .missions label { touch-action: manipulation; -webkit-user-select: none; user-select: none; }
   .missions input { margin-right: 6px; }
   .missions b { color: #9f9; }
@@ -163,7 +163,7 @@
   /* ---------- Full-screen menus (start / pause / end) ---------- */
   .screen { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
     background: rgba(0, 0, 0, 0.78); z-index: 10; }
-  .dossier { max-width: 720px; padding: 22px 30px; background: #0c120c; border: 2px solid #4a4;
+  .dossier { max-width: 860px; padding: 22px 30px; background: #0c120c; border: 2px solid #4a4;
     box-shadow: 0 0 40px rgba(60,255,60,0.15); }
   .dossier h1 { margin: 0 0 4px; color: #7f7; letter-spacing: 3px; font-size: 28px; }
   .dossier h2 { margin: 0 0 16px; color: #9a9; font-size: 14px; letter-spacing: 2px; }
@@ -194,9 +194,10 @@
     <h1>OPERATION: BLACK FILE</h1>
     <h2 id="briefSub">TARGET: VALKYRIE</h2>
     <div class="missions">
-      <label id="m0Card"><input type="radio" name="mission" value="0" checked><b>MISSION 00 — TRAINING</b><br>Camp Halyard: CHIEF teaches you everything. Every station can be skipped.</label>
+      <label id="m0Card"><input type="radio" name="mission" value="0" checked><b>MISSION 00 — TRAINING</b><br>Camp Halyard: CHIEF teaches the basics. Every station skippable.</label>
       <label id="m1Card"><input type="radio" name="mission" value="1"><b>MISSION 01 — BLACK FILE</b><br>Indoor raid on a Valkyrie facility. Close quarters, stealth.</label>
-      <label id="m2Card"><input type="radio" name="mission" value="2"><b>MISSION 02 — COLD HORIZON</b><br>Outdoor long-range sniper mission. Ridge nest, 100–1,600 m.</label>
+      <label id="m3Card"><input type="radio" name="mission" value="3"><b>SNIPER LESSON</b><br>Range day with GRAVEL. Exploding steel, 100–1,200 m.</label>
+      <label id="m2Card"><input type="radio" name="mission" value="2"><b>MISSION 02 — COLD HORIZON</b><br>Outdoor long-range sniper op. Ridge nest, 100–1,600 m.</label>
     </div>
     <button class="startBtn" id="startBtn">▶ CLICK OR TAP TO BEGIN MISSION</button>
     <button id="skipTrainBtn">Skip training → go straight to Mission 01</button>
@@ -353,12 +354,13 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 // ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
 // ##  part failed and why.                                           ##
 // #####################################################################
-const VERSION = 'v0.6a';
+const VERSION = 'v0.6.1';
 // v0.4.4: the game must only ever start ONCE per page (one canvas, one camera, one loop).
 // If this script somehow ran a second time, stop the second copy right here.
 window.__valkyrieBoots = (window.__valkyrieBoots || 0) + 1;
 if (window.__valkyrieBoots > 1) throw new Error('second copy of the game blocked (boot #' + window.__valkyrieBoots + ')');
-const DEBUG_ON_BY_DEFAULT = true;     // set to false once things are working on the iPad
+// v0.6.1: the DEBUG box is OFF by default. Add ?debug=1 to the link (or press G / `) to show it.
+const DEBUG_ON_BY_DEFAULT = /[?&#]debug=1\b/.test(location.search + location.hash);
 const debugInfo = { on: DEBUG_ON_BY_DEFAULT, lastInput: '-', lastInputAt: 0, errors: {}, lastError: null,
   fps: 0, frameCount: 0, fpsTimer: 0, updates: 0, shownAt: 0 };
 // Run one part of the game; if it throws, remember the first error (and keep going).
@@ -553,6 +555,8 @@ const SETTINGS = {
   viewDistance: 20000,       // metres you can see outdoors
   towerHeight: 9,            // watchtower deck height (m)
   windMax: 7,                // strongest wind gust (m/s)
+  windEffect: 3.7,           // v0.6.1: how hard the wind pushes a bullet. 3.7 = realistic: a 10 mph (4.5 m/s)
+                             //   full-value crosswind moves a .408 about 1.1 m (1.1 mils) at 1,000 m. 1 = the old, too-weak wind.
   maxDialRange: 2000,        // furthest scope elevation setting (m)
   rangefinderMax: 3000,      // laser rangefinder reach (m)
   holdBreathTime: 5,         // seconds you can hold your breath while scoped (Shift)
@@ -577,6 +581,7 @@ const MISSION_OVERRIDES = {
   2: { enemySightRange: 420, enemyHearingRange: 600, enemyAttackRange: 450, enemyAccuracy: 0.3, silencedAlertRadius: 40,
        alertShoutRadius: 40, searchDuration: 40, killWitnessRange: 150, bodySightRange: 110, shotErrorBase: 10,
        enemyFieldOfView: 110, teammates: 0 },
+  3: { teammates: 0, sunElevation: 38, enemyDamage: 0, ammoDropChance: 0, maskingEnabled: false },   // v0.6 sniper lesson: bright daytime range, nobody shoots back
 };
 const BASE_SETTINGS = { ...SETTINGS };   // the values above, so Mission 1 gets them back
 
@@ -731,6 +736,11 @@ const BRIEFINGS = {
     <li>Bonus: the parked helicopter. Then exfil to the <b>LZ behind the ridge</b>.</li></ul>
     <p><b>Sniping:</b> lase the range (F), dial elevation ([ / ]), hold for wind, hold breath (Shift), squeeze. Bullets take over a second to arrive. Fuel, barrels and ammo crates go bang.</p>
     <p style="color:#8a8"><i>HALO jump intro: coming soon.</i></p>`,
+  3: `<p><b>SNIPER LESSON — GRAVEL'S RANGE DAY.</b> Before Cold Horizon, your spotter GRAVEL takes you to the ridge in daylight. No guards. Just you, the CheyTac and orange steel plates with a jug of Tannerite at their feet — hit one and it goes <b>BANG</b>.</p>
+    <ul><li>Plates at <b>100 · 300 · 500 · 800 · 1,000 · 1,200 m</b> (yellow signs). They pop back up a few seconds after a hit.</li>
+    <li>8 short lessons: the scope and zoom · the rangefinder (F) · dialling elevation ([ ] or ↑ ↓) and why bullets drop · wind · breath (Shift) · trigger squeeze and follow-through · leading a moving target · CheyTac vs Barrett.</li>
+    <li>GRAVEL calls every shot: "low left — dial UP 2 clicks". His box at the top says what to press, worded for <b>your</b> device.</li>
+    <li>Finish with a timed <b>3-plate qualifier</b>. <b>0 twice</b> (or SKIP twice) skips a lesson; <b>O</b> (or RADIO) and GRAVEL repeats himself.</li></ul>`,
 };
 
 // #####################################################################
@@ -1135,7 +1145,7 @@ function buildLevel() {
   heightField = null; materiel = []; smokers.length = 0; projectiles.length = 0; sniperWater = null; lastLase = null;
   obstacles = []; popTargets = []; trainGates = {}; lookPanels = []; trainMarker = null; trainRP = {};
   if (scene.environment) { scene.environment.dispose(); scene.environment = null; }
-  if (currentMission === 2) { buildSniperMission(); return; }       // the outdoor sniper map (SECTION 15)
+  if (currentMission === 2 || currentMission === 3) { buildSniperMission(); return; }   // the outdoor sniper map (SECTION 15); 3 = sniper lesson
   applyLighting();
 
   // Copy the MAP into a grid. Pad short rows with walls so a typo can't crash the game.
@@ -2424,7 +2434,7 @@ function loadFigures() {
       for (const a of gltf.animations) FIGURES.clips[a.name.split('|').pop()] = a;
       FIGURES.status = 'ok';
       // Still on the briefing screen? Rebuild the level behind it with the new figures.
-      if (state === 'start') safe('figures:rebuild', () => { buildLevel(); resetPlayer(); resetWeapons(); resetMasking(); if (currentMission === 2) missionStartPose(); });
+      if (state === 'start') safe('figures:rebuild', () => { buildLevel(); resetPlayer(); resetWeapons(); resetMasking(); if (currentMission === 2 || currentMission === 3) missionStartPose(); });
     }, undefined, err => { clearTimeout(timer); FIGURES.status = 'failed'; FIGURES.error = String((err && err.message) || err).slice(0, 80); });
   } catch (err) { clearTimeout(timer); FIGURES.status = 'failed'; FIGURES.error = String(err.message || err); }
 }
@@ -3135,7 +3145,7 @@ function spotterSay(text, minGap = 3) {
   const now = performance.now() / 1000;
   if (now - lastSpotterTime < minGap) return;
   lastSpotterTime = now;
-  hud.spotter.textContent = (currentMission === 2 ? SPOTTER_CALLSIGN : 'SPOTTER') + ': ' + text;
+  hud.spotter.textContent = (currentMission === 2 || currentMission === 3 ? SPOTTER_CALLSIGN : 'SPOTTER') + ': ' + text;
   hud.spotter.style.opacity = 1; hud.spotterTimer = 3.5;
   SOUNDS.radio();
 }
@@ -3639,7 +3649,7 @@ function updateHUD(dt) {
   // Objective checklist
   let html = '<h3>MISSION OBJECTIVES</h3>';
   const ready = allIntelCollected();
-  if (currentMission === 0) html = trainingObjectivesHTML();
+  if (currentMission === 0 || currentMission === 3) html = trainingObjectivesHTML();
   else if (currentMission === 2) {
     for (const o of sniperObjectives()) html += `<div class="${o.done ? 'done' : ''}">${o.done ? '☑' : '☐'} ${o.text}</div>`;
     html += `<div class="${ready ? '' : 'locked'}">${ready ? '☐ Exfil to the LZ behind the ridge' : '🔒 Exfil LZ (finish the list first)'}</div>`;
@@ -3647,7 +3657,7 @@ function updateHUD(dt) {
     for (const item of intelItems) html += `<div class="${item.collected ? 'done' : ''}">${item.collected ? '☑' : '☐'} Retrieve: ${item.name}</div>`;
     html += `<div class="${ready ? '' : 'locked'}">${ready ? '☐ Reach the extraction elevator' : '🔒 Extraction elevator (locked)'}</div>`;
   }
-  if (currentMission !== 0) html += `<div style="margin-top:6px;color:#8a8">Guards down: ${player.kills} / ${enemies.length}</div>`;
+  if (currentMission === 1 || currentMission === 2) html += `<div style="margin-top:6px;color:#8a8">Guards down: ${player.kills} / ${enemies.length}</div>`;
   if (hud.objectives.innerHTML !== html) hud.objectives.innerHTML = html;
   hud.modeTag.textContent = (SETTINGS.realisticMode ? 'REALISTIC BALLISTICS' : 'ARCADE') + (SETTINGS.oneShotOneKill ? ' · ONE SHOT ONE KILL' : '') + (SETTINGS.gore ? '' : ' · GORE OFF');
   // Fading effects
@@ -3667,8 +3677,8 @@ function updateHUD(dt) {
   const nvText = nvMode ? NV_LABELS[nvMode] + (irOn ? ' · IR LASER/ILLUM ON' : '') : (irOn ? 'IR ON (needs NV)' : '');
   hud.nvTag.style.display = nvText ? 'block' : 'none';
   // Wind indicator (Mission 2): the arrow shows where the wind blows, relative to where you look.
-  hud.windBox.style.display = currentMission === 2 ? 'block' : 'none';
-  if (currentMission === 2) {
+  hud.windBox.style.display = currentMission === 2 || currentMission === 3 ? 'block' : 'none';
+  if (currentMission === 2 || currentMission === 3) {
     hud.windArrow.style.transform = `rotate(${windArrowAngle()}rad)`;
     hud.windText.textContent = wind.speed.toFixed(1) + ' m/s · ELEV ' + fmtDist(zeroRange);
   }
@@ -4150,13 +4160,13 @@ function buildSniperMission() {
   for (const f of SNIPER_LAYOUT.floodlights) addFloodlight(f, night);
 
   // 7. Materiel
-  for (const m of SNIPER_LAYOUT.materiel) addMateriel(m);
+  for (const m of SNIPER_LAYOUT.materiel) if (!(currentMission === 3 && m.z < -500)) addMateriel(m);   // lesson: no forward-post jeep on the range
 
   // 8. Trees, rocks, grass (instanced = one draw call for thousands of copies)
   scatterVegetation(Q);
 
   // 9. Guards
-  for (const g of SNIPER_LAYOUT.guards) addSniperGuard(g);
+  if (currentMission !== 3) for (const g of SNIPER_LAYOUT.guards) addSniperGuard(g);   // the lesson has no guards
   sniperState.leadersTotal = enemies.filter(e => e.officer).length;
 
   // 10. Player nest, spotter, extraction LZ, a little ammo
@@ -4166,7 +4176,7 @@ function buildSniperMission() {
   const spotter = teammates[teammates.length - 1];
   spotter.static = true; spotter.yaw = 0; spotter.group.rotation.order = 'YXZ'; spotter.group.rotation.x = Math.PI / 2;
   const X = L2W(SNIPER_LAYOUT.exfil.x, SNIPER_LAYOUT.exfil.z);
-  createExit(X.x, X.z);
+  if (currentMission === 3) buildSniperLesson(); else createExit(X.x, X.z);
   createPickup(N.x - 1.5, N.z - 1.5, 'ammo'); createPickup(N.x - 2.5, N.z - 1.2, 'ammo'); createPickup(N.x + 2.5, N.z - 2, 'health');
   finalizeTargets();
 }
@@ -4531,7 +4541,7 @@ function sniperObjectives() {
   ];
 }
 function objectivesComplete() {
-  if (currentMission === 0) return trainingDoneAll();
+  if (currentMission === 0 || currentMission === 3) return trainingDoneAll();
   if (currentMission === 2) return sniperObjectives().every(o => o.done || o.bonus);
   return intelItems.every(i => i.collected);
 }
@@ -4589,7 +4599,7 @@ function flightAt(cal, angle, range, cross = 0) {
   let x = 0, y = 0, z = 0, vx = cal.velocity * Math.cos(angle), vy = cal.velocity * Math.sin(angle), vz = 0, t = 0;
   const h = 1 / 400, k = cal.drag;
   while (x < range && t < 10) {
-    vx += -k * vx * h; vy += (-GRAVITY - k * vy) * h; vz += -k * (vz - cross) * h;
+    vx += -k * vx * h; vy += (-GRAVITY - k * vy) * h; vz += (-k * vz + k * SETTINGS.windEffect * cross) * h;
     x += vx * h; y += vy * h; z += vz * h; t += h;
   }
   return { y, t, drift: z, speed: Math.hypot(vx, vy) };
@@ -4641,7 +4651,8 @@ function fireProjectile(w) {
   const glow = new THREE.Mesh(traceGlowGeometry, traceGlowMaterial); glow.position.copy(start);
   levelGroup.add(tracer, glow);
   const p = { w, cal, pos: start.clone(), vel: dir.clone().multiplyScalar(cal.velocity), start: start.clone(), right, t: 0,
-    path: [start.clone()], power: 1, pen: w.penetration || 0, hitSet: new Set(), tracer, glow, aim, done: false, counted: false, fade: 0.6 };
+    path: [start.clone()], power: 1, pen: w.penetration || 0, hitSet: new Set(), tracer, glow, aim, done: false, counted: false, fade: 0.6,
+    held: scopeState.holding, scoped };
   projectiles.push(p); lastProjectile = p;
   return p;
 }
@@ -4660,9 +4671,9 @@ function stepProjectile(p, dt) {
   const n = Math.max(1, Math.ceil(dt * 400)), h = dt / n, k = p.cal.drag;
   for (let s = 0; s < n && !p.done; s++) {
     const prev = p.pos.clone();
-    p.vel.x += -k * (p.vel.x - wind.x) * h;
+    p.vel.x += (-k * p.vel.x + k * SETTINGS.windEffect * wind.x) * h;   // drag + the wind's push (SETTINGS.windEffect)
     p.vel.y += (-GRAVITY - k * p.vel.y) * h;
-    p.vel.z += -k * (p.vel.z - wind.z) * h;
+    p.vel.z += (-k * p.vel.z + k * SETTINGS.windEffect * wind.z) * h;
     p.pos.addScaledVector(p.vel, h); p.t += h;
     if (p.path.length < 5000) p.path.push(p.pos.clone());
     checkProjectileSegment(p, prev, p.pos);
@@ -4705,7 +4716,7 @@ function checkProjectileSegment(p, a, b) {
       p.power *= 0.6; continue;
     }
     const pt = hit.object.userData.popTarget;
-    if (pt) { p.what = p.what || 'steel target'; p.done = true; p.pos.copy(hit.point); player.shotsHit++; hitPopTarget(pt, hit.object.userData.zone, null, hit.point); return; }
+    if (pt) { p.what = p.what || 'steel target'; p.done = true; p.pos.copy(hit.point); player.shotsHit++; p.popHit = pt; hitPopTarget(pt, hit.object.userData.zone, null, hit.point); lessonShotDone(p, hit.point); return; }
     const mat = hit.object.userData.materiel;
     if (mat) { p.what = p.what || 'vehicle/target'; p.done = true; p.pos.copy(hit.point); projectileHitMateriel(p, mat, hit); return; }
     if (!p.what) p.what = 'wall/building';
@@ -4758,6 +4769,7 @@ function findAimTarget() {
 }
 // The spotter tells you how far off a miss was, in mils (1 mil = 1 m at 1000 m).
 function missCall(p, impact) {
+  if (currentMission === 3) { lessonShotDone(p, impact); return; }   // v0.6 sniper lesson: GRAVEL calls it
   if (!p.aim || p.hitSet.size || currentMission !== 2) return;
   const range = dist2D(p.start.x, p.start.z, p.aim.pos.x, p.aim.pos.z);
   let near = p.path[p.path.length - 1];
@@ -4786,7 +4798,7 @@ function laseRange() {
   if (best === Infinity) { showMessage('RANGE ---- (no return)', 1.5); lastLase = null; return null; }
   lastLase = { range: best, time: masking.time }; trainEvent('lase', best);
   showMessage('RANGE ' + fmtDist(best), 2);
-  if (currentMission === 2) spotterRangeCall(best);
+  if (currentMission === 2 || currentMission === 3) spotterRangeCall(best);
   return best;
 }
 // Hitscan guns outdoors: stop the shot where it hits the hillside.
@@ -4939,7 +4951,7 @@ function windHold(range, w = WEAPONS[currentWeapon]) {
   return { mils: Math.abs(drift / range * 1000), side: drift > 0 ? 'left' : 'right' };   // hold AGAINST the drift
 }
 function windCall() {
-  if (currentMission !== 2) return;
+  if (currentMission !== 2 && currentMission !== 3) return;
   const w = WEAPONS[currentWeapon].projectile ? WEAPONS[currentWeapon] : WEAPONS[7];
   const range = lastLase ? Math.round(lastLase.range / 100) * 100 || 100 : 1100;
   const hold = windHold(range, w);
@@ -5290,6 +5302,7 @@ function playerDistances() {
 // The thing the compass points at.
 function currentObjective() {
   if (currentMission === 0) return trainingObjective();
+  if (currentMission === 3) return lessonObjective();
   if (currentMission === 1) {
     const left = intelItems.filter(i => !i.collected);
     if (left.length) {
@@ -5341,7 +5354,7 @@ function drawCompass() {
 }
 // Remember where you've been (for the map), and what you've seen.
 function updateNavigation(dt) {
-  if (currentMission === 2 || !navInfo) return;
+  if (currentMission === 2 || currentMission === 3 || !navInfo) return;
   const [c, r] = cellOf(camera.position.x, camera.position.z);
   for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
     const cc = c + dc, rr = r + dr; if (cc < 0 || rr < 0 || cc >= worldCols || rr >= worldRows) continue;
@@ -5378,7 +5391,7 @@ function giveHint() {
 let mapOpenedAt = 0;
 function openMap() {
   if (state !== 'playing') return;
-  if (currentMission === 2 || !navInfo) { showMessage('No floor plan for an outdoor op — follow the yellow ◆ on the compass.', 2.5); return; }
+  if (currentMission === 2 || currentMission === 3 || !navInfo) { showMessage('No floor plan for an outdoor op — follow the yellow ◆ on the compass.', 2.5); return; }
   trainEvent('mapOpen');
   releaseInputs(); state = 'map'; mapOpenedAt = performance.now();
   $('mapScreen').style.display = 'flex'; drawMap();
@@ -5526,7 +5539,8 @@ function applyMission(m) {
   SETTINGS.nightOps = $('optNight').checked;
   SETTINGS.xrayCam = $('optXray').checked;
   SETTINGS.graphicsQuality = $('optQuality').value;
-  const outdoors = m === 2, high = SETTINGS.graphicsQuality === 'high';
+  if (m === 3) SETTINGS.nightOps = false;                              // the lesson is always in daylight
+  const outdoors = m === 2 || m === 3, high = SETTINGS.graphicsQuality === 'high';
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, high ? 1.5 : 1));
   fitRenderer(true);
   renderer.shadowMap.enabled = outdoors;
@@ -5535,22 +5549,22 @@ function applyMission(m) {
   weaponScene.children[0].intensity = outdoors ? 1.6 : 0.7;          // brighter gun under the outdoor tone mapping
   camera.near = outdoors ? 0.1 : 0.05; camera.far = outdoors ? SETTINGS.viewDistance : 200; camera.updateProjectionMatrix();
   document.querySelectorAll('.m2only').forEach(el => (el.style.display = outdoors ? 'flex' : 'none'));
-  document.querySelectorAll('.trainonly').forEach(el => (el.style.display = m === 0 ? 'flex' : 'none'));
-  $('trainBox').style.display = m === 0 ? 'block' : 'none';
-  for (const k of [0, 1, 2]) $('m' + k + 'Card').classList.toggle('sel', m === k);
+  document.querySelectorAll('.trainonly').forEach(el => (el.style.display = m === 0 || (m === 3 && el.id === 'tSkip') ? 'flex' : 'none'));
+  $('trainBox').style.display = m === 0 || m === 3 ? 'block' : 'none';
+  for (const k of [0, 1, 2, 3]) $('m' + k + 'Card').classList.toggle('sel', m === k);
   $('briefText').innerHTML = BRIEFINGS[m];
 }
 // v0.4.6 (iPad fix): the chosen mission lives in a variable, not only in the radio button,
 // because on some iPads tapping the mission card never ticked its radio (always Mission 1).
 let chosenMission = 1;
-const MISSION_NAMES = { 0: 'TRAINING', 1: 'BLACK FILE', 2: 'COLD HORIZON' };
+const MISSION_NAMES = { 0: 'TRAINING', 1: 'BLACK FILE', 2: 'COLD HORIZON', 3: 'SNIPER LESSON' };
 function selectedMission() { return chosenMission; }
 function chooseMission(m, rebuild = true) {
-  m = m === 2 ? 2 : m === 0 ? 0 : 1;
+  m = m === 2 || m === 0 || m === 3 ? m : 1;
   const changed = m !== chosenMission;
   chosenMission = m;
   document.querySelectorAll('input[name="mission"]').forEach(r => (r.checked = +r.value === m));
-  for (const k of [0, 1, 2]) $('m' + k + 'Card').classList.toggle('sel', m === k);
+  for (const k of [0, 1, 2, 3]) $('m' + k + 'Card').classList.toggle('sel', m === k);
   $('startBtn').textContent = '▶ START: ' + MISSION_NAMES[m];
   if (changed && rebuild && state === 'start') {
     applyMission(m); buildLevel(); resetPlayer(); resetWeapons(); resetMasking(); missionStartPose();
@@ -5560,10 +5574,10 @@ function chooseMission(m, rebuild = true) {
 function missionStartPose() {
   zeroRange = 100; scopeState.breath = SETTINGS.holdBreathTime; scopeState.gasp = 0;
   resetWind();
-  if (currentMission === 2) {
+  if (currentMission === 2 || currentMission === 3) {
     player.stance = 'prone'; player.eyeY = SETTINGS.proneEyeHeight;
     switchWeapon(7); switchTimer = 0; fireCooldown = 0;       // CheyTac ready
-    zeroRange = 1100;
+    zeroRange = currentMission === 3 ? 100 : 1100;
     camera.rotation.set(-0.12, playerStart.yaw, 0);
     camera.position.y = groundAt(camera.position.x, camera.position.z) + player.eyeY;
   }
@@ -5590,10 +5604,11 @@ function startMission() {
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   window.scrollTo(0, 0); fitRenderer(true);   // so Space/Enter can't "press" the start button again
   state = 'playing';
-  safe('start:training', () => { garrote.active = false; garrote.anim = 0; if (currentMission === 0) resetTraining(); });
+  safe('start:training', () => { garrote.active = false; garrote.anim = 0; if (currentMission === 0 || currentMission === 3) resetTraining(); });
   showMessage(currentMission === 0 ? 'Welcome to CAMP HALYARD. Read CHIEF\'s box at the top. Follow the yellow ◆ and the floor rings.'
+    : currentMission === 3 ? 'SNIPER LESSON. Read GRAVEL\'s box at the top — he\'ll walk you through every shot.'
     : currentMission === 2 ? 'Operation COLD HORIZON. Lase (F), dial ([ ] or ↑ ↓), breathe (Shift), send it.' : 'Mission start. Find the intel. Your squad (green ▼ HAWK, DOC) follows you — guards are deeper in. (V = knife, hold H = garrote)', 3.5);
-  if (currentMission === 0) setTimeout(() => { if (state === 'playing' && currentMission === 0 && TRAIN && !TRAIN.begun) beginStation(); }, 600);
+  if (currentMission === 0 || currentMission === 3) { const m = currentMission; setTimeout(() => { if (state === 'playing' && currentMission === m && TRAIN && !TRAIN.begun) beginStation(); }, 600); }
   if (cameFromTouch()) touch.active = true;   // started with a tap: show the touch buttons
   else lockMouse();                           // started with a click: capture mouse/trackpad
 }
@@ -5613,20 +5628,24 @@ function endGame(won) {
   safeUnlock();
   const secs = Math.round((performance.now() - player.startTime) / 1000);
   const acc = player.shotsFired ? Math.round(player.shotsHit / player.shotsFired * 100) : 0;
-  $('endTitle').textContent = won ? (currentMission === 0 ? 'TRAINING COMPLETE' : 'MISSION COMPLETE') : 'MISSION FAILED';
+  $('endTitle').textContent = won ? (currentMission === 0 ? 'TRAINING COMPLETE' : currentMission === 3 ? 'QUALIFIED — SNIPER LESSON COMPLETE' : 'MISSION COMPLETE') : 'MISSION FAILED';
   $('endTitle').style.color = won ? '#7f7' : '#f66';
-  $('endSubtitle').textContent = won ? (currentMission === 0 ? 'CHIEF: "Congratulations, Wraith. You are now marginally less likely to die. Black File is waiting."' : currentMission === 2 ? 'Exfil complete. The Conductor just lost an airfield.' : 'Extraction successful. Good work, Agent.')
+  $('endSubtitle').textContent = won ? (currentMission === 0 ? 'CHIEF: "Congratulations, Wraith. You are now marginally less likely to die. Black File is waiting."' : currentMission === 3 ? 'GRAVEL: "Measure, dial, breathe, squeeze, stay. Now do it when they shoot back."' : currentMission === 2 ? 'Exfil complete. The Conductor just lost an airfield.' : 'Extraction successful. Good work, Agent.')
     : (currentMission === 2 ? 'Wraith down. Gravel is going to be insufferable about this.' : 'Agent down. The intel is lost.');
   if (won && currentMission === 0) { try { localStorage.setItem('valkyrieTrainingDone', '1'); } catch (err) {} }
-  const objLine = currentMission === 0
+  if (won && currentMission === 3) { try { localStorage.setItem('valkyrieSniperLessonDone', '1'); } catch (err) {} }
+  const objLine = currentMission === 3
+    ? 'Lessons: ' + TRAIN.done.filter(Boolean).length + ' / ' + LESSON.length + (TRAIN.skipped.some(Boolean) ? ' (skipped: ' + LESSON.filter((s, i) => TRAIN.skipped[i]).map(s => s.name).join(', ') + ')' : ' — none skipped')
+      + '<br><b>Press Enter (or tap CONTINUE) for MISSION 02 — COLD HORIZON</b> · R = run the lesson again'
+    : currentMission === 0
     ? 'Stations: ' + TRAIN.done.filter(Boolean).length + ' / ' + STATIONS.length + (TRAIN.skipped.some(Boolean) ? ' (skipped: ' + STATIONS.filter((s, i) => TRAIN.skipped[i]).map(s => s.name).join(', ') + ')' : ' — none skipped')
       + '<br><b>Press Enter (or tap CONTINUE) for MISSION 01 — BLACK FILE</b> · R = run training again'
     : currentMission === 2
     ? sniperObjectives().map(o => (o.done ? '☑ ' : '☐ ') + o.text).join('<br>')
     : `Intel recovered: ${intelItems.filter(i => i.collected).length} / ${intelItems.length}`;
   $('endStats').innerHTML = `Time: ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}<br>
-    Guards neutralised: ${player.kills} / ${enemies.length}<br>Accuracy: ${acc}% &nbsp; Headshots: ${player.headshots}<br>${objLine}`;
-  $('restartBtn').textContent = won && currentMission === 0 ? '▶ CONTINUE: MISSION 01 — BLACK FILE (Enter)' : '↻ CLICK / TAP TO RESTART MISSION (Enter)';
+    ${currentMission === 3 ? 'Plates hit: ' + player.shotsHit : 'Guards neutralised: ' + player.kills + ' / ' + enemies.length}<br>Accuracy: ${acc}% &nbsp; Headshots: ${player.headshots}<br>${objLine}`;
+  $('restartBtn').textContent = won && currentMission === 0 ? '▶ CONTINUE: MISSION 01 — BLACK FILE (Enter)' : won && currentMission === 3 ? '▶ CONTINUE: MISSION 02 — COLD HORIZON (Enter)' : '↻ CLICK / TAP TO RESTART MISSION (Enter)';
   $('endScreen').style.display = 'flex';
   safe('end:sound', () => (won ? SOUNDS.win() : SOUNDS.lose()));
 }
@@ -5640,7 +5659,7 @@ $('optQuality').value = SETTINGS.graphicsQuality;
 // Picking a mission shows its briefing and builds it behind the start screen.
 document.querySelectorAll('input[name="mission"]').forEach(r => r.addEventListener('change', () => { if (r.checked) chooseMission(+r.value); }));
 // Tapping / clicking anywhere on a mission card picks it (pointer, touch AND click, whichever arrives).
-for (const [id, m] of [['m0Card', 0], ['m1Card', 1], ['m2Card', 2]]) for (const ev of ['pointerup', 'touchend', 'click'])
+for (const [id, m] of [['m0Card', 0], ['m1Card', 1], ['m3Card', 3], ['m2Card', 2]]) for (const ev of ['pointerup', 'touchend', 'click'])
   $(id).addEventListener(ev, () => { noteInput('mission card ' + m + ' (' + ev + ')'); chooseMission(m); });
 // A link can pick the mission: ...?mission=2  or  ...#m2
 {
@@ -5648,7 +5667,7 @@ for (const [id, m] of [['m0Card', 0], ['m1Card', 1], ['m2Card', 2]]) for (const 
   // No choice in the link: Training first, until you've finished it once (then Black File).
   const all = [...location.search.matchAll(/mission=([a-z0-9]+)/gi)], q = all.length ? all[all.length - 1][1].toLowerCase() : null, h = (location.hash || '').toLowerCase();
   let done = false; try { done = !!localStorage.getItem('valkyrieTrainingDone'); } catch (err) {}
-  const want = q === '2' || h === '#m2' || h === '#mission2' ? 2 : q === '1' || h === '#m1' || h === '#mission1' ? 1
+  const want = q === '3' || q === 'sniper' || q === 'lesson' || h === '#m3' || h === '#sniper' ? 3 : q === '2' || h === '#m2' || h === '#mission2' ? 2 : q === '1' || h === '#m1' || h === '#mission1' ? 1
     : q === '0' || q === 'training' || h === '#m0' || h === '#training' ? 0 : done ? 1 : 0;
   chosenMission = -1; chooseMission(want, false);     // the level itself is built once, below
 }
@@ -5658,6 +5677,7 @@ $('restartBtn').addEventListener('click', continueOrRestart);
 // After training: CONTINUE goes on to Black File. Otherwise it replays the same mission.
 function continueOrRestart() {
   if (state === 'won' && currentMission === 0) { chooseMission(1, false); lastStartAt = -1e9; }
+  if (state === 'won' && currentMission === 3) { chooseMission(2, false); lastStartAt = -1e9; }
   startMission();
 }
 $('skipTrainBtn').addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); noteInput('skip training'); chooseMission(1); startMission(); });
@@ -5968,8 +5988,8 @@ function popTargetMeshes() { const out = []; for (const t of popTargets) if (t.u
 function hitPopTarget(t, zone, w, point) {
   if (!t.up) return;
   t.up = false; t.downTimer = t.autoReset; t.hits++;
-  spawnParticles(point, 0xffe0a0, 8, 3, 0.04);
-  playTone(t.hostage ? 400 : 2300, t.hostage ? 300 : 2150, 0.25, 0.22, 'triangle');
+  if (t.tannerite) tanneriteBoom(t, point);
+  else { spawnParticles(point, 0xffe0a0, 8, 3, 0.04); playTone(t.hostage ? 400 : 2300, t.hostage ? 300 : 2150, 0.25, 0.22, 'triangle'); }
   flashHitmarker(false);
   trainEvent('pop', { id: t.id, zone, hostage: t.hostage, weapon: currentWeapon, aiming });
 }
@@ -6184,17 +6204,20 @@ const STATIONS = [
         start: () => resetRolePlayer(trainRP.g2), check: () => !!(trainRP.g2 && trainRP.g2.garroteKill) },
     ] },
 ];
-// ---- The station engine ----
+// ---- The station engine (also runs GRAVEL's SNIPER LESSON, mission 3) ----
 var TRAIN = null;
+function ST() { return currentMission === 3 ? LESSON : STATIONS; }          // the list of stations / lessons
+function coach() { return currentMission === 3 ? 'GRAVEL' : 'CHIEF'; }
+const trainLike = () => currentMission === 0 || currentMission === 3;
 function resetTraining() {
-  TRAIN = { i: 0, step: 0, begun: false, done: STATIONS.map(() => false), skipped: STATIONS.map(() => false), ev: {}, S: {}, fired: new Set(), lastLase: 0,
+  TRAIN = { i: 0, step: 0, begun: false, done: ST().map(() => false), skipped: ST().map(() => false), ev: {}, S: {}, fired: new Set(), lastLase: 0,
     stepT: 0, idle: 0, boxHTML: '', boxAt: 0, lastSkip: -1e9, startedAt: performance.now() };
   setMarker(null);
 }
-function curStation() { return TRAIN && TRAIN.i < STATIONS.length ? STATIONS[TRAIN.i] : null; }
+function curStation() { return TRAIN && TRAIN.i < ST().length ? ST()[TRAIN.i] : null; }
 function curStep() { const s = curStation(); return s && TRAIN.begun ? s.steps[TRAIN.step] : null; }
 function trainEvent(name, data) {
-  if (currentMission !== 0 || !TRAIN) return;
+  if (!trainLike() || !TRAIN) return;
   const E = TRAIN.ev, add = k => { E[k] = (E[k] || 0) + 1; };
   add(name);
   if (name === 'pop') { add('pop:' + data.id); add('pop:' + data.id + (data.aiming ? ':aim' : ':hip')); if (data.zone === 'head') add('pop:' + data.id + ':head'); add('popW:' + data.weapon); }
@@ -6203,7 +6226,7 @@ function trainEvent(name, data) {
 }
 function beginStation() {
   const s = curStation(); TRAIN.begun = true; TRAIN.step = 0;
-  radioSay('CHIEF', s.intro, 7); startStep();
+  radioSay(coach(), s.intro, currentMission === 3 ? 9 : 7); startStep();
 }
 function startStep() {
   const st = curStep(); TRAIN.ev = {}; TRAIN.S = {}; TRAIN.stepT = 0; TRAIN.idle = 0;
@@ -6215,17 +6238,23 @@ function finishStep() {
   const s = curStation(), st = curStep();
   playTone(880, 880, 0.08, 0.2, 'triangle'); playTone(1320, 1320, 0.12, 0.2, 'triangle', 0.08);
   if (st.after) st.after();
-  else if (st.say && TRAIN.step < s.steps.length - 1) radioSay('CHIEF', st.say, 5);
+  else if (st.say && TRAIN.step < s.steps.length - 1) radioSay(coach(), st.say, 5);
   TRAIN.step++;
   if (TRAIN.step >= s.steps.length) completeStation(false, st.after ? '' : st.say); else startStep();
 }
 function completeStation(skipped, lastSay = '') {
   const s = curStation(); if (!s) return;
   TRAIN.done[TRAIN.i] = true; TRAIN.skipped[TRAIN.i] = skipped;
-  openGate(s.gate); setMarker(null);
+  if (s.gate) openGate(s.gate); setMarker(null);
   if (s.id === 'comms') teammates.forEach(m => { m.hold = false; });
-  if (!skipped) setTimeout(() => { if (state === 'playing' && currentMission === 0) radioSay('CHIEF', (lastSay ? lastSay + ' ' : '') + s.outro, 7); }, s.id === 'comms' ? 4500 : 300);
+  const m = currentMission, who = coach();
+  if (!skipped) setTimeout(() => { if (state === 'playing' && currentMission === m) radioSay(who, (lastSay ? lastSay + ' ' : '') + s.outro, 7); }, s.id === 'comms' ? 4500 : m === 3 && (s.id === 'drop' || s.id === 'rifles') ? 0 : 300);
   TRAIN.i++; TRAIN.begun = false; TRAIN.step = 0;
+  if (m === 3) {                                    // sniper lesson: straight on to the next lesson, or done
+    if (TRAIN.i >= LESSON.length) { showMessage('QUALIFIED! Lesson complete.', 4); setTimeout(() => { if (state === 'playing' && currentMission === 3) endGame(true); }, 3500); }
+    else { showMessage('LESSON ' + TRAIN.i + (skipped ? ' SKIPPED' : ' COMPLETE') + ' — next: ' + LESSON[TRAIN.i].name, 2.5); setTimeout(() => { if (state === 'playing' && currentMission === 3 && TRAIN && !TRAIN.begun) beginStation(); }, skipped ? 400 : 4500); }
+    noteProgress(); return;
+  }
   if (TRAIN.i >= STATIONS.length) showMessage('ALL STATIONS DONE — walk onto the green GRADUATION pad', 4);
   else showMessage('STATION ' + TRAIN.i + (skipped ? ' SKIPPED' : ' COMPLETE') + ' — next: ' + STATIONS[TRAIN.i].name, 2.5);
   noteProgress();
@@ -6239,7 +6268,8 @@ function teleportTo(c, r) {
 }
 function skipStation() {
   const s = curStation();
-  if (!s) { showMessage('Nothing left to skip — the graduation pad is open.', 2); return; }
+  if (!s) { showMessage(currentMission === 3 ? 'Nothing left to skip.' : 'Nothing left to skip — the graduation pad is open.', 2); return; }
+  if (currentMission === 3) { radioSay('GRAVEL', 'Skipping ' + s.name + '. Your call, Wraith. The bullet won\'t skip it.', 4); completeStation(true); return; }
   radioSay('CHIEF', 'Skipping ' + s.name + '? Fine. I\'ll write "enthusiastic" on your file.', 5);
   dropTargets(); if (garrote.active) garroteFail('skip');
   completeStation(true);
@@ -6248,7 +6278,7 @@ function skipStation() {
 }
 function skipPressed() {
   const now = performance.now();
-  if (currentMission !== 0) return;
+  if (!trainLike() || !TRAIN) return;
   if (now - TRAIN.lastSkip < 1500) { TRAIN.lastSkip = -1e9; skipStation(); }
   else { TRAIN.lastSkip = now; showMessage('Skip this station? Press ' + plain(K('skip')).replace(' twice', '') + ' again.', 1.5); }
 }
@@ -6264,6 +6294,12 @@ function trainingObjective() {
 }
 function radioPressed() {
   noteInput('radio');
+  if (currentMission === 3 && TRAIN) {
+    const st = curStep(); trainEvent('radio');
+    if (st && st.radio) return;                                    // the step was waiting for exactly this
+    if (st) radioSay('GRAVEL', plain(st.text(TRAIN.S)), 8); else windCall();
+    return;
+  }
   if (currentMission === 0 && TRAIN) {
     const st = curStep(); trainEvent('radio');
     if (st && st.radio) return;                                    // the step was waiting for exactly this
@@ -6275,8 +6311,9 @@ function radioPressed() {
   if (navInfo && elapsed - navInfo.lastHint > 8) giveHint(); else radioSay('HAWK', 'Just told you, Wraith. Follow the ◆.', 3);
 }
 function updateTraining(dt) {
-  if (currentMission !== 0 || !TRAIN) return;
+  if (!trainLike() || !TRAIN) return;
   updateGates(dt); updatePopTargets(dt);
+  if (currentMission === 3) updateLessonTargets(dt);
   if (trainRP.beacon) trainRP.beacon.userData.lamp.visible = (elapsed % 1) < 0.5;
   for (const e of [trainRP.k1, trainRP.g1, trainRP.g2]) {
     if (!e || e.state === 'dead') continue;
@@ -6285,13 +6322,13 @@ function updateTraining(dt) {
   weaponState.forEach((s, i) => { if (s.reserve < WEAPONS[i].magSize * 2) s.reserve = WEAPONS[i].reserve; });   // training ammo never runs out
   if (state !== 'playing') return;
   const s = curStation();
-  if (s && !TRAIN.begun && zoneAtXZ(camera.position.x, camera.position.z).id === s.zone) beginStation();
+  if (s && !TRAIN.begun && currentMission === 0 && zoneAtXZ(camera.position.x, camera.position.z).id === s.zone) beginStation();
   const st = curStep();
   if (st) {
     TRAIN.stepT += dt; TRAIN.idle += dt;
     if (st.tick) st.tick(TRAIN.S, dt);
     if (st.check(TRAIN.S)) finishStep();
-    else if (TRAIN.idle > 50) { TRAIN.idle = 0; radioSay('CHIEF', 'Still waiting, Wraith. ' + plain(st.text(TRAIN.S)), 8); }
+    else if (TRAIN.idle > 50) { TRAIN.idle = 0; radioSay(coach(), (currentMission === 3 ? 'Take your time. ' : 'Still waiting, Wraith. ') + plain(st.text(TRAIN.S)), 8); }
   }
   if (obstacleBlocked && elapsed - obstacleMsgAt > 2.5) {
     obstacleMsgAt = elapsed;
@@ -6305,6 +6342,13 @@ function updateTrainBox() {
   if (now - TRAIN.boxAt < 200) return; TRAIN.boxAt = now;
   const s = curStation(), st = curStep();
   let html;
+  if (currentMission === 3) {
+    html = !s ? '<b>QUALIFIED</b><br>Lesson complete.' : !st ? `<b>NEXT: LESSON ${TRAIN.i + 1} · ${s.name}</b><br>GRAVEL is getting the next one ready…`
+      : `<b>GRAVEL · LESSON ${TRAIN.i + 1}/${LESSON.length} · ${s.name}</b> &nbsp; <span class="tstep">step ${TRAIN.step + 1}/${s.steps.length}</span><br>${st.text(TRAIN.S)}`;
+    html += `<div class="tsmall">${K('radio')} = GRAVEL repeats / wind call · ${K('skip')} = skip this lesson</div>`;
+    if (html !== TRAIN.boxHTML) { el.innerHTML = html; TRAIN.boxHTML = html; }
+    return;
+  }
   if (!s) html = '<b>GRADUATION</b><br>All stations done. Walk onto the green pad (follow the ◆).';
   else if (!st) html = `<b>NEXT: STATION ${TRAIN.i + 1} · ${s.name}</b><br>Follow the ◆ on the compass and the yellow floor arrows.`;
   else html = `<b>STATION ${TRAIN.i + 1}/${STATIONS.length} · ${s.name}</b> &nbsp; <span class="tstep">step ${TRAIN.step + 1}/${s.steps.length}</span><br>${st.text(TRAIN.S)}`;
@@ -6312,12 +6356,13 @@ function updateTrainBox() {
   if (html !== TRAIN.boxHTML) { el.innerHTML = html; TRAIN.boxHTML = html; }
 }
 function trainingObjectivesHTML() {
-  let html = '<h3>CAMP HALYARD — TRAINING</h3>';
-  STATIONS.forEach((s, i) => {
+  let html = currentMission === 3 ? '<h3>SNIPER LESSON — GRAVEL</h3>' : '<h3>CAMP HALYARD — TRAINING</h3>';
+  ST().forEach((s, i) => {
     const cur = i === TRAIN.i, mark = TRAIN.done[i] ? (TRAIN.skipped[i] ? '⤼' : '☑') : cur ? '▶' : '☐';
     html += `<div class="${TRAIN.done[i] ? 'done' : ''}"${cur ? ' style="color:#ffd23a"' : ''}>${mark} ${i + 1} ${s.name}${TRAIN.skipped[i] ? ' (skipped)' : ''}</div>`;
   });
   const ready = trainingDoneAll();
+  if (currentMission === 3) return html + `<div style="margin-top:6px;color:#8a8">Plates hit: ${player.shotsHit} · Dial ${fmtDist(zeroRange)}</div>`;
   html += `<div class="${ready ? '' : 'locked'}">${ready ? '☐ Graduation pad' : '🔒 Graduation (finish or skip every station)'}</div>`;
   return html;
 }
@@ -6436,8 +6481,229 @@ const arrowTextureGo = makeCanvasTexture(128, (ctx, s) => {
 });
 const arrowMaterialGo = new THREE.MeshStandardMaterial({ map: arrowTextureGo, transparent: true, depthWrite: false, roughness: 0.8, emissive: 0x332200, polygonOffset: true, polygonOffsetFactor: -2 });
 // Weapons you actually carry: Mission 2 = the two sniper rifles; elsewhere the 870 is a training/Black File extra.
-function weaponOwned(i) { return currentMission === 2 ? i < 8 : true; }
+function weaponOwned(i) { return currentMission === 2 || currentMission === 3 ? i < 8 : true; }
 function cycleWeapon(dir) { for (let k = 1; k <= WEAPONS.length; k++) { const n = (currentWeapon + dir * k + WEAPONS.length * 2) % WEAPONS.length; if (weaponOwned(n)) { switchWeapon(n); return; } } }
+
+// #####################################################################
+// ##  SECTION 20: SNIPER LESSON — GRAVEL'S RANGE DAY (v0.6)          ##
+// ##  Mission 3 in the code, shown right before Cold Horizon.        ##
+// ##  Same ridge, sky and ballistics as Cold Horizon, but daytime,   ##
+// ##  no guards: you lie at one firing point and shoot exploding     ##
+// ##  steel ("Tannerite") at 100 / 300 / 500 / 800 / 1,000 / 1,200 m.##
+// ##  GRAVEL teaches one thing per lesson and calls every shot       ##
+// ##  ("low left — dial 2 clicks up"). It runs on the same lesson    ##
+// ##  engine as the training camp (SECTION 18): 0 twice skips.       ##
+// #####################################################################
+const LESSON_DIST = [100, 300, 500, 800, 1000, 1200];
+const LESSON_LINE = THREE.MathUtils.degToRad(8);   // the range runs a little west of due south (clear of the compound)
+let lessonTargets = [];
+const lessonMats = {
+  jug: new THREE.MeshStandardMaterial({ color: 0xf4f4ee, roughness: 0.5 }),
+  plate: new THREE.MeshStandardMaterial({ color: 0xff7a1a, roughness: 0.45, metalness: 0.4 }),   // orange steel: easy to see
+  head: new THREE.MeshStandardMaterial({ color: 0xffa040, roughness: 0.45, metalness: 0.4 }),
+  post: new THREE.MeshStandardMaterial({ color: 0x3a3226, roughness: 0.9 }),
+  mat: new THREE.MeshStandardMaterial({ color: 0x4a5234, roughness: 1 }),
+};
+function lessonEye() { const N = L2W(SNIPER_LAYOUT.nest.x, SNIPER_LAYOUT.nest.z); return { x: N.x, z: N.z, y: groundAt(N.x, N.z) + SETTINGS.proneEyeHeight }; }
+// A point h metres (flat distance) down the range, plus 'side' metres to the right of the line.
+function lessonPoint(h, side = 0) {
+  const e = lessonEye(), dx = -Math.sin(LESSON_LINE), dz = Math.cos(LESSON_LINE);
+  return { x: e.x + dx * h - dz * side, z: e.z + dz * h + dx * side };
+}
+// Is the straight line from your eye to (x, y, z) clear of the hillside?
+function lessonClear(x, y, z) {
+  const e = lessonEye(), d = Math.hypot(x - e.x, z - e.z);
+  for (let s = 6; s < d - 4; s += 4) { const t = s / d; if (groundAt(e.x + (x - e.x) * t, e.z + (z - e.z) * t) > e.y + (y - e.y) * t - 0.4) return false; }
+  return true;
+}
+function addLessonTarget(id, d, side, label, opts = {}) {
+  const e = lessonEye(), sc = THREE.MathUtils.clamp(d / 400, 1.2, 2.6);   // bigger plates further out (about 1.2-1.4 mils wide past 500 m)
+  // Find the spot whose straight-line (laser) distance is d metres.
+  let h = d, p = lessonPoint(h, side);
+  for (let k = 0; k < 6; k++) { p = lessonPoint(h, side); const dy = e.y - (groundAt(p.x, p.z) + sc); h = Math.sqrt(Math.max(1, d * d - dy * dy)); }
+  p = lessonPoint(h, side);
+  let lift = 0; const gy = groundAt(p.x, p.z);
+  while (lift < 30 && !lessonClear(p.x, gy + lift + sc, p.z)) lift += 1;   // on a tall post if the hill is in the way
+  const yaw = Math.atan2(e.x - p.x, e.z - p.z);
+  const t = createPopTarget(id, p.x, p.z, yaw, { up: true, autoReset: 3 });
+  t.group.position.y = gy + lift; t.group.scale.setScalar(sc);
+  t.meshes[0].material = lessonMats.plate; t.meshes[1].material = lessonMats.head;
+  const jug = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.32, 12), lessonMats.jug);   // the Tannerite jug at the plate's foot
+  jug.position.set(0, 0.16, 0.22); t.group.add(jug); jug.userData.popTarget = t; jug.userData.zone = 'jug'; t.meshes.push(jug); t.jug = jug;
+  if (lift > 0) { const post = new THREE.Mesh(new THREE.BoxGeometry(0.25, lift, 0.25), lessonMats.post); post.position.set(p.x, gy + lift / 2, p.z); levelGroup.add(post); }
+  const sign = makeSign(label, 1.5 * sc, 0.5 * sc, '#101010', '#ffd23a');
+  sign.position.set(p.x + Math.cos(yaw) * 1.5 * sc, gy + lift + 2.1 * sc, p.z - Math.sin(yaw) * 1.5 * sc); sign.rotation.y = yaw; levelGroup.add(sign);
+  Object.assign(t, { tannerite: true, lesson: true, dist: d, label, sc, lift, gy, baseSide: side, h, sign });
+  if (opts.mover) { t.mover = { phase: 0, amp: 9, speed: 1.5 }; t.up = false; t.raise = 0; t.autoReset = 0; }
+  lessonTargets.push(t); return t;
+}
+function buildSniperLesson() {
+  lessonTargets = [];
+  for (const d of LESSON_DIST) addLessonTarget('T' + d, d, 0, fmtDist(d));
+  addLessonTarget('MOVER', 500, 34, 'MOVER 500 M', { mover: true });
+  // The firing point: a firing mat at the nest (no sandbag: it would block the view down the hill).
+  const N = L2W(SNIPER_LAYOUT.nest.x, SNIPER_LAYOUT.nest.z), y = groundAt(N.x, N.z);
+  const mat = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.05, 2.6), lessonMats.mat); mat.position.set(N.x, y + 0.02, N.z - 1.2); levelGroup.add(mat);
+  exitZone = null;
+}
+function lessonTarget(id) { return lessonTargets.find(t => t.id === id); }
+function targetCenter(t) { return t.meshes[0].getWorldPosition(new THREE.Vector3()); }
+// The moving target slides left and right along a rail; the jug only shows while the plate is up.
+function updateLessonTargets(dt) {
+  for (const t of lessonTargets) {
+    if (t.jug) t.jug.visible = t.up;
+    if (!t.mover) continue;
+    if (t.up) t.mover.phase += dt * t.mover.speed;
+    const tri = ((t.mover.phase / (2 * t.mover.amp)) % 2 + 2) % 2, off = (tri < 1 ? tri : 2 - tri) * 2 * t.mover.amp - t.mover.amp;
+    t.mover.vel = (off - (t.mover.off ?? off)) / Math.max(dt, 1e-4); t.mover.off = off;   // m/s, + = moving to your right
+    const p = lessonPoint(t.h, t.baseSide + off), gy = groundAt(p.x, p.z);
+    t.group.position.set(p.x, gy + t.lift, p.z); t.x = p.x; t.z = p.z;
+    t.sign.position.set(p.x + Math.cos(t.group.rotation.y) * 1.5 * t.sc, gy + t.lift + 2.1 * t.sc, p.z - Math.sin(t.group.rotation.y) * 1.5 * t.sc);
+  }
+}
+// BOOM: a flash, a fat smoke puff, and the bang arrives later (sound travels ~343 m/s).
+function tanneriteBoom(t, point) {
+  const c = point.clone(), r = t.sc, me = shooterPos(), d = me.distanceTo(c);
+  const fire = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), new THREE.MeshBasicMaterial({ color: 0xfff0b0, transparent: true, opacity: 1, depthWrite: false, toneMapped: false }));
+  fire.position.copy(c); levelGroup.add(fire);
+  effects.push({ obj: fire, life: 0.45, max: 0.45, update(dt, fx) { const k = 1 - fx.life / fx.max; fire.scale.setScalar(r * (0.6 + k * 2.2)); fire.material.opacity = 1 - k; fire.material.color.setRGB(1, 0.9 - k * 0.5, 0.6 - k * 0.5); } });
+  const smoke = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), new THREE.MeshBasicMaterial({ color: 0xd8d4cc, transparent: true, opacity: 0.85, depthWrite: false }));
+  smoke.position.copy(c); levelGroup.add(smoke);
+  effects.push({ obj: smoke, life: 3.5, max: 3.5, update(dt, fx) { const k = 1 - fx.life / fx.max; smoke.scale.setScalar(r * (1 + k * 4)); smoke.position.y += dt * r * 0.8; smoke.material.opacity = 0.85 * (1 - k); } });
+  spawnParticles(c, 0xfff0c0, 16, 6 * r, 0.06 * r);
+  setTimeout(() => { if (currentMission === 3) SOUNDS.boom(THREE.MathUtils.clamp(1.1 - d / 1600, 0.3, 1) * 0.8); }, d / 343 * 1000);
+}
+// ---- GRAVEL calls every shot ----
+const clickWord = n => n + ' click' + (n === 1 ? '' : 's');
+function lessonShotDone(p, impact) {
+  if (currentMission !== 3 || !TRAIN || p.lessonDone || !p.w.projectile) return;
+  p.lessonDone = true;
+  // Which plate were you shooting at? The one nearest the line the bullet left the muzzle on (up/down counts:
+  // the plates are all in one line, but each sits at a different angle below you).
+  const a = p.path[0], b = p.path[Math.min(40, p.path.length - 1)], dir = b.clone().sub(a).normalize();
+  let t = p.popHit || null, best = 0.035;
+  if (!t) for (const q of lessonTargets) { if (!q.up && !q.mover) continue; const ang = targetCenter(q).sub(a).angleTo(dir); if (ang < best) { best = ang; t = q; } }
+  const E = TRAIN.ev, add = k => { E[k] = (E[k] || 0) + 1; };
+  if (!t) { TRAIN.lastCall = { hit: false, id: null }; radioSay('GRAVEL', 'Where was that going? Pick a plate and put the crosshair on it.', 4); return; }
+  const center = targetCenter(t), range = dist2D(a.x, a.z, center.x, center.z);
+  // Where was the bullet when it reached the plate's distance? (exact, between two path points)
+  let q = impact;
+  const hit0 = p.popHit === t;
+  if (!hit0) for (let k = 1; k < p.path.length; k++) {
+    const d1 = dist2D(a.x, a.z, p.path[k].x, p.path[k].z);
+    if (d1 >= range) { const d0 = dist2D(a.x, a.z, p.path[k - 1].x, p.path[k - 1].z); q = p.path[k - 1].clone().lerp(p.path[k], (range - d0) / Math.max(1e-6, d1 - d0)); break; }
+  }
+  const off = q.clone().sub(center), v = off.y / range * 1000, h = off.dot(p.right) / range * 1000;
+  const hit = p.popHit === t, wi = WEAPONS.indexOf(p.w), tof = p.t;
+  add('shotAt:' + t.id);
+  TRAIN.lastCall = { hit, id: t.id, v, h, tof, dial: zeroRange, range };
+  if (hit) {
+    add('hit:' + t.id); add('hit:any'); add('hitW' + wi + ':' + t.id);
+    if (p.held) add('hitHeld:' + t.id);
+    if (aiming) add('hitFT:' + t.id); else showMessage('Hit — but you came off the scope before it landed. Stay in the glass: that\'s follow-through.', 3);
+    TRAIN.lastCallText = `HIT! ${t.label}.`;
+    radioSay('GRAVEL', `HIT! ${t.label}. Flight time ${tof.toFixed(2)} s.` + (p.held ? '' : ' Try it on a held breath.'), 4);
+    return;
+  }
+  // The miss call: which way, how far (mils), and the fix.
+  const vw = Math.abs(v) < 0.4 ? '' : v < 0 ? 'low' : 'high', hw = Math.abs(h) < 0.4 ? '' : h < 0 ? 'left' : 'right';
+  const fixes = [], need = THREE.MathUtils.clamp(Math.round(range / 100) * 100, 100, SETTINGS.maxDialRange);
+  if (vw) {
+    if (need !== zeroRange) { const n = Math.abs(need - zeroRange) / 100; fixes.push(`dial ${need > zeroRange ? 'UP' : 'DOWN'} ${clickWord(n)} to ${fmtDist(need)}`); }
+    else fixes.push(`hold ${Math.abs(v).toFixed(1)} mils ${v < 0 ? 'higher' : 'lower'}`);
+  }
+  if (hw) fixes.push(`hold ${Math.abs(h).toFixed(1)} mils ${h < 0 ? 'right' : 'left'}`);
+  const where = (vw + ' ' + hw).trim() || 'just off the edge';
+  if (fixes.length) fixes[0] = fixes[0][0].toUpperCase() + fixes[0].slice(1);
+  TRAIN.lastCallText = `Miss — ${where} (${Math.abs(v).toFixed(1)} mils ${v < 0 ? 'low' : 'high'}). ${fixes.length ? fixes.join(', ') + '.' : ''}`;
+  radioSay('GRAVEL', `Miss — ${where} (${Math.abs(v).toFixed(1)} mils ${v < 0 ? 'low' : 'high'}, ${Math.abs(h).toFixed(1)} ${h < 0 ? 'left' : 'right'}). ${fixes.length ? fixes.join(', ') + '.' : 'Same hold, smoother squeeze.'}`.replace(/^./, c => c.toUpperCase()), 6);
+}
+function setLessonWind(speed, fromLeft = true) {
+  // Blowing across the range: you face roughly south (+z), so "from the left" (east) blows towards the west.
+  const s = fromLeft ? -1 : 1;
+  wind.speed = wind.targetSpeed = speed; wind.dir = wind.targetDir = s < 0 ? -Math.PI / 2 : Math.PI / 2;
+  wind.x = Math.sin(wind.dir) * speed; wind.z = Math.cos(wind.dir) * speed;
+}
+const lev = k => (TRAIN && TRAIN.ev[k]) || 0;
+const atT = id => () => { const t = lessonTarget(id); return t ? { x: t.x, z: t.z } : null; };
+const dropM = (range, dial) => { const cal = CALIBERS['.408 CheyTac']; return -flightAt(cal, zeroAngle(cal, dial), range).y; };   // metres low
+const lead = (id, w = 7) => { const cal = CALIBERS[WEAPONS[w].caliber], t = lessonTarget(id); const f = flightAt(cal, zeroAngle(cal, 500), t ? t.dist : 500); return { tof: f.t, m: f.t * 1.5, mils: f.t * 1.5 / (t ? t.dist : 500) * 1000 }; };
+const LESSON = [
+  { id: 'scope', name: 'THE SCOPE', intro: 'Morning, Wraith. Gravel. Today you learn to hit things a kilometre away without the things noticing. Steel plates, orange, with a jug of Tannerite at the feet. Hit it and it goes BANG.',
+    outro: 'Good. That\'s your glass. Now let\'s talk about gravity, which is undefeated.',
+    steps: [
+      { text: () => `You're lying on the firing mat with the CheyTac (${KW(7)}). Look through the scope: ${K('aim')}. Then zoom: ${K('zoom')} — try both zoom levels.`, start: S => { S.z1 = S.z2 = 0; if (currentWeapon !== 7) switchWeapon(7); setLessonWind(0); },
+        tick: S => { if (aiming && zoomStep === 1) S.z1 = 1; if (aiming && zoomStep === 2) S.z2 = 1; }, check: S => S.z1 && S.z2, say: 'Low zoom to find things, high zoom to hit them.' },
+      { text: () => `RANGEFINDER — find the 100 m plate (the yellow signs give the distance), put the crosshair on it and press ${K('lase')}. The laser tells you exactly how far it is.`, at: atT('T100'), label: '100 M',
+        check: () => TRAIN.lastLase > 85 && TRAIN.lastLase < 118, say: 'There. Never guess a range if you can measure it.' },
+    ] },
+  { id: 'drop', name: 'RANGE & BULLET DROP', intro: 'Bullets fall. From the second they leave the barrel, gravity pulls them down. The further the target, the more they fall. So you tell the scope how far: that\'s "dialling elevation".',
+    outro: 'That\'s the whole secret: measure, dial, shoot. Everything else is details. Annoying details.',
+    steps: [
+      { text: () => `Your scope is dialled to ${fmtDist(zeroRange)}. The 100 m plate is 100 m. Dial to 100 m: ${K('dial')} (each click = 100 m).`, start: () => { zeroRange = 500; }, check: () => zeroRange === 100 },
+      { text: () => `Put the crosshair dead centre on the 100 m plate and ${K('fire')}. (Breathe out first; we'll get to breathing.)`, at: atT('T100'), label: '100 M', check: () => lev('hit:T100') > 0, say: 'BANG. That\'s Tannerite. Never gets old.' },
+      { text: () => `300 m: lase it (${K('lase')}) and dial to match (${K('dial')}). Now: ${fmtDist(zeroRange)}.`, at: atT('T300'), label: '300 M', check: () => TRAIN.lastLase > 270 && TRAIN.lastLase < 330 && zeroRange === 300 },
+      { text: () => 'Hit the 300 m plate.', at: atT('T300'), label: '300 M', check: () => lev('hit:T300') > 0 },
+      { text: () => `WHY IT MATTERS — leave the dial on ${fmtDist(300)} and shoot the 500 m plate anyway, aiming dead centre. Watch where it lands.`, at: atT('T500'), label: '500 M',
+        start: () => { zeroRange = 300; }, check: () => lev('shotAt:T500') > 0,
+        after: () => { const c = TRAIN.lastCall || {}, m = dropM(500, 300), m2 = dropM(1000, 300); radioSay('GRAVEL', `${c.hit ? 'Lucky — that clipped the bottom edge.' : (TRAIN.lastCallText || 'See that? Low.')} Dialled for 300, the bullet falls another ${m.toFixed(2)} m by 500 m (${(m / 500 * 1000).toFixed(1)} mils) — and ${m2.toFixed(1)} m by 1,000 m. That\'s why we dial.`, 10); } },
+      { text: () => `Now dial 500 m (${K('dial')}) and hit the 500 m plate. Dial: ${fmtDist(zeroRange)}.`, at: atT('T500'), label: '500 M', check: () => lev('hit:T500') > 0 },
+      { text: () => `800 m — on your own: lase, dial, centre, ${K('fire')}. Dial: ${fmtDist(zeroRange)}.`, at: atT('T800'), label: '800 M', check: () => lev('hit:T800') > 0, say: 'Eight hundred. You\'re officially dangerous.' },
+    ] },
+  { id: 'wind', name: 'WIND', intro: 'So far the air has been dead still. It never is. Wind pushes the bullet sideways — more the further it flies. I\'m switching the wind on.',
+    outro: 'Wind is the hard part. Even the pros miss on wind. Just miss less.',
+    steps: [
+      { text: () => `Wind: a strong 10 m/s from your LEFT (the arrow at the top shows it). Ask me for a wind call: ${K('radio')}.`, radio: true, start: () => setLessonWind(10, true),
+        check: () => lev('radio') > 0, after: () => { lastLase = { range: 1000, time: masking.time }; windCall(); } },
+      { text: () => { const w = windHold(1000); return `Hit the 1,000 m plate in the wind. Dial 1,000 m, then aim ${w.mils.toFixed(1)} mils to the ${w.side.toUpperCase()} of the plate's centre — use the black dots on the crosshair (1 dot = 1 mil). The bullet flies over a second, so the wind has time to push it. Dial: ${fmtDist(zeroRange)}.`; },
+        at: atT('T1000'), label: '1,000 M', check: () => lev('hit:T1000') > 0, say: 'Held it into the wind and it blew back on. Lovely.' },
+    ] },
+  { id: 'breath', name: 'BREATH CONTROL', intro: 'Notice the crosshair wandering? That\'s you breathing and your heart beating. Hold your breath and it settles — for a few seconds. Then you have to breathe.',
+    outro: 'Breathe, settle, shoot, breathe. Don\'t hold so long you start gasping.',
+    steps: [
+      { text: S => `Scope in and hold your breath: ${K('breath')}. Watch the sway almost stop. Watch the BREATH bar too — run out and you gasp. (${Math.min(1.5, S.h || 0).toFixed(1)} / 1.5 s)`,
+        start: S => { S.h = 0; setLessonWind(0); }, tick: (S, dt) => { if (scopeState.holding) S.h += dt; }, check: S => S.h > 1.5, say: 'Steady. Feel that? That\'s the shot.' },
+      { text: () => `Hit the 800 m plate on a held breath (${K('breath')} while you ${K('fire')}). Dial: ${fmtDist(zeroRange)}.`, at: atT('T800'), label: '800 M', check: () => lev('hitHeld:T800') > 0 },
+    ] },
+  { id: 'trigger', name: 'TRIGGER & FOLLOW-THROUGH', intro: 'Squeeze the trigger, don\'t yank it — one smooth press. Then STAY in the scope until the bullet lands. That\'s follow-through: you see the hit, or you see the miss and fix it.',
+    outro: 'Squeeze, stay, see. That\'s the rhythm.',
+    steps: [
+      { text: () => { const cal = CALIBERS['.408 CheyTac'], f = flightAt(cal, zeroAngle(cal, 1000), 1000); return `1,000 m. The bullet takes about ${f.t.toFixed(1)} s to get there. Lase, dial, breathe, one smooth ${K('fire')} — and stay scoped until it lands. Dial: ${fmtDist(zeroRange)}.`; },
+        at: atT('T1000'), label: '1,000 M', check: () => lev('hitFT:T1000') > 0, say: 'A kilometre. Most people never see that.' },
+    ] },
+  { id: 'lead', name: 'LEADING A MOVER', intro: 'Your bullet takes time to fly. If the target is walking, by the time the bullet gets there it has moved. So you aim where it WILL be. That\'s called leading.',
+    outro: 'Lead the mover, trust the maths. You\'ve just done the hardest shot on the course.',
+    steps: [
+      { text: () => { const l = lead('MOVER'); return `The MOVER (500 m, right of the line) walks back and forth at 1.5 m/s. Flight time is ${l.tof.toFixed(2)} s, so it moves about ${l.m.toFixed(1)} m — aim ${l.mils.toFixed(1)} mils IN FRONT of it, the way it's walking. Dial 500 m. Dial: ${fmtDist(zeroRange)}.`; },
+        at: atT('MOVER'), label: 'MOVER', start: () => { const t = lessonTarget('MOVER'); if (t) { t.up = true; t.autoReset = 3; } setLessonWind(0); }, check: () => lev('hit:MOVER') > 0 },
+    ] },
+  { id: 'rifles', name: 'CHEYTAC vs BARRETT', intro: 'Two big rifles. The CheyTac (.408) is the scalpel: flat, accurate, bolt-action — one shot, work the bolt. The Barrett (.50) is the sledgehammer: semi-auto, kills vehicles, but drops more and kicks hard.',
+    outro: 'People: CheyTac. Trucks, dishes and helicopters: Barrett. Pick the right tool.',
+    steps: [
+      { text: () => `Switch to the Barrett M107 (${KW(6)}). Same scope, same dial. Hit any plate at 800 m or further. It fires as fast as you click — the CheyTac makes you work the bolt.`, at: atT('T800'), label: '800 M',
+        check: () => ['T800', 'T1000', 'T1200'].some(id => lev('hitW6:' + id) > 0),
+        after: () => { const a = CALIBERS['.408 CheyTac'], b = CALIBERS['.50 BMG']; const fa = flightAt(a, 0, 1000), fb = flightAt(b, 0, 1000); radioSay('GRAVEL', `Numbers at 1,000 m: CheyTac drops ${(-fa.y).toFixed(1)} m in ${fa.t.toFixed(2)} s; Barrett drops ${(-fb.y).toFixed(1)} m in ${fb.t.toFixed(2)} s. Barrett hits harder and wrecks engines; CheyTac is flatter and quieter on the shoulder.`, 9); } },
+      { text: () => `Back to the CheyTac (${KW(7)}) for the qualifier.`, check: () => currentWeapon === 7 },
+    ] },
+  { id: 'qual', name: 'QUALIFIER', intro: 'Qualifier. Three plates: 300, 800 and 1,200 m. Ninety seconds. Light wind. Use everything.',
+    outro: 'Qualified. Wraith, you can shoot. Cold Horizon is next — the plates shoot back there.',
+    steps: [
+      { text: S => `QUALIFIER — hit 300 m ${S.h300 ? '☑' : '☐'} · 800 m ${S.h800 ? '☑' : '☐'} · 1,200 m ${S.h1200 ? '☑' : '☐'} in <b>${Math.max(0, Math.ceil(S.left))} s</b>. Wind 6 m/s from the left: ${K('radio')} for my call. Dial: ${fmtDist(zeroRange)}.`,
+        at: S => { const id = !S.h300 ? 'T300' : !S.h800 ? 'T800' : 'T1200'; return atT(id)(); }, label: 'NEXT PLATE', radio: true,
+        start: S => { S.left = 90; S.h300 = S.h800 = S.h1200 = 0; setLessonWind(6, true); },
+        tick: (S, dt) => {
+          if (lev('hit:T300')) S.h300 = 1; if (lev('hit:T800')) S.h800 = 1; if (lev('hit:T1200')) S.h1200 = 1;
+          if (lev('radio') > (S.radios || 0)) { S.radios = lev('radio'); windCall(); }
+          S.left -= dt;
+          if (S.left <= 0 && !(S.h300 && S.h800 && S.h1200)) { radioSay('GRAVEL', 'Time! Clock\'s reset — go again. Breathe.', 4); S.left = 90; S.h300 = S.h800 = S.h1200 = 0; TRAIN.ev = {}; S.radios = 0; S.fails = (S.fails || 0) + 1; }
+        }, check: S => S.h300 && S.h800 && S.h1200 },
+    ] },
+];
+function lessonObjective() {
+  const st = curStep(); if (!st || !st.at) return null;
+  const p = typeof st.at === 'function' ? st.at(TRAIN.S) : st.at;
+  return p ? { x: p.x, z: p.z, label: st.label || 'TARGET' } : null;
+}
 
 loadFigures();
 // Build the level once so it shows behind the briefing screen, then start the loop.
@@ -6475,7 +6741,7 @@ window.__game = {
   tick: (n, dt = 0.05) => { for (let i = 0; i < n; i++) { for (const e of enemies) updateEnemy(e, dt); updateStealth(dt); updateHUD(dt); } },
   spotterText: () => hud.spotter.textContent, alertText: () => hud.alertText.textContent, lastKillBody: () => lastKillBody,
   // v0.6 training / garrote hooks
-  training: () => TRAIN, STATIONS, skipStation, skipPressed, beginStation, popTargets: () => popTargets, trainRP: () => trainRP, garrote, garrotePress, updateGarrote, tryJump,
+  training: () => TRAIN, STATIONS, LESSON, lessonTargets: () => lessonTargets, lessonCall: () => TRAIN && TRAIN.lastCall, setLessonWind, windHold, lessonClear, lessonLead: id => lead(id), skipStation, skipPressed, beginStation, popTargets: () => popTargets, trainRP: () => trainRP, garrote, garrotePress, updateGarrote, tryJump,
   radioPressed, trainingOverview, teleportTo, curStep, trainGates: () => trainGates, obstacles: () => obstacles, chooseMission, currentWeapon: () => currentWeapon, aiming: () => aiming,
   aimAt: (x, y, z) => { const d = new THREE.Vector3(x, y, z).sub(camera.position); camera.rotation.set(Math.asin(THREE.MathUtils.clamp(d.y / d.length(), -1, 1)), Math.atan2(-d.x, -d.z), 0, 'YXZ'); },
   onPlayerShotNoise, nvMode: () => nvMode, lastShot: () => ({ lastShotSpot, repeatShots }), setZoom, weapon: () => WEAPONS[currentWeapon], zoomStep: () => zoomStep,
