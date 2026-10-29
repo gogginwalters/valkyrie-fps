@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>OPERATION: BLACK FILE — v0.5.3</title>
+<title>OPERATION: BLACK FILE — v0.6a</title>
 <link rel="icon" href="data:,">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <!--
@@ -148,6 +148,17 @@
   #tRange  { left: 16px; top: 165px; } #tElevUp { left: 16px; top: 239px; } #tElevDn { left: 16px; top: 313px; }
   #tBreath { left: 90px; top: 239px; }
   .m2only { display: none; }
+  .trainonly { display: none; }
+  /* v0.6 training: CHIEF's instruction box (top centre) + training buttons */
+  #trainBox { position: absolute; top: 66px; left: 50%; transform: translateX(-50%); width: min(660px, 66vw); font-size: 14px; line-height: 1.45;
+    text-align: center; display: none; border: 1px solid rgba(255,210,60,0.6); background: rgba(10,14,10,0.78); padding: 7px 12px; }
+  #trainBox b { color: #ffd23a; } #trainBox .tstep { color: #9a9; font-size: 12px; } #trainBox .tsmall { font-size: 11px; color: #8a8; margin-top: 4px; }
+  #tJump { right: 150px; bottom: 30px; width: 64px; height: 44px; font-size: 11px; }
+  #tGarrote { right: 300px; bottom: 270px; font-size: 10px; border-color: rgba(220,170,110,0.9); }
+  #tRadio { right: 128px; top: 110px; width: 48px; height: 48px; font-size: 10px; }
+  #tSkip { right: 184px; top: 110px; width: 52px; height: 48px; font-size: 10px; border-color: rgba(255,210,60,0.9); }
+  .missions { flex-wrap: wrap; }
+  #skipTrainBtn { margin: 8px 0 4px; padding: 6px 12px; font: inherit; font-size: 12px; background: #13200f; color: #cfc; border: 1px solid #4a4; cursor: pointer; touch-action: manipulation; }
 
   /* ---------- Full-screen menus (start / pause / end) ---------- */
   .screen { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
@@ -183,10 +194,12 @@
     <h1>OPERATION: BLACK FILE</h1>
     <h2 id="briefSub">TARGET: VALKYRIE</h2>
     <div class="missions">
-      <label id="m1Card"><input type="radio" name="mission" value="1" checked><b>MISSION 01 — BLACK FILE</b><br>Indoor raid on a Valkyrie facility. Close quarters, stealth.</label>
+      <label id="m0Card"><input type="radio" name="mission" value="0" checked><b>MISSION 00 — TRAINING</b><br>Camp Halyard: CHIEF teaches you everything. Every station can be skipped.</label>
+      <label id="m1Card"><input type="radio" name="mission" value="1"><b>MISSION 01 — BLACK FILE</b><br>Indoor raid on a Valkyrie facility. Close quarters, stealth.</label>
       <label id="m2Card"><input type="radio" name="mission" value="2"><b>MISSION 02 — COLD HORIZON</b><br>Outdoor long-range sniper mission. Ridge nest, 100–1,600 m.</label>
     </div>
     <button class="startBtn" id="startBtn">▶ CLICK OR TAP TO BEGIN MISSION</button>
+    <button id="skipTrainBtn">Skip training → go straight to Mission 01</button>
     <div id="briefText"></div>
     <div class="modes">
       <b>DAMAGE MODEL</b>
@@ -231,6 +244,10 @@
   <div class="tbtn" id="tLeanL">◁ LEAN</div>
   <div class="tbtn" id="tLeanR">LEAN ▷</div>
   <div class="tbtn" id="tDual">DUAL</div>
+  <div class="tbtn trainonly" id="tJump">JUMP</div>
+  <div class="tbtn" id="tGarrote">GARROTE<br>(hold)</div>
+  <div class="tbtn" id="tRadio">RADIO</div>
+  <div class="tbtn trainonly" id="tSkip">SKIP</div>
   <div class="tbtn m2only" id="tRange">RANGE</div>
   <div class="tbtn m2only" id="tElevUp">ELEV +</div>
   <div class="tbtn m2only" id="tElevDn">ELEV −</div>
@@ -270,6 +287,7 @@
   <div id="damageFlash"></div>
   <div id="damageDir"><div></div></div>
   <div class="panel" id="objectives"></div>
+  <div id="trainBox"></div>
   <div class="panel" id="modeTag"></div>
   <div class="panel" id="nvTag"></div>
   <div class="panel" id="windBox">WIND<br><span id="windArrow">↑</span><br><span id="windText"></span></div>
@@ -335,7 +353,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 // ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
 // ##  part failed and why.                                           ##
 // #####################################################################
-const VERSION = 'v0.5.3';
+const VERSION = 'v0.6a';
 // v0.4.4: the game must only ever start ONCE per page (one canvas, one camera, one loop).
 // If this script somehow ran a second time, stop the second copy right here.
 window.__valkyrieBoots = (window.__valkyrieBoots || 0) + 1;
@@ -554,6 +572,7 @@ const SETTINGS = {
 // ---- MISSION_OVERRIDES: settings that change for one mission only ----
 // Outdoors everything is bigger: guards see and hear much further.
 const MISSION_OVERRIDES = {
+  0: { fogFar: 300, maskingEnabled: false, ammoDropChance: 0, enemyDamage: 0, teammates: 2 },   // v0.6 training: nobody can hurt you
   1: {},
   2: { enemySightRange: 420, enemyHearingRange: 600, enemyAttackRange: 450, enemyAccuracy: 0.3, silencedAlertRadius: 40,
        alertShoutRadius: 40, searchDuration: 40, killWitnessRange: 150, bodySightRange: 110, shotErrorBase: 10,
@@ -579,6 +598,7 @@ const CALIBERS = {
   '7.62x51':      { energy: 3500,  damage: 110, dmgDecay: 600, decay: 97,  velocity: 830, drag: 0.25 }, // energy drops under 3000 J past ~15 m (pink-mist tuning)
   '.408 CheyTac': { energy: 11000, damage: 180, decay: 400, velocity: 900, drag: 0.10 },
   '.50 BMG':      { energy: 18000, damage: 250, decay: 500, velocity: 850, drag: 0.12 },
+  '12 gauge':     { energy: 2400,  damage: 22,  dmgDecay: 20, decay: 15,  velocity: 400, drag: 1.2  },   // per PELLET (8 pellets a shot)
 };
 
 // ---- HIT_ZONES: damage multipliers per body part (REALISTIC mode) ----
@@ -626,6 +646,10 @@ const WEAPONS = [
   { name: 'CheyTac M200 Intervention', caliber: '.408 CheyTac', model: 'sniper', magSize: 7, reserve: 21, fireDelay: 1.3, reloadTime: 3.0,
     arcadeDamage: 140, alwaysKills: true, automatic: false, spread: 0.0, zoomLevels: [6, 1.6], kick: 0.045, length: 1.2, sound: 1.9,
     color: 0x4a4d40, grip: 0x30322a, scope: true, boltAction: true, suppressed: false, canSuppress: false, projectile: true },
+  // v0.6: pump shotgun. 8 pellets per shot, brutal close up, weak past ~25 m. Also blows door hinges (breaching, v0.6b).
+  { name: 'Remington 870', caliber: '12 gauge', model: 'shotgun', magSize: 6, reserve: 30, fireDelay: 0.85, reloadTime: 2.6,
+    arcadeDamage: 18, pellets: 8, automatic: false, spread: 0.045, zoomLevels: [55], kick: 0.06, length: 0.9, sound: 1.8,
+    color: 0x2a2a2c, grip: 0x6a4424, pump: true, suppressed: false, canSuppress: false },
 ];
 
 // ---- QUIPS: one-liners from your narrator. Turn off with SETTINGS.quips = false. ----
@@ -689,9 +713,16 @@ const KNIFE_QUIPS = [
 //   8. Depot demolition — plant charges on a fuel/ammo depot, exfil before the blast.
 //   9. Final showdown  — corner The Conductor (and maybe unmask The Patron).
 const BRIEFINGS = {
+  0: `<p><b>CAMP HALYARD — NAVAL SPECIAL WARFARE TRAINING ANNEX.</b> Before anyone hands you a Black File, CHIEF wants to see you can walk, talk and shoot without hurting yourself. Or him.</p>
+    <ul><li><b>8 stations</b> in a row: movement · look · comms · live-fire range · sniper lane · weapons locker · knife · garrote.</li>
+    <li>CHIEF's box at the top of the screen tells you exactly what to press — worded for <b>your</b> device (Magic Keyboard + trackpad, mouse, or touch).</li>
+    <li>Follow the yellow <b>◆</b> on the compass and the yellow rings on the floor. Steel doors open as you finish each station.</li>
+    <li>Bored? <b>0 twice</b> (or SKIP twice) skips a station. Lost? <b>O</b> (or RADIO) and CHIEF repeats himself, loudly.</li>
+    <li>Nobody here can hurt you. Ammo is free. Role-players in red are <b>not</b> targets.</li></ul>
+    <p style="color:#8a8"><i>Coming in v0.6b: navigation maze, demolition range, breaching shoot house, final timed run.</i></p>`,
   1: `<p><b>Wraith,</b> VALKYRIE — a rogue breakaway faction of the Kantor Group mercenaries — runs a hardened facility out of an old bunker. Inside are files on their warlord, <b>THE CONDUCTOR</b>, and the Moscow money man behind him.</p>
     <ul><li>Infiltrate the Valkyrie facility.</li><li>Retrieve all <b>intel files</b> (glowing yellow folders).</li><li>Reach the <b>extraction elevator</b> (unlocks once the intel is secured).</li></ul>
-    <p>Stay hidden: crouch or go prone, shoot when a jet, artillery or the faulty generator covers the noise (your spotter will say <b>"Now!"</b>), then relocate. You start with a suppressed Colt M1911 — rumour says a <b>spare .45</b> is stashed in the <b>ARMORY</b>. This message will self-destruct.</p>
+    <p>Stay hidden: crouch or go prone, shoot when a jet, artillery or the faulty generator covers the noise (your spotter will say <b>"Now!"</b>), then relocate. You start with a suppressed Colt M1911 — rumour says a <b>spare .45</b> is stashed in the <b>ARMORY</b>. New kit: the <b>garrote</b> (hold <b>H</b> right behind an unaware guard — silent, no blood) and a <b>Remington 870</b> shotgun (key <b>9</b>, loud). This message will self-destruct.</p>
     <p><b>Getting around:</b> the yellow <b>◆</b> on the compass (top of the screen) points at your next objective. Each area looks different — red-brick <b>OFFICES</b>, grey <b>WAREHOUSE</b>, blue <b>COMMS</b>, caged <b>ARMORY</b>, bright <b>ELEVATOR LOBBY</b> — and wall signs + yellow floor arrows lead to the elevator. Press <b>M</b> (or MAP) for a map of everywhere you've been. Lost for a couple of minutes? HAWK or DOC will radio a hint.</p>`,
   2: `<p><b>OPERATION: COLD HORIZON.</b> <i>(The compass ◆ points at the next target.)</i> The Black File intel led us to a Valkyrie airfield in the mountains. The Conductor's section leaders are meeting there tonight — and a convoy is loading out.</p>
     <ul><li>You and your spotter <b>GRAVEL</b> are in a ridge nest about <b>1,150 m</b> north of the compound.</li>
@@ -811,8 +842,10 @@ function applyLighting() {
   if (!scene.background || !scene.background.isColor) scene.background = new THREE.Color(0x07080a);
   if (scene.environment) { scene.environment.dispose(); scene.environment = null; }
   hemiLight.color.set(0xc8d8ff); hemiLight.groundColor.set(0x302820);
-  hemiLight.intensity = SETTINGS.nightOps ? 0.03 : 0.55;
-  ambientLight.intensity = SETTINGS.nightOps ? 0.02 : 0.15;
+  scene.fog.near = SETTINGS.fogNear; scene.fog.far = SETTINGS.fogFar;            // v0.6: per mission (training is a big bright hall)
+  const bright = currentMission === 0;
+  hemiLight.intensity = SETTINGS.nightOps ? 0.03 : bright ? 1.0 : 0.55;
+  ambientLight.intensity = SETTINGS.nightOps ? 0.02 : bright ? 0.35 : 0.15;
   scene.background.set(SETTINGS.nightOps ? 0x020203 : 0x07080a);
   scene.fog.color.set(SETTINGS.nightOps ? 0x020203 : 0x07080a);
 }
@@ -1053,6 +1086,7 @@ function circleHitsWall(x, z, r) {
     for (let w = Math.floor((z - r) / CELL); w <= Math.floor((z + r) / CELL); w++)
       if (isWall(c, w)) return true;
   for (const p of props) if (Math.hypot(x - p.x, z - p.z) < r + p.r) return true;   // generator etc.
+  if (obstacleMover && obstacles.length && obstacleHit(x, z, r)) return true;       // v0.6 training hurdles / bars / nets (player only)
   return false;
 }
 // Move, but slide along walls instead of going through them (x and z checked separately).
@@ -1099,13 +1133,15 @@ function buildLevel() {
   wallMeshes = []; enemies = []; intelItems = []; pickups = []; effects = []; decals = []; exitZone = null;
   props = []; teammates = []; masking.generator = null; lastKillBody = null; lastShotSpot = null; repeatShots = 0;
   heightField = null; materiel = []; smokers.length = 0; projectiles.length = 0; sniperWater = null; lastLase = null;
+  obstacles = []; popTargets = []; trainGates = {}; lookPanels = []; trainMarker = null; trainRP = {};
   if (scene.environment) { scene.environment.dispose(); scene.environment = null; }
   if (currentMission === 2) { buildSniperMission(); return; }       // the outdoor sniper map (SECTION 15)
   applyLighting();
 
   // Copy the MAP into a grid. Pad short rows with walls so a typo can't crash the game.
-  const width = Math.max(...MAP.map(r => r.length));
-  grid = MAP.map((row, i) => {
+  const SRC = activeMap();                     // v0.6: the training camp has its own map
+  const width = Math.max(...SRC.map(r => r.length));
+  grid = SRC.map((row, i) => {
     if (row.length !== width) console.warn(`MAP row ${i} is ${row.length} long, expected ${width}. Padding with walls.`);
     return row.padEnd(width, '#').split('');
   });
@@ -1170,6 +1206,10 @@ function buildLevel() {
   for (let i = 0; i < SETTINGS.teammates; i++) {
     const a = playerStart.yaw + Math.PI + (i - 0.5) * 0.8;
     const spot = randomFloorNear(playerStart.x + Math.sin(a) * 1.5, playerStart.z + Math.cos(a) * 1.5, 0.5);
+    if (currentMission === 0) {                // training: HAWK and DOC wait for you in the comms room
+      const p = trainMateSpots[i] || trainMateSpots[0]; createTeammate(p.x, p.z, i === 0 ? 'HAWK' : 'DOC');
+      teammates[teammates.length - 1].hold = true; continue;
+    }
     createTeammate(spot.x, spot.z, i === 0 ? 'HAWK' : 'DOC');
   }
 
@@ -1184,11 +1224,12 @@ function buildLevel() {
   levelGroup.add(floor, ceiling); wallMeshes.push(floor, ceiling);
 
   // Ceiling lamps, spread out so they don't bunch together.
-  const lamps = [];
+  const lamps = currentMission === 0 ? trainingLamps() : [];
   // the lobby always gets its own bright light (it's the way out)
   for (let r = 0; r < rows && !lamps.length; r++) for (let c = 0; c < cols; c++) if (grid[r][c] === 'X') { lamps.push({ c, r }); break; }
+  if (currentMission === 0) lamps.length = Math.min(lamps.length, 99);   // training lamps are hand-placed
   for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-    if (grid[r][c] === '#' || lamps.length >= SETTINGS.maxLights) continue;
+    if (grid[r][c] === '#' || lamps.length >= SETTINGS.maxLights || currentMission === 0) continue;
     if (lamps.every(l => Math.abs(l.c - c) + Math.abs(l.r - r) >= 5)) lamps.push({ c, r });
   }
   const lampGeometry = new THREE.BoxGeometry(1.2, 0.08, 0.4);
@@ -1202,6 +1243,7 @@ function buildLevel() {
     levelGroup.add(lamp, light);
   }
   safe('zones', () => decorateZones());
+  if (currentMission === 0) safe('training', () => buildTraining());   // v0.6 stations, doors, targets, role-players
   finalizeTargets();
 }
 
@@ -1222,7 +1264,7 @@ const M1_ZONES = [
   { id: 'armory',    name: 'ARMORY',         c0: 0,  c1: 9,  r0: 11, r1: 16, color: '#c04040', light: 0xffc890, lightPower: 4 },
   { id: 'records',   name: 'RECORDS',        c0: 0,  c1: 22, r0: 0,  r1: 16, color: '#c8b898', light: 0xfff0d0, lightPower: 4 },
 ];
-function zoneAt(col, row) { return M1_ZONES.find(z => col >= z.c0 && col <= z.c1 && row >= z.r0 && row <= z.r1) || M1_ZONES[M1_ZONES.length - 1]; }
+function zoneAt(col, row) { const Z = activeZones(); return Z.find(z => col >= z.c0 && col <= z.c1 && row >= z.r0 && row <= z.r1) || Z[Z.length - 1]; }
 function zoneAtXZ(x, z) { return zoneAt(Math.floor(x / CELL), Math.floor(z / CELL)); }
 
 // ---- Zone textures (all drawn in code) ----
@@ -1393,19 +1435,24 @@ function decorateZones() {
     const k = toExit[r * cols + c]; if (k <= 0) continue;
     const open = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dc, dr]) => !isWall(c + dc, r + dr));
     const corner = open.length === 2 && (open[0][0] + open[1][0] !== 0 || open[0][1] + open[1][1] !== 0);
-    if (open.length < 3 && !corner && k % 4 !== 0) continue;
+    if (currentMission === 0) {                // training: arrows only on the approach to each station door
+      let nearGate = false;
+      for (let dr = -2; dr <= 2 && !nearGate; dr++) for (let dc = -2; dc <= 2; dc++) { const ch = (grid[r + dr] || [])[c + dc]; if (ch >= '1' && ch <= '8') { nearGate = true; break; } }
+      if (!nearGate) continue;
+    } else if (open.length < 3 && !corner && k % 4 !== 0) continue;
     const next = open.find(([dc, dr]) => toExit[(r + dr) * cols + c + dc] === k - 1); if (!next) continue;
-    const a = new THREE.Mesh(arrowGeo, arrowMaterial);
+    const a = new THREE.Mesh(arrowGeo, currentMission === 0 ? arrowMaterialGo : arrowMaterial);
     a.position.set(c * CELL + CELL / 2, 0.012, r * CELL + CELL / 2); a.rotation.y = Math.atan2(-next[0], -next[1]);
     levelGroup.add(a);
     // At junctions, a wall sign "ELEVATOR ->" on a side wall, arrow pointing the right way for someone facing it.
-    if (open.length >= 3) {
+    if (open.length >= 3 && currentMission !== 0) {
       for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
         if (!isWall(c + dc, r + dr)) continue;
         const dot = dc * next[0] + dr * next[1]; if (dot !== 0) continue;       // the go-direction runs along this wall
         // facing the wall (looking along +(dc,dr)), your right-hand side is (-dr, dc)
         const right = (-dr * next[0] + dc * next[1]) > 0;
-        onWallFace(makeSign(right ? 'ELEVATOR  →' : '←  ELEVATOR', 1.5, 0.36, '#0a2a10', '#7dff8c'), c, r, c + dc, r + dr, 2.35);
+        const word = currentMission === 0 ? 'NEXT STATION' : 'ELEVATOR';
+        onWallFace(makeSign(right ? word + '  →' : '←  ' + word, 1.5, 0.36, '#0a2a10', '#7dff8c'), c, r, c + dc, r + dr, 2.35);
         break;
       }
     }
@@ -1426,8 +1473,9 @@ function decorateZones() {
   // 5) Landmarks: big zone banners + a few one-of-a-kind set pieces.
   const banners = { offices: ['VALKYRIE', '#7a0d0d', '#f0d8a0'], warehouse: ['LOADING BAY 3', '#202020', '#f0c020'], comms: ['NETWORK CORE', '#0a1a30', '#58b0ff'],
     power: ['DANGER · HIGH VOLTAGE', '#e0b020', '#111'], armory: ['ARMORY · AUTHORISED ONLY', '#401010', '#ff8080'], records: ['ARCHIVES', '#3a2a18', '#e8d8b0'] };
-  for (const z of M1_ZONES) {
-    if (!banners[z.id]) continue;
+  for (const z of activeZones()) {
+    const bn = z.banner || banners[z.id];
+    if (!bn) continue;
     // the open square nearest the zone's centre that has a wall to its north or south
     const mc = (z.c0 + Math.min(z.c1, cols - 1)) / 2, mr = (z.r0 + Math.min(z.r1, rows - 1)) / 2; let best = null, bd = 1e9;
     for (let r = z.r0; r <= Math.min(z.r1, rows - 1); r++) for (let c = z.c0; c <= Math.min(z.c1, cols - 1); c++) {
@@ -1435,7 +1483,7 @@ function decorateZones() {
       const wall = [[0, -1], [0, 1], [1, 0], [-1, 0]].find(([dc, dr]) => isWall(c + dc, r + dr)); if (!wall) continue;
       const d = Math.hypot(c - mc, r - mr); if (d < bd) { bd = d; best = [c, r, wall]; }
     }
-    if (best) { const [b0, b1, b2] = banners[z.id]; onWallFace(makeSign(b0, 3.0, 1.1, b1, b2, false), best[0], best[1], best[0] + best[2][0], best[1] + best[2][1], 1.75); }
+    if (best) { const [b0, b1, b2] = bn; onWallFace(makeSign(b0, 3.0, 1.1, b1, b2, false), best[0], best[1], best[0] + best[2][0], best[1] + best[2][1], 1.75); }
   }
   // The comms "network core": a glowing pillar in the biggest comms room.
   for (const [c, r] of [[15, 3], [13, 3]]) if (!isWall(c, r) && zoneAt(c, r).id === 'comms') {
@@ -1445,7 +1493,7 @@ function decorateZones() {
     levelGroup.add(core); props.push({ x: core.position.x, z: core.position.z, r: 0.6 }); break;
   }
   // A yellow forklift in the warehouse.
-  for (const [c, r] of [[9, 7], [10, 7]]) if (!isWall(c, r)) {
+  for (const [c, r] of [[9, 7], [10, 7]]) if (currentMission !== 0 && !isWall(c, r)) {
     const f = new THREE.Group(); f.position.set(c * CELL + CELL / 2 + 0.8, 0, r * CELL + CELL / 2 - 0.6); f.rotation.y = 0.6;
     box(1.1, 0.9, 1.8, propMat.yellow, 0, 0.6, 0, f); box(1.0, 0.08, 0.9, propMat.dark, 0, 2.0, -0.2, f);
     for (const x of [-0.5, 0.5]) box(0.06, 1.9, 0.06, propMat.dark, x, 1.05, 0.4, f), box(0.06, 2.2, 0.06, propMat.dark, x * 0.6, 1.1, 1.0, f);
@@ -1459,7 +1507,7 @@ function decorateZones() {
     box(2.5, 0.2, 0.08, propMat.dark, 0, 2.7, 0, doors);
     const lamp = box(0.3, 0.12, 0.06, new THREE.MeshBasicMaterial({ color: 0xff3030 }), 0, 2.95, 0.02, doors);
     onWallFace(doors, ex, ez, ex + dc, ez + dr, 0);
-    onWallFace(makeSign('EXTRACTION ELEVATOR', 2.4, 0.4, '#04140a', '#40ff70'), ex, ez, ex + dc, ez + dr, 3.25);
+    onWallFace(makeSign(currentMission === 0 ? 'GRADUATION' : 'EXTRACTION ELEVATOR', 2.4, 0.4, '#04140a', '#40ff70'), ex, ez, ex + dc, ez + dr, 3.25);
     exitZone.doorLamp = lamp; break;
   }
   // The way into the lobby: the open square next to the lobby that's outside it.
@@ -1506,7 +1554,8 @@ document.addEventListener('keydown', e => {
   if (e.code === 'KeyM' && (state === 'playing' || state === 'map')) { e.preventDefault(); if (!e.repeat) state === 'map' ? closeMap() : openMap(); return; }
   if (state === 'map') { e.preventDefault(); return; }                // map open: the game is frozen
   if ((state === 'won' || state === 'lost') && !e.repeat && performance.now() - endShownAt > 700) {           // MISSION COMPLETE / FAILED screen
-    if (e.code === 'Enter' || e.code === 'Space' || e.code === 'KeyR') { e.preventDefault(); startMission(); }
+    if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); continueOrRestart(); }
+    else if (e.code === 'KeyR') { e.preventDefault(); startMission(); }
     else if (e.code === 'KeyB') { e.preventDefault(); $('menuBtn').click(); }
     return;
   }
@@ -1522,8 +1571,12 @@ document.addEventListener('keydown', e => {
   if (ELEV_UP.includes(e.code) && (!arrow || sniperInHand)) dialElevation(1);
   if (ELEV_DOWN.includes(e.code) && (!arrow || sniperInHand)) dialElevation(-1);
   if (e.code === 'KeyQ') aimPress(true);
-  if (e.code === 'Comma') switchWeapon((currentWeapon + WEAPONS.length - 1) % WEAPONS.length);
-  if (e.code === 'Period') switchWeapon((currentWeapon + 1) % WEAPONS.length);
+  if (e.code === 'Comma') cycleWeapon(-1);
+  if (e.code === 'Period') cycleWeapon(1);
+  if (e.code === 'Space') tryJump();                         // v0.6
+  if (e.code === 'KeyH') garrotePress();                     // v0.6: HOLD H behind an unaware guard
+  if (e.code === 'KeyO') radioPressed();                     // v0.6: radio CHIEF / ask HAWK for a hint / ask GRAVEL for wind
+  if (e.code === 'Digit0') skipPressed();                    // v0.6 training: 0 twice = skip this station
   if (e.code === 'KeyF') laseRange();
   if (e.code === 'KeyV') safe('knife', knifeAttack);
   if (e.code === 'KeyR') startReload();
@@ -1536,7 +1589,7 @@ document.addEventListener('keydown', e => {
   if (e.code === 'KeyX') toggleDual();
   if (e.code.startsWith('Digit')) {               // number keys switch weapons
     const n = parseInt(e.code.slice(5), 10) - 1;
-    if (n >= 0 && n < WEAPONS.length) switchWeapon(n);
+    if (n >= 0 && n < WEAPONS.length && weaponOwned(n)) switchWeapon(n);
   }
 });
 document.addEventListener('keyup', e => { keys[e.code] = false; if (state === 'playing') e.preventDefault(); });
@@ -1548,7 +1601,7 @@ function setStance(s) { player.stance = s; }
 function resetPlayer() {
   player.health = SETTINGS.playerMaxHealth;
   player.velocity.set(0, 0, 0);
-  player.stance = 'stand'; player.eyeY = SETTINGS.eyeHeight;
+  player.stance = 'stand'; player.eyeY = SETTINGS.eyeHeight; player.jumpY = 0; player.jumpV = 0;
   player.kills = player.shotsFired = player.shotsHit = player.headshots = 0;
   player.startTime = performance.now();
   lean.off.set(0, 0, 0); lean.amt = 0; lean.dist = 0;
@@ -1611,6 +1664,7 @@ function updatePlayer(dt) {
   // (While scoped, Shift holds your breath instead of sprinting.)
   const sprinting = (keys.ShiftLeft || keys.ShiftRight || touch.sprint) && len > 0 && !(aiming && WEAPONS[currentWeapon].scope);
   if (sprinting && player.stance !== 'stand') player.stance = 'stand';    // sprinting stands you up
+  player.sprinting = sprinting;
   const stanceMult = player.stance === 'prone' ? SETTINGS.proneSpeedMult : player.stance === 'crouch' ? SETTINGS.crouchSpeedMult : 1;
   const speed = SETTINGS.playerSpeed * (sprinting ? SETTINGS.sprintMultiplier : 1) * (aiming ? 0.6 : 1) * amount * stanceMult;
   const targetX = len ? (mx / len) * speed : 0, targetZ = len ? (mz / len) * speed : 0;
@@ -1619,14 +1673,18 @@ function updatePlayer(dt) {
   const smooth = 1 - Math.exp(-12 * dt);
   player.velocity.x += (targetX - player.velocity.x) * smooth;
   player.velocity.z += (targetZ - player.velocity.z) * smooth;
+  if (garrote.active) player.velocity.set(0, 0, 0);       // v0.6: rooted while the garrote is on
+  obstacleMover = true;                                      // training hurdles only block YOU
   moveWithCollision(camera.position, player.velocity.x * dt, player.velocity.z * dt, SETTINGS.playerRadius);
+  obstacleMover = false;
+  updateJump(dt);
 
   // Head bob
   const moving = Math.hypot(player.velocity.x, player.velocity.z);
   player.bobTime += dt * moving * 1.8;
   const eyeTarget = player.stance === 'prone' ? SETTINGS.proneEyeHeight : player.stance === 'crouch' ? SETTINGS.crouchEyeHeight : SETTINGS.eyeHeight;
   player.eyeY += (eyeTarget - player.eyeY) * Math.min(1, dt * 8);       // smoothly duck / get up
-  camera.position.y = groundAt(camera.position.x, camera.position.z) + player.eyeY + Math.sin(player.bobTime) * SETTINGS.headBob * Math.min(moving / 5, 1);
+  camera.position.y = groundAt(camera.position.x, camera.position.z) + player.eyeY + player.jumpY + Math.sin(player.bobTime) * SETTINGS.headBob * Math.min(moving / 5, 1);
   applyLean(dt);
 }
 
@@ -1760,6 +1818,18 @@ function buildGunModel(w) {
     box(0.1, 0.11, 0.12, glove, 0, -0.13, 0.06, 0.35);         // trigger hand
     box(0.11, 0.08, 0.12, glove, -0.02, -0.07, -0.2 - hg / 2); // support hand
     muzzleZ = -0.2 - hg - bl; muzzleY = 0.012; suppR = 0.032;
+  } else if (w.model === 'shotgun') {                          // v0.6 pump shotgun
+    box(0.075, 0.09, 0.3, metal, 0, 0, -0.05);                 // receiver
+    tube(0.019, 0.62, black, 0, 0.025, -0.5);                  // barrel
+    tube(0.016, 0.5, black, 0, -0.02, -0.44);                  // magazine tube
+    const pump = box(0.07, 0.07, 0.2, furniture, 0, -0.02, -0.38); // the pump (slides when you rack it)
+    box(0.012, 0.02, 0.012, black, 0, 0.05, -0.8);             // bead sight
+    box(0.06, 0.12, 0.08, furniture, 0, -0.1, 0.07, 0.4);      // grip
+    box(0.07, 0.12, 0.32, furniture, 0, -0.04, 0.27);          // stock
+    box(0.1, 0.11, 0.12, glove, 0, -0.13, 0.07, 0.4);
+    box(0.11, 0.08, 0.12, glove, -0.02, -0.07, -0.38);
+    g.userData.pump = pump;
+    muzzleZ = -0.81; muzzleY = 0.025; suppR = 0.03;
   } else {                                                     // 'sniper'
     const bl = w.length * 0.55;
     box(0.09, 0.12, 0.42, metal, 0, 0, -0.05);                 // receiver
@@ -1785,7 +1855,7 @@ function buildGunModel(w) {
   const flash = new THREE.Mesh(new THREE.OctahedronGeometry(0.05 + w.length * 0.05),
     new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0.95 }));
   flash.visible = false; g.add(flash);
-  g.userData = { flash, suppressor, muzzleZ, muzzleY, supLen };
+  g.userData = { flash, suppressor, muzzleZ, muzzleY, supLen, pump: g.userData.pump };
   g.visible = false;
   return g;
 }
@@ -1817,7 +1887,7 @@ function toggleSuppressor() {
   showMessage(w.suppressed ? 'Suppressor ON — quieter, slightly weaker' : 'Suppressor OFF — loud, full power', 1.5);
 }
 function switchWeapon(n) {
-  if (n === currentWeapon) return;
+  if (n === currentWeapon || !weaponOwned(n) || garrote.active) return;
   currentWeapon = n; reloadTimer = 0; switchTimer = 0.3; fireCooldown = 0.3; boltTimer = 0; setZoom(0);
   weaponModels.forEach((m, i) => (m.visible = i === n));
   showMessage(displayName(WEAPONS[n]) + '  [' + WEAPONS[n].caliber + ']', 1.2);
@@ -1826,7 +1896,7 @@ function startReload() {
   const w = WEAPONS[currentWeapon], s = weaponState[currentWeapon];
   if (reloadTimer > 0 || s.ammo >= magSizeOf(currentWeapon) || s.reserve === 0) return;
   reloadTimer = w.reloadTime * (dualActive() ? SETTINGS.dualReloadMult : 1);
-  SOUNDS.reload(reloadTimer);
+  SOUNDS.reload(reloadTimer); trainEvent('reload');
 }
 
 document.addEventListener('mousedown', e => {
@@ -1912,14 +1982,14 @@ window.addEventListener('wheel', e => {
   const now = performance.now();
   if (Math.abs(scrollAccum) > 60 && now - lastScrollSwitch > 250) {
     const dir = scrollAccum > 0 ? 1 : -1;
-    switchWeapon((currentWeapon + dir + WEAPONS.length) % WEAPONS.length);
+    cycleWeapon(dir);
     scrollAccum = 0; lastScrollSwitch = now;
   }
 }, { passive: false });
 
 function tryShoot() {
   const w = WEAPONS[currentWeapon], s = weaponState[currentWeapon];
-  if (reloadTimer > 0 || fireCooldown > 0 || switchTimer > 0) return;
+  if (reloadTimer > 0 || fireCooldown > 0 || switchTimer > 0 || garrote.active) return;
   if (!w.automatic && !pressPending) return;       // semi-auto: one shot per press, never on hold
   pressPending = false; triggerReleased = false;
   shotQueued = 0;                                  // this press has been used
@@ -1936,7 +2006,8 @@ function tryShoot() {
     fireCooldown = w.fireDelay * 0.5; dual.recoil[String(side)] = recoil; dual.flash[String(side)] = 0.05; recoil *= 0.3; flashTimer = 0;
   }
   if (w.suppressed) SOUNDS.suppressedShot(); else SOUNDS.gunshot(w.sound);
-  if (w.boltAction) { boltTimer = 0.9; SOUNDS.bolt(); }
+  if (w.boltAction || w.pump) { boltTimer = 0.9; SOUNDS.bolt(); }
+  trainEvent('shot', currentWeapon); if (akimbo) trainEvent('dualShot');
 
   // NOISE: who hears this shot, and how well they can tell where it came from
   // (see SECTION 9b: shot localization, and 9c: sound masking).
@@ -1949,7 +2020,9 @@ function tryShoot() {
   // BUG FIX v0.4.1: spread used to be added in *screen* units x20, which threw shots up to
   // ~2 degrees off the crosshair (a head 8 m away was missed most of the time). Now 'spread'
   // is a real angle in radians: the bullet leaves within that cone around the crosshair.
-  const spreadRad = akimbo ? w.spread * SETTINGS.dualSpreadMult : aiming ? w.spread * 0.4 : w.spread;
+  let countedHit = false;
+  for (let pellet = 0; pellet < (w.pellets || 1); pellet++) {   // v0.6: a shotgun fires 8 pellets, each its own ray
+  const spreadRad = akimbo ? w.spread * SETTINGS.dualSpreadMult : aiming ? w.spread * (w.pellets ? 0.8 : 0.4) : w.spread;
   const shotDir = aimDirection();
   if (spreadRad > 0) {
     const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * spreadRad;
@@ -1959,8 +2032,9 @@ function tryShoot() {
   }
   raycaster.set(camera.position, shotDir);
   raycaster.far = (heightField ? 600 : 150) * (w.suppressed ? SETTINGS.suppressorRangeMult : 1);
+  if (w.pellets) raycaster.far = 60;
   raycaster.far = groundHitDistance(raycaster.ray.origin, raycaster.ray.direction, raycaster.far);   // hillsides stop bullets
-  const targets = wallMeshes.concat(...enemies.filter(e => e.state !== 'dead').map(e => e.hitMeshes.filter(m => m.visible)),
+  const targets = wallMeshes.concat(popTargetMeshes(), ...enemies.filter(e => e.state !== 'dead').map(e => e.hitMeshes.filter(m => m.visible)),
     ...teammates.map(m => m.meshes || []));                // v0.4.4: your own squad stops bullets (no damage)
   const hits = raycaster.intersectObjects(targets, false);
   pointBlankHits(raycaster.ray, hits);          // muzzle already touching a guard? still counts
@@ -1972,11 +2046,15 @@ function tryShoot() {
   lastShotRay = { o: raycaster.ray.origin.toArray(), d: raycaster.ray.direction.toArray(), far: raycaster.far, hits: hits.slice(0, 4).map(h => (h.object.userData.enemy ? 'E:' + h.object.userData.zone : 'W') + '@' + h.distance.toFixed(2)) };
   // Walk through everything the ray touched, nearest first. Most guns stop at the
   // first thing; guns with 'penetration' (Barrett) punch through that many walls/guards.
-  let throughLeft = w.penetration || 0, power = 1, countedHit = false;
+  let throughLeft = w.penetration || 0, power = 1;
   const alreadyHit = new Set();
   for (const hit of hits) {
     const enemy = hit.object.userData.enemy;
     if (hit.object.userData.teammate) { friendlyHit(hit.object.userData.teammate); break; }
+    if (hit.object.userData.popTarget) {                 // v0.6 training steel
+      if (!countedHit) { player.shotsHit++; countedHit = true; }
+      hitPopTarget(hit.object.userData.popTarget, hit.object.userData.zone, w, hit.point); break;
+    }
     if (enemy) {
       if (alreadyHit.has(enemy) || enemy.state === 'dead') continue;   // same guard, another body part
       alreadyHit.add(enemy);
@@ -1985,7 +2063,7 @@ function tryShoot() {
       let zone = hit.object.userData.zone;
       if (!zone) { const h = hit.point.y - enemy.group.position.y; zone = h > 1.7 ? 'head' : h > 0.95 ? 'torso' : 'limb'; }
       lastHit = { zone, distance: hit.distance };
-      shootEnemy(enemy, w, zone, hit.distance, hit.point, power);
+      shootEnemy(enemy, w, zone, hit.distance, hit.point, power * (w.pellets ? THREE.MathUtils.clamp(1 - hit.distance / 40, 0.15, 1) : 1));
     } else if (hit.object.userData.materiel) {
       hitMateriel(hit.object.userData.materiel, hit.object.userData.part, w, hit.point, power);
       break;
@@ -2000,6 +2078,7 @@ function tryShoot() {
     if (throughLeft <= 0) break;
     throughLeft--; power *= 0.6;          // loses 40% power each time it punches through
   }
+  }                                       // (end of the pellet loop)
   applyKick(w);
 }
 // A ray that STARTS inside a box can't "see" that box (it only hits faces from outside),
@@ -2051,6 +2130,11 @@ function headExplodes(weapon, distance, power = 1) {
 }
 
 function shootEnemy(e, weapon, zone, distance, point, power = 1) {
+  if (e.dummy || e.roleplayer) {          // v0.6 training: dummies and role-players take no damage from live rounds
+    e.hitFlash = 0.12; spawnParticles(point, 0x888888, 5, 2, 0.04); SOUNDS.hit();
+    if (e.roleplayer && currentMission === 0) { radioSay('CHIEF', 'CEASE FIRE! That\'s a role-player, not a target. Simunitions only, and you don\'t have any.', 4); alertEnemy(e, true); }
+    return;
+  }
   let damage = bulletDamage(weapon, zone, distance, power);
   let popHead = false;
   if (zone === 'head') {
@@ -2138,7 +2222,16 @@ function knifeAttack() {
     return;
   }
   const e = t.e, chest = e.group.position.clone(); chest.y += 1.3;
+  if (e.dummy) {                          // v0.6 training dummy: thwack, no fight
+    SOUNDS.knifeHit(); e.hitFlash = 0.12; spawnParticles(chest, 0xc8b080, 8, 2, 0.04); flashHitmarker(false); trainEvent('knifeDummy'); return;
+  }
+  if (currentMission === 0 && (e === trainRP.g1 || e === trainRP.g2)) { showMessage('Garrote station — put the knife away and ' + plain(K('garrote')) + '.', 2); return; }
+  if (e.roleplayer && !isBehindUnaware(e)) {   // role-player from the front: he blocks it and shouts
+    SOUNDS.knifeHit(); alertEnemy(e, true); flashHitmarker(false);
+    radioSay('CHIEF', 'From the FRONT? He saw that coming a mile off. Get BEHIND him.', 4); return;
+  }
   if (isBehindUnaware(e)) {
+    if (e.roleplayer) trainEvent('rpKnife');
     // SILENT TAKEDOWN: instant, no alarm, no gunshot noise.
     e.health = 0; e.hitFlash = 0.12;
     if (SETTINGS.gore) spawnParticles(chest, 0x8a0000, 10, 1.5, 0.04);
@@ -2556,6 +2649,7 @@ function killEnemy(e, poppedHead = false, opts = {}) {
   spotterKillCall(e, info);
   witnessKill(e);              // did another guard see that?
   if (opts.knife) { sayQuip(KNIFE_QUIPS, 0); SOUNDS.takedown(); }
+  else if (opts.garrote) { sayQuip(GARROTE_QUIPS, 0); playNoise(0.3, 0.05, 500); }   // v0.6: silent, no blood
   else { quipForKill(poppedHead); SOUNDS.enemyDeath(volumeAt(e.group.position.x, e.group.position.z)); }
   if (Math.random() < SETTINGS.ammoDropChance) createPickup(e.group.position.x + 0.5, e.group.position.z + 0.3, 'ammo');
 }
@@ -2592,6 +2686,7 @@ function enemyTracer(e, to) {
   effects.push({ obj: line, life: 0.06, max: 0.06 });
 }
 function enemyShoot(e, dist) {
+  if (e.roleplayer || e.dummy) { e.fireCooldown = 1; return; }   // v0.6: role-players only point fingers
   e.fireCooldown = SETTINGS.enemyFireDelay * (0.7 + Math.random() * 0.6);
   let chance = SETTINGS.enemyAccuracy * THREE.MathUtils.clamp(1 - dist / (SETTINGS.enemyAttackRange * 1.5), 0.25, 1);
   if (Math.hypot(player.velocity.x, player.velocity.z) > SETTINGS.playerSpeed * 1.2) chance *= 0.7; // sprinting helps
@@ -2640,6 +2735,14 @@ function updateEnemy(e, dt) {
   e.hitFlash -= dt;
   e.materials.forEach(m => m.emissive && m.emissive.setRGB(e.hitFlash > 0 ? 0.8 : 0, 0, 0));
   e.flashTimer -= dt; e.flash.visible = e.flashTimer > 0;
+  // v0.6: the training dummy just stands there; a garroted guard is held by you (SECTION 8d).
+  if (e.dummy || e.garroted) {
+    if (e.garroted) e.staggerTimer = 0.3;
+    e.legL.rotation.x = e.legR.rotation.x = 0; e.group.rotation.y = e.yaw;
+    pos.y = groundAt(pos.x, pos.z) + e.baseY;
+    if (e.fig) animateGuard(e, dt, false, 0);
+    return;
+  }
 
   const px = camera.position.x, pz = camera.position.z;
   const dx = px - pos.x, dz = pz - pos.z, dist = Math.max(Math.hypot(dx, dz), 0.001);
@@ -2798,6 +2901,7 @@ function alertEnemy(e, instant = false) {
   e.lastKnown = { x: camera.position.x, z: camera.position.z };
   SOUNDS.alert(volumeAt(e.group.position.x, e.group.position.z));
   // Shout to nearby friends: they come and search where you were seen.
+  if (e.roleplayer) return;                       // v0.6 training: role-players only spoil their own drill
   for (const o of enemies) {
     if (o !== e && rankOf(o) >= 0 && rankOf(o) < 2 &&
         o.group.position.distanceTo(e.group.position) < SETTINGS.alertShoutRadius) startSearch(o, e.lastKnown.x, e.lastKnown.z, 5);
@@ -3178,7 +3282,8 @@ function updateTeammates(dt) {
     const d = dist2D(pos.x, pos.z, camera.position.x, camera.position.z);
     let move = { x: 0, z: 0 };
     const followDist = SETTINGS.teammateFollowDistance + i * 1.5;
-    if (state === 'playing' && d > followDist) move = steerTo(m, camera.position.x, camera.position.z, dt);
+    if (m.hold) turnToward(m, Math.atan2(camera.position.x - pos.x, camera.position.z - pos.z), dt, 3);   // v0.6 training: wait in the comms room
+    else if (state === 'playing' && d > followDist) move = steerTo(m, camera.position.x, camera.position.z, dt);
     else {
       // Stopped: face the same way you're looking.
       const look = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ').y + Math.PI;
@@ -3451,12 +3556,13 @@ function updateObjectives(dt, time) {
     if (!exitZone.unlocked && allIntelCollected()) {
       exitZone.unlocked = true;
       if (currentMission === 2) showMessage('ALL TARGETS DOWN — exfil to the LZ behind the ridge (green beam)!', 5);
+      if (currentMission === 0) radioSay('CHIEF', 'That\'s every station. Graduation pad is green. Walk onto it before I find another drill.', 6);
       exitZone.padMat.color.set(0x30ff60); exitZone.beamMat.color.set(0x30ff60);
     }
     exitZone.beamMat.opacity = 0.12 + Math.sin(time * 4) * 0.05;
     if (Math.hypot(exitZone.x - px, exitZone.z - pz) < exitZone.radius) {
       if (exitZone.unlocked) endGame(true);
-      else if (time - exitZone.warned > 3) { exitZone.warned = time; showMessage(currentMission === 2 ? 'LZ not ready — finish the objectives first.' : 'Elevator LOCKED — retrieve all intel first.', 2.5); }
+      else if (time - exitZone.warned > 3) { exitZone.warned = time; showMessage(currentMission === 0 ? 'Graduation LOCKED — finish (or skip) every station first.' : currentMission === 2 ? 'LZ not ready — finish the objectives first.' : 'Elevator LOCKED — retrieve all intel first.', 2.5); }
     }
   }
 }
@@ -3533,14 +3639,15 @@ function updateHUD(dt) {
   // Objective checklist
   let html = '<h3>MISSION OBJECTIVES</h3>';
   const ready = allIntelCollected();
-  if (currentMission === 2) {
+  if (currentMission === 0) html = trainingObjectivesHTML();
+  else if (currentMission === 2) {
     for (const o of sniperObjectives()) html += `<div class="${o.done ? 'done' : ''}">${o.done ? '☑' : '☐'} ${o.text}</div>`;
     html += `<div class="${ready ? '' : 'locked'}">${ready ? '☐ Exfil to the LZ behind the ridge' : '🔒 Exfil LZ (finish the list first)'}</div>`;
   } else {
     for (const item of intelItems) html += `<div class="${item.collected ? 'done' : ''}">${item.collected ? '☑' : '☐'} Retrieve: ${item.name}</div>`;
     html += `<div class="${ready ? '' : 'locked'}">${ready ? '☐ Reach the extraction elevator' : '🔒 Extraction elevator (locked)'}</div>`;
   }
-  html += `<div style="margin-top:6px;color:#8a8">Guards down: ${player.kills} / ${enemies.length}</div>`;
+  if (currentMission !== 0) html += `<div style="margin-top:6px;color:#8a8">Guards down: ${player.kills} / ${enemies.length}</div>`;
   if (hud.objectives.innerHTML !== html) hud.objectives.innerHTML = html;
   hud.modeTag.textContent = (SETTINGS.realisticMode ? 'REALISTIC BALLISTICS' : 'ARCADE') + (SETTINGS.oneShotOneKill ? ' · ONE SHOT ONE KILL' : '') + (SETTINGS.gore ? '' : ' · GORE OFF');
   // Fading effects
@@ -3767,7 +3874,11 @@ touchButton('tAim', () => {                       // tap to toggle aim (2-step s
 touchButton('tReload', () => startReload());
 touchButton('tSupp', () => toggleSuppressor());
 touchButton('tKnife', () => safe('knife', knifeAttack));
-touchButton('tWeapon', () => switchWeapon((currentWeapon + 1) % WEAPONS.length));
+touchButton('tWeapon', () => cycleWeapon(1));
+touchButton('tJump', () => tryJump());
+touchButton('tGarrote', () => { touch.garrote = true; garrotePress(); }, () => { touch.garrote = false; });
+touchButton('tRadio', () => radioPressed());
+touchButton('tSkip', () => skipPressed());
 touchButton('tPause', () => pauseGame('Paused'));
 touchButton('tStance', () => setStance({ stand: 'crouch', crouch: 'prone', prone: 'stand' }[player.stance]));
 touchButton('tNV', () => cycleNightVision());
@@ -4420,6 +4531,7 @@ function sniperObjectives() {
   ];
 }
 function objectivesComplete() {
+  if (currentMission === 0) return trainingDoneAll();
   if (currentMission === 2) return sniperObjectives().every(o => o.done || o.bonus);
   return intelItems.every(i => i.collected);
 }
@@ -4580,6 +4692,7 @@ function checkProjectileSegment(p, a, b) {
   const mid = a.clone().lerp(b, 0.5), cands = [];
   for (const m of wallMeshes) { const wp = m.userData.wpos; if (!wp || wp.distanceTo(mid) < m.userData.wrad + len) cands.push(m); }
   for (const e of enemies) if (e.state !== 'dead' && !p.hitSet.has(e) && e.group.position.distanceTo(mid) < len + 4) for (const m of e.hitMeshes) if (m.visible) cands.push(m);
+  if (popTargets.length) cands.push(...popTargetMeshes());          // v0.6 training steel
   if (!cands.length) return;
   bulletRay.set(a, seg); bulletRay.far = len; bulletRay.near = 0;
   for (const hit of bulletRay.intersectObjects(cands, false)) {
@@ -4591,6 +4704,8 @@ function checkProjectileSegment(p, a, b) {
       if (p.done || p.pen-- <= 0) { p.done = true; p.pos.copy(hit.point); return; }
       p.power *= 0.6; continue;
     }
+    const pt = hit.object.userData.popTarget;
+    if (pt) { p.what = p.what || 'steel target'; p.done = true; p.pos.copy(hit.point); player.shotsHit++; hitPopTarget(pt, hit.object.userData.zone, null, hit.point); return; }
     const mat = hit.object.userData.materiel;
     if (mat) { p.what = p.what || 'vehicle/target'; p.done = true; p.pos.copy(hit.point); projectileHitMateriel(p, mat, hit); return; }
     if (!p.what) p.what = 'wall/building';
@@ -4661,7 +4776,7 @@ function laseRange() {
   const dir = camera.getWorldDirection(new THREE.Vector3()), o = camera.position;
   let best = Infinity;
   bulletRay.set(o, dir); bulletRay.near = 0.5; bulletRay.far = SETTINGS.rangefinderMax;
-  const targets = wallMeshes.concat(...enemies.filter(e => e.state !== 'dead').map(e => e.hitMeshes));
+  const targets = wallMeshes.concat(popTargetMeshes(), ...enemies.filter(e => e.state !== 'dead').map(e => e.hitMeshes));
   const hit = bulletRay.intersectObjects(targets, false)[0];
   if (hit) best = hit.distance;
   if (heightField) for (let d = 2; d < Math.min(best, SETTINGS.rangefinderMax); d += 1.5) {
@@ -4669,7 +4784,7 @@ function laseRange() {
   }
   playTone(2600, 2600, 0.06, 0.1, 'sine'); playTone(3400, 3400, 0.06, 0.1, 'sine', 0.08);
   if (best === Infinity) { showMessage('RANGE ---- (no return)', 1.5); lastLase = null; return null; }
-  lastLase = { range: best, time: masking.time };
+  lastLase = { range: best, time: masking.time }; trainEvent('lase', best);
   showMessage('RANGE ' + fmtDist(best), 2);
   if (currentMission === 2) spotterRangeCall(best);
   return best;
@@ -4897,7 +5012,7 @@ function addKillFeed(text) {
     div.style.opacity = 0; setTimeout(() => div.remove(), 600); }, 7000);
   fade();
 }
-const ZONE_WORDS = { head: 'headshot', torso: 'body shot', limb: 'limb shot', explosion: 'explosion', knife: 'knife takedown', knifeFront: 'knife' };
+const ZONE_WORDS = { head: 'headshot', torso: 'body shot', limb: 'limb shot', explosion: 'explosion', knife: 'knife takedown', knifeFront: 'knife', garrote: 'garrote' };
 
 // #####################################################################
 // ##  SECTION 18: X-RAY KILL CAM  (SETTINGS.xrayCam)                 ##
@@ -5095,8 +5210,12 @@ const CONTROLS = [
     ['Shift', 'sprint · while scoped: hold breath'],
     ['Q', 'aim / scope (same as 2-finger click) · dual pistols: fire the LEFT gun'],
     ['V', 'knife (from behind = silent takedown)'],
+    ['H (hold)', 'garrote — right behind an unaware guard, hold ~2 s: silent, no blood (let go early = he breaks free)'],
+    ['Space', 'jump (and stand up from crouch / prone)'],
+    ['O', 'radio: CHIEF repeats the instruction (training) · HAWK/DOC hint (Black File) · GRAVEL wind call (Cold Horizon)'],
+    ['0 (twice)', 'training only: skip this station'],
     ['R', 'reload'],
-    ['1 – 8', 'pick weapon'],
+    ['1 – 9', 'pick weapon (9 = Remington 870 shotgun)'],
     [', and .', 'previous / next weapon'],
     ['T', 'suppressor on / off'],
     ['Tab / E (hold)', 'lean / peek left / right (stops at walls)'],
@@ -5170,6 +5289,7 @@ function playerDistances() {
 }
 // The thing the compass points at.
 function currentObjective() {
+  if (currentMission === 0) return trainingObjective();
   if (currentMission === 1) {
     const left = intelItems.filter(i => !i.collected);
     if (left.length) {
@@ -5221,13 +5341,14 @@ function drawCompass() {
 }
 // Remember where you've been (for the map), and what you've seen.
 function updateNavigation(dt) {
-  if (currentMission !== 1 || !navInfo) return;
+  if (currentMission === 2 || !navInfo) return;
   const [c, r] = cellOf(camera.position.x, camera.position.z);
   for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
     const cc = c + dc, rr = r + dr; if (cc < 0 || rr < 0 || cc >= worldCols || rr >= worldRows) continue;
     navInfo.visited[rr * worldCols + cc] = 1;
   }
   navInfo.zonesSeen.add(zoneAt(c, r).id);
+  if (currentMission === 0) return;                // training: CHIEF does the talking
   if (!navInfo.exitSeen && exitZone && dist2D(exitZone.x, exitZone.z, camera.position.x, camera.position.z) < 16 && hasLineOfSight(camera.position.x, camera.position.z, exitZone.x, exitZone.z)) {
     navInfo.exitSeen = true; showMessage('Extraction elevator spotted — it\'s on your map (M).', 2.5);
   }
@@ -5257,7 +5378,8 @@ function giveHint() {
 let mapOpenedAt = 0;
 function openMap() {
   if (state !== 'playing') return;
-  if (currentMission !== 1 || !navInfo) { showMessage('No floor plan for an outdoor op — follow the yellow ◆ on the compass.', 2.5); return; }
+  if (currentMission === 2 || !navInfo) { showMessage('No floor plan for an outdoor op — follow the yellow ◆ on the compass.', 2.5); return; }
+  trainEvent('mapOpen');
   releaseInputs(); state = 'map'; mapOpenedAt = performance.now();
   $('mapScreen').style.display = 'flex'; drawMap();
 }
@@ -5280,7 +5402,7 @@ function drawMap() {
   }
   // zone names (once you've been in that zone)
   g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `bold ${Math.max(9, px * 0.32)}px "Courier New", monospace`;
-  for (const z of M1_ZONES) {
+  for (const z of activeZones()) {
     if (!navInfo.zonesSeen.has(z.id)) continue;
     let sx = 0, sy = 0, n = 0;
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) if (!isWall(c, r) && zoneAt(c, r) === z && seen(c, r)) { sx += c; sy += r; n++; }
@@ -5301,7 +5423,8 @@ function drawMap() {
   const h = headingNow(), x = camera.position.x / CELL * px, y = camera.position.z / CELL * px, L = px * 0.42;
   g.save(); g.translate(x, y); g.rotate(h); g.fillStyle = '#ffe23a';
   g.beginPath(); g.moveTo(0, -L); g.lineTo(L * 0.6, L * 0.6); g.lineTo(0, L * 0.25); g.lineTo(-L * 0.6, L * 0.6); g.closePath(); g.fill(); g.restore();
-  $('mapTitle').textContent = 'FACILITY MAP — ' + (zoneAt(...cellOf(camera.position.x, camera.position.z)).name) + '   ·   ' + intelItems.filter(i => i.collected).length + '/' + intelItems.length + ' intel';
+  $('mapTitle').textContent = (currentMission === 0 ? 'CAMP HALYARD — ' + zoneAt(...cellOf(camera.position.x, camera.position.z)).name + '   ·   ' + TRAIN.done.filter(Boolean).length + '/' + STATIONS.length + ' stations'
+    : 'FACILITY MAP — ' + (zoneAt(...cellOf(camera.position.x, camera.position.z)).name) + '   ·   ' + intelItems.filter(i => i.collected).length + '/' + intelItems.length + ' intel');
 }
 $('mapScreen').addEventListener('click', () => { if (performance.now() - mapOpenedAt > 250) closeMap(); });
 $('mapScreen').addEventListener('touchend', e => { e.preventDefault(); if (performance.now() - mapOpenedAt > 250) closeMap(); }, { passive: false });
@@ -5375,10 +5498,10 @@ function lockMouse() {
     const p = req.call(el); if (p && p.catch) p.catch(() => {});
   } catch (err) { /* ignore */ }
 }
-function releaseInputs() { mouseDown = false; touch.fire = false; touch.leanL = touch.leanR = false; pressPending = false; setZoom(0); for (const k in keys) keys[k] = false; }
+function releaseInputs() { mouseDown = false; touch.fire = false; touch.leanL = touch.leanR = false; touch.garrote = false; pressPending = false; setZoom(0); for (const k in keys) keys[k] = false; }
 function pauseGame(text) {
   if (state !== 'playing') return;
-  state = 'paused'; releaseInputs();
+  state = 'paused'; releaseInputs(); trainEvent('paused');
   $('pauseText').textContent = text + ' — click or tap to resume.';
   $('pauseScreen').style.display = 'flex';
   safeUnlock();
@@ -5412,20 +5535,22 @@ function applyMission(m) {
   weaponScene.children[0].intensity = outdoors ? 1.6 : 0.7;          // brighter gun under the outdoor tone mapping
   camera.near = outdoors ? 0.1 : 0.05; camera.far = outdoors ? SETTINGS.viewDistance : 200; camera.updateProjectionMatrix();
   document.querySelectorAll('.m2only').forEach(el => (el.style.display = outdoors ? 'flex' : 'none'));
-  $('m1Card').classList.toggle('sel', m === 1); $('m2Card').classList.toggle('sel', m === 2);
+  document.querySelectorAll('.trainonly').forEach(el => (el.style.display = m === 0 ? 'flex' : 'none'));
+  $('trainBox').style.display = m === 0 ? 'block' : 'none';
+  for (const k of [0, 1, 2]) $('m' + k + 'Card').classList.toggle('sel', m === k);
   $('briefText').innerHTML = BRIEFINGS[m];
 }
 // v0.4.6 (iPad fix): the chosen mission lives in a variable, not only in the radio button,
 // because on some iPads tapping the mission card never ticked its radio (always Mission 1).
 let chosenMission = 1;
-const MISSION_NAMES = { 1: 'BLACK FILE', 2: 'COLD HORIZON' };
+const MISSION_NAMES = { 0: 'TRAINING', 1: 'BLACK FILE', 2: 'COLD HORIZON' };
 function selectedMission() { return chosenMission; }
 function chooseMission(m, rebuild = true) {
-  m = m === 2 ? 2 : 1;
+  m = m === 2 ? 2 : m === 0 ? 0 : 1;
   const changed = m !== chosenMission;
   chosenMission = m;
   document.querySelectorAll('input[name="mission"]').forEach(r => (r.checked = +r.value === m));
-  $('m1Card').classList.toggle('sel', m === 1); $('m2Card').classList.toggle('sel', m === 2);
+  for (const k of [0, 1, 2]) $('m' + k + 'Card').classList.toggle('sel', m === k);
   $('startBtn').textContent = '▶ START: ' + MISSION_NAMES[m];
   if (changed && rebuild && state === 'start') {
     applyMission(m); buildLevel(); resetPlayer(); resetWeapons(); resetMasking(); missionStartPose();
@@ -5465,7 +5590,10 @@ function startMission() {
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   window.scrollTo(0, 0); fitRenderer(true);   // so Space/Enter can't "press" the start button again
   state = 'playing';
-  showMessage(currentMission === 2 ? 'Operation COLD HORIZON. Lase (F), dial ([ ] or ↑ ↓), breathe (Shift), send it.' : 'Mission start. Find the intel. Your squad (green ▼ HAWK, DOC) follows you — guards are deeper in. (V = knife)', 3);
+  safe('start:training', () => { garrote.active = false; garrote.anim = 0; if (currentMission === 0) resetTraining(); });
+  showMessage(currentMission === 0 ? 'Welcome to CAMP HALYARD. Read CHIEF\'s box at the top. Follow the yellow ◆ and the floor rings.'
+    : currentMission === 2 ? 'Operation COLD HORIZON. Lase (F), dial ([ ] or ↑ ↓), breathe (Shift), send it.' : 'Mission start. Find the intel. Your squad (green ▼ HAWK, DOC) follows you — guards are deeper in. (V = knife, hold H = garrote)', 3.5);
+  if (currentMission === 0) setTimeout(() => { if (state === 'playing' && currentMission === 0 && TRAIN && !TRAIN.begun) beginStation(); }, 600);
   if (cameFromTouch()) touch.active = true;   // started with a tap: show the touch buttons
   else lockMouse();                           // started with a click: capture mouse/trackpad
 }
@@ -5485,15 +5613,20 @@ function endGame(won) {
   safeUnlock();
   const secs = Math.round((performance.now() - player.startTime) / 1000);
   const acc = player.shotsFired ? Math.round(player.shotsHit / player.shotsFired * 100) : 0;
-  $('endTitle').textContent = won ? 'MISSION COMPLETE' : 'MISSION FAILED';
+  $('endTitle').textContent = won ? (currentMission === 0 ? 'TRAINING COMPLETE' : 'MISSION COMPLETE') : 'MISSION FAILED';
   $('endTitle').style.color = won ? '#7f7' : '#f66';
-  $('endSubtitle').textContent = won ? (currentMission === 2 ? 'Exfil complete. The Conductor just lost an airfield.' : 'Extraction successful. Good work, Agent.')
+  $('endSubtitle').textContent = won ? (currentMission === 0 ? 'CHIEF: "Congratulations, Wraith. You are now marginally less likely to die. Black File is waiting."' : currentMission === 2 ? 'Exfil complete. The Conductor just lost an airfield.' : 'Extraction successful. Good work, Agent.')
     : (currentMission === 2 ? 'Wraith down. Gravel is going to be insufferable about this.' : 'Agent down. The intel is lost.');
-  const objLine = currentMission === 2
+  if (won && currentMission === 0) { try { localStorage.setItem('valkyrieTrainingDone', '1'); } catch (err) {} }
+  const objLine = currentMission === 0
+    ? 'Stations: ' + TRAIN.done.filter(Boolean).length + ' / ' + STATIONS.length + (TRAIN.skipped.some(Boolean) ? ' (skipped: ' + STATIONS.filter((s, i) => TRAIN.skipped[i]).map(s => s.name).join(', ') + ')' : ' — none skipped')
+      + '<br><b>Press Enter (or tap CONTINUE) for MISSION 01 — BLACK FILE</b> · R = run training again'
+    : currentMission === 2
     ? sniperObjectives().map(o => (o.done ? '☑ ' : '☐ ') + o.text).join('<br>')
     : `Intel recovered: ${intelItems.filter(i => i.collected).length} / ${intelItems.length}`;
   $('endStats').innerHTML = `Time: ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}<br>
     Guards neutralised: ${player.kills} / ${enemies.length}<br>Accuracy: ${acc}% &nbsp; Headshots: ${player.headshots}<br>${objLine}`;
+  $('restartBtn').textContent = won && currentMission === 0 ? '▶ CONTINUE: MISSION 01 — BLACK FILE (Enter)' : '↻ CLICK / TAP TO RESTART MISSION (Enter)';
   $('endScreen').style.display = 'flex';
   safe('end:sound', () => (won ? SOUNDS.win() : SOUNDS.lose()));
 }
@@ -5507,17 +5640,28 @@ $('optQuality').value = SETTINGS.graphicsQuality;
 // Picking a mission shows its briefing and builds it behind the start screen.
 document.querySelectorAll('input[name="mission"]').forEach(r => r.addEventListener('change', () => { if (r.checked) chooseMission(+r.value); }));
 // Tapping / clicking anywhere on a mission card picks it (pointer, touch AND click, whichever arrives).
-for (const [id, m] of [['m1Card', 1], ['m2Card', 2]]) for (const ev of ['pointerup', 'touchend', 'click'])
+for (const [id, m] of [['m0Card', 0], ['m1Card', 1], ['m2Card', 2]]) for (const ev of ['pointerup', 'touchend', 'click'])
   $(id).addEventListener(ev, () => { noteInput('mission card ' + m + ' (' + ev + ')'); chooseMission(m); });
 // A link can pick the mission: ...?mission=2  or  ...#m2
 {
-  const q = new URLSearchParams(location.search).get('mission'), h = (location.hash || '').toLowerCase();
-  const want = q === '2' || h === '#m2' || h === '#mission2' ? 2 : 1;
-  chosenMission = 0; chooseMission(want, false);     // the level itself is built once, below
+  // v0.6: ...?mission=0 (or =training) = Training, =1 = Black File, =2 = Cold Horizon. The LAST mission= wins.
+  // No choice in the link: Training first, until you've finished it once (then Black File).
+  const all = [...location.search.matchAll(/mission=([a-z0-9]+)/gi)], q = all.length ? all[all.length - 1][1].toLowerCase() : null, h = (location.hash || '').toLowerCase();
+  let done = false; try { done = !!localStorage.getItem('valkyrieTrainingDone'); } catch (err) {}
+  const want = q === '2' || h === '#m2' || h === '#mission2' ? 2 : q === '1' || h === '#m1' || h === '#mission1' ? 1
+    : q === '0' || q === 'training' || h === '#m0' || h === '#training' ? 0 : done ? 1 : 0;
+  chosenMission = -1; chooseMission(want, false);     // the level itself is built once, below
 }
 $('menuBtn').addEventListener('click', () => { $('endScreen').style.display = 'none'; $('startScreen').style.display = 'flex'; hud.root.style.display = 'none'; state = 'start'; });
 $('startBtn').addEventListener('click', startMission);
-$('restartBtn').addEventListener('click', startMission);
+$('restartBtn').addEventListener('click', continueOrRestart);
+// After training: CONTINUE goes on to Black File. Otherwise it replays the same mission.
+function continueOrRestart() {
+  if (state === 'won' && currentMission === 0) { chooseMission(1, false); lastStartAt = -1e9; }
+  startMission();
+}
+$('skipTrainBtn').addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); noteInput('skip training'); chooseMission(1); startMission(); });
+$('skipTrainBtn').addEventListener('touchend', e => { e.preventDefault(); e.stopPropagation(); $('skipTrainBtn').click(); }, { passive: false });
 for (const id of ['restartBtn', 'menuBtn']) $(id).addEventListener('touchend', e => { e.preventDefault(); $(id).click(); }, { passive: false });
 $('pauseScreen').addEventListener('click', resumeGame);
 let lockedSince = 0;   // when pointer lock last really started (0 = not locked)
@@ -5574,8 +5718,10 @@ function gameLoop() {
     debugInfo.updates++;
     // Each part in its own safety net: one crash can't freeze the guards, bullets, HUD...
     safe('edgeTurn', () => edgeTurn(dt));
-    safe('player', () => updatePlayer(dt));
+    if (!trainOverview) safe('player', () => updatePlayer(dt));
     safe('weapon', () => updateWeapon(dt));
+    safe('garrote', () => updateGarrote(dt));
+    safe('training', () => updateTraining(dt));
     safe('wind', () => updateWind(dt));
     safe('projectiles', () => updateProjectiles(dt));
     for (const e of enemies) safe('enemies', () => updateEnemy(e, dt));
@@ -5602,7 +5748,7 @@ function gameLoop() {
     renderer.clear();
     renderer.render(scene, camera);
     renderer.clearDepth();
-    renderer.render(weaponScene, weaponCamera);
+    if (!trainOverview) renderer.render(weaponScene, weaponCamera);
   });
 }
 function nearestMateText() {
@@ -5657,6 +5803,642 @@ function underCrosshair() {
   return (live ? (e.state === 'dead' ? 'dead guard ' : 'guard (' + e.state + ') ') : 'GHOST guard (not in game!) ') + h.distance.toFixed(1) + ' m';
 }
 
+// #####################################################################
+// ##  SECTION 18: TRAINING MISSION — CAMP HALYARD (v0.6a)            ##
+// ##  Mission 0. Stations in a row, each with steps; CHIEF tells you ##
+// ##  what to do (worded for your device) and checks you did it.     ##
+// ##  Stations: see STATIONS below. 0 twice = skip a station.        ##
+// #####################################################################
+// #####################################################################
+// ##  SECTION 19: MISSION 00 — TRAINING, CAMP HALYARD (v0.6)         ##
+// ##  A guided course at a (made-up) Naval Special Warfare training  ##
+// ##  annex. CHIEF talks you through 8 stations in order; each one   ##
+// ##  opens the door to the next. Every station can be skipped       ##
+// ##  (press 0 twice, or SKIP twice on touch). The map below works   ##
+// ##  like the Mission 1 MAP; digits 1-8 are the station doors.      ##
+// ##    #  wall   .  floor   P  start   X  graduation pad           ##
+// ##    1-8  station doors (open when that station is done/skipped) ##
+// #####################################################################
+const TRAIN_MAP = [
+  "########################################################",
+  "#P........#.......#.......#............................#",
+  "#.........#.......#.......#............................#",
+  "#########.#.......2.......3............................#",
+  "#.........#.......#.......#............................#",
+  "#.#########.......#.......#............................#",
+  "#.........1.......#.......#............................#",
+  "#####################################################4##",
+  "#......................................................#",
+  "#......................................................#",
+  "######################################################5#",
+  "#.......................#.........#.........#..........#",
+  "#.......................#.........#.........#..........#",
+  "#.......................#.........#.........#..........#",
+  "#.......................#.........#.........#..........#",
+  "#..X....................8.........7.........6..........#",
+  "#.......................#.........#.........#..........#",
+  "#.......................#.........#.........#..........#",
+  "#.......................#.........#.........#..........#",
+  "#.......................#.........#.........#..........#",
+  "#.......................#.........#.........#..........#",
+  "########################################################"
+
+];
+// Each station area (map rectangles, like M1_ZONES). First match wins.
+const TRAIN_ZONES = [
+  { id: 't_move',    name: 'STATION 1 · MOVEMENT',       c0: 0,  c1: 10, r0: 0,  r1: 6,  color: '#ffd23a', band: '#e0b020', light: 0xffffff, lightPower: 6, banner: ['MOVE · SPRINT · JUMP · CRAWL · LEAN', '#1a1a1a', '#ffd23a'] },
+  { id: 't_look',    name: 'STATION 2 · LOOK',           c0: 11, c1: 18, r0: 0,  r1: 6,  color: '#6fd0ff', band: '#2a8ad0', light: 0xf4fbff, lightPower: 6, banner: ['EYES UP, WRAITH', '#0a2030', '#6fd0ff'] },
+  { id: 't_comms',   name: 'STATION 3 · COMMS',          c0: 19, c1: 26, r0: 0,  r1: 6,  color: '#7dff8c', band: '#30a050', light: 0xf4fff4, lightPower: 6, banner: ['TALK · LISTEN · DON\'T SHOOT HAWK', '#08200e', '#7dff8c'] },
+  { id: 't_range',   name: 'STATION 4 · RANGE',          c0: 27, c1: 55, r0: 0,  r1: 7,  color: '#ff8a5a', band: '#d05020', light: 0xffffff, lightPower: 7, banner: ['LIVE FIRE · EARS ON · MUZZLE DOWNRANGE', '#2a0e06', '#ff8a5a'] },
+  { id: 't_lane',    name: 'STATION 5 · SNIPER LANE',    c0: 0,  c1: 55, r0: 8,  r1: 10, color: '#c8a0ff', band: '#7a50c0', light: 0xf8f4ff, lightPower: 7, banner: ['LONG RANGE · 50 · 100 · 200 M', '#180a2a', '#c8a0ff'] },
+  { id: 't_locker',  name: 'STATION 6 · WEAPONS LOCKER', c0: 44, c1: 55, r0: 11, r1: 21, color: '#ff6060', band: '#b02828', light: 0xffffff, lightPower: 6, banner: ['WEAPONS LOCKER · TRY EVERYTHING', '#2a0808', '#ff8080'] },
+  { id: 't_knife',   name: 'STATION 7 · KNIFE',          c0: 34, c1: 43, r0: 11, r1: 21, color: '#e8e8e8', band: '#808890', light: 0xffffff, lightPower: 6, banner: ['STEEL · SILENCE · BEHIND', '#202428', '#e8e8e8'] },
+  { id: 't_garrote', name: 'STATION 8 · GARROTE',        c0: 24, c1: 33, r0: 11, r1: 21, color: '#d89a50', band: '#8a5a20', light: 0xfff4e8, lightPower: 6, banner: ['PIANO WIRE · TWO HANDLES · NO NOISE', '#2a1a08', '#e8b070'] },
+  { id: 't_grad',    name: 'GRADUATION',                 c0: 0,  c1: 23, r0: 11, r1: 21, color: '#40ff70', band: '#20a040', light: 0xffffff, lightPower: 7, banner: ['CAMP HALYARD · GRADUATION', '#04200a', '#60ff80'] },
+];
+// Clean training-facility look: pale painted blockwork with a coloured band per station, grey epoxy floor.
+function trainWallTexture(band, seed) {
+  return makeCanvasTexture(256, (ctx, s) => {
+    const r = makeRandom(seed); ctx.fillStyle = '#d6d9dc'; ctx.fillRect(0, 0, s, s); addNoise(ctx, s, r, 1500, 0.05);
+    ctx.strokeStyle = 'rgba(90,96,104,0.35)'; ctx.lineWidth = 2;
+    for (let y = 0; y <= s; y += 32) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(s, y); ctx.stroke();
+      for (let x = (y / 32) % 2 ? 32 : 0; x < s; x += 64) { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + 32); ctx.stroke(); } }
+    ctx.fillStyle = band; ctx.fillRect(0, s * 0.62, s, s * 0.09);
+    ctx.fillStyle = '#3c4046'; ctx.fillRect(0, s * 0.9, s, s * 0.1);
+  });
+}
+const trainFloorTexture = makeCanvasTexture(128, (ctx, s) => { const r = makeRandom(31); ctx.fillStyle = '#8a8f94'; ctx.fillRect(0, 0, s, s); addNoise(ctx, s, r, 2000, 0.08);
+  ctx.strokeStyle = 'rgba(40,44,48,0.25)'; ctx.lineWidth = 2; ctx.strokeRect(1, 1, s - 2, s - 2); });
+const trainMatTexture = makeCanvasTexture(128, (ctx, s) => { ctx.fillStyle = '#2a4a8a'; ctx.fillRect(0, 0, s, s); ctx.strokeStyle = '#1a3060'; ctx.lineWidth = 4; ctx.strokeRect(2, 2, s - 4, s - 4); });
+TRAIN_ZONES.forEach((z, i) => {
+  zoneMat[z.id] = { wall: new THREE.MeshStandardMaterial({ map: trainWallTexture(z.band, 50 + i), roughness: 0.75 }),
+    floor: new THREE.MeshStandardMaterial({ map: z.id === 't_knife' || z.id === 't_garrote' ? trainMatTexture : z.id === 't_locker' ? zoneTex.steelPlate : trainFloorTexture, roughness: 0.6, metalness: z.id === 't_locker' ? 0.4 : 0.05 }) };
+  ZONE_PROPS[z.id] = [];
+});
+function activeZones() { return currentMission === 0 ? TRAIN_ZONES : M1_ZONES; }
+function activeMap() { return currentMission === 0 ? TRAIN_MAP : MAP; }
+
+// ---- Device-aware prompts: the same instruction, worded for how you're playing ----
+// 'touch' = on-screen buttons · 'ipad' = Magic Keyboard + trackpad (no pointer capture) · 'desktop' = mouse
+function devKind() { return touch.active ? 'touch' : pointerLockSupported ? 'desktop' : 'ipad'; }
+const PROMPTS = {
+  move: ['the left thumb stick', 'W A S D'], sprint: ['push the stick past its ring', 'hold Shift while moving'],
+  look: ['drag your right thumb', 'slide one finger on the trackpad (push into the screen edge to keep turning · two-finger swipe or ← → turn too)', 'move the mouse (← → also turn)'],
+  fire: ['FIRE', 'click the trackpad', 'left-click'], hold: ['hold FIRE', 'hold the trackpad click down', 'hold the left button'],
+  aim: ['AIM', 'two-finger click (or Q)', 'right-click (or Q)'], zoom: ['AIM again', 'two-finger swipe up / down (or Q again)', 'the mouse wheel (or Q again)'],
+  jump: ['JUMP', 'Space'], crouch: ['STANCE', 'C'], prone: ['STANCE twice', 'Z'], stand: ['STANCE', 'C or Z again'],
+  leanL: ['hold ◁ LEAN', 'hold Tab'], leanR: ['hold LEAN ▷', 'hold E'], knife: ['KNIFE', 'V'], garrote: ['hold GARROTE', 'hold H'],
+  radio: ['RADIO', 'O'], map: ['MAP', 'M'], reload: ['RELOAD', 'R'], pause: ['II (top right)', 'P'], lase: ['RANGE', 'F'],
+  dial: ['ELEV + / ELEV −', '[ and ] (or ↑ ↓)'], breath: ['hold BREATH', 'hold Shift'], skip: ['SKIP twice', '0 twice'], dual: ['DUAL', 'X'],
+  swap: ['GUN ▸', '1–9, or , and .', '1–9, , and . or the mouse wheel'],
+};
+function K(k) { const p = PROMPTS[k] || [k], d = devKind(); return '<b>' + (d === 'touch' ? p[0] : d === 'ipad' ? p[1] || p[0] : p[2] || p[1] || p[0]) + '</b>'; }
+function KW(n) { return devKind() === 'touch' ? '<b>GUN ▸</b> until the ' + WEAPONS[n].name : '<b>' + (n + 1) + '</b>'; }
+// ---- Training world pieces: doors, obstacles, steel targets, markers ----
+const TP = (c, r) => ({ x: c * CELL + CELL / 2, z: r * CELL + CELL / 2 });
+let trainGates = {}, obstacles = [], popTargets = [], trainMarker = null, lookPanels = [];
+let obstacleMover = false, obstacleBlocked = null, obstacleMsgAt = -1e9;
+const stripeTexture = makeCanvasTexture(64, (ctx, s) => { for (let i = -s; i < s * 2; i += 16) { ctx.fillStyle = '#f0c020'; ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i + 8, 0); ctx.lineTo(i + 8 + s, s); ctx.lineTo(i + s, s); ctx.fill(); }
+  ctx.globalCompositeOperation = 'destination-over'; ctx.fillStyle = '#151515'; ctx.fillRect(0, 0, s, s); });
+const trainMats = {
+  door: new THREE.MeshStandardMaterial({ color: 0x9aa2aa, roughness: 0.35, metalness: 0.8 }), stripe: new THREE.MeshStandardMaterial({ map: stripeTexture, roughness: 0.6 }),
+  steel: new THREE.MeshStandardMaterial({ color: 0xb8bcc0, roughness: 0.35, metalness: 0.7 }), head: new THREE.MeshStandardMaterial({ color: 0xd0d4d8, roughness: 0.3, metalness: 0.7 }),
+  post: new THREE.MeshStandardMaterial({ color: 0x2a2c30, roughness: 0.6 }), hostage: new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.6 }),
+  marker: new THREE.MeshBasicMaterial({ color: 0xffd23a, transparent: true, opacity: 0.75, side: THREE.DoubleSide, depthWrite: false }),
+  column: new THREE.MeshBasicMaterial({ color: 0xffd23a, transparent: true, opacity: 0.12, side: THREE.DoubleSide, depthWrite: false }),
+  panelOff: new THREE.MeshBasicMaterial({ color: 0x30343a }), panelOn: new THREE.MeshBasicMaterial({ color: 0xff3030 }), panelDone: new THREE.MeshBasicMaterial({ color: 0x30ff60 }),
+  net: new THREE.MeshStandardMaterial({ color: 0x3a4a2a, roughness: 0.9, transparent: true, opacity: 0.85, side: THREE.DoubleSide }),
+  mat: new THREE.MeshStandardMaterial({ color: 0x3a3f2a, roughness: 1 }), wood: new THREE.MeshStandardMaterial({ color: 0x8a5a30, roughness: 0.7 }),
+};
+// A station door: a striped steel roller door in the doorway. Opens (rolls up) when its station is done.
+function createGate(ch, c, r) {
+  const along = isWall(c - 1, r) && isWall(c + 1, r);        // the wall runs east-west -> door spans x
+  const { x, z } = TP(c, r), H = SETTINGS.wallHeight;
+  const g = new THREE.Group(); g.position.set(x, 0, z); if (!along) g.rotation.y = Math.PI / 2;
+  const door = new THREE.Mesh(new THREE.BoxGeometry(CELL, H, 0.25), trainMats.door); door.position.y = H / 2; g.add(door);
+  for (const y of [0.25, H - 0.25]) { const s = new THREE.Mesh(new THREE.BoxGeometry(CELL, 0.3, 0.27), trainMats.stripe); s.position.y = y; door.add(s); s.position.y = y - H / 2; }
+  const sign = makeSign('STATION ' + ch + ' ▸ LOCKED', 2.2, 0.4, '#200808', '#ff6060'); sign.position.set(0, 1.7 - H / 2, 0.14); door.add(sign);
+  const back = makeSign('STATION ' + ch, 2.2, 0.4, '#200808', '#ff6060'); back.position.set(0, 1.7 - H / 2, -0.14); back.rotation.y = Math.PI; door.add(back);
+  levelGroup.add(g); wallMeshes.push(door);
+  solid[r * worldCols + c] = 1;
+  trainGates[ch] = { c, r, group: g, door, open: false, t: 0 };
+}
+function openGate(ch) {
+  const gt = trainGates[ch]; if (!gt || gt.open) return;
+  gt.open = true; solid[gt.r * worldCols + gt.c] = 0;
+  wallMeshes = wallMeshes.filter(m => m !== gt.door);
+  playTone(140, 220, 0.8, 0.25, 'sawtooth'); playTone(900, 900, 0.1, 0.15, 'square', 0.85);
+}
+function updateGates(dt) {
+  for (const gt of Object.values(trainGates)) if (gt.open && gt.t < 1) { gt.t = Math.min(1, gt.t + dt * 0.8); gt.door.position.y = SETTINGS.wallHeight / 2 + gt.t * (SETTINGS.wallHeight - 0.25); }
+}
+// Obstacles only the PLAYER bumps into: 'jump' = hurdle (jump over), 'crouch' = low bar, 'prone' = crawl net.
+function addObstacle(need, x0, x1, z0, z1) {
+  const o = { need, x0, x1, z0, z1 }; obstacles.push(o);
+  const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, w = x1 - x0, d = z1 - z0;
+  if (need === 'jump') { box(w, 0.12, d, trainMats.stripe, cx, 0.55, cz, levelGroup); for (const s of [-1, 1]) box(0.08, 0.55, 0.08, trainMats.post, cx, 0.27, cz + s * (d / 2 - 0.1), levelGroup); }
+  if (need === 'crouch') { box(w, 0.14, d, trainMats.stripe, cx, 1.3, cz, levelGroup); for (const s of [-1, 1]) box(0.1, 1.3, 0.1, trainMats.post, cx, 0.65, cz + s * (d / 2 - 0.1), levelGroup); }
+  if (need === 'prone') { const n = box(w, 0.04, d, trainMats.net, cx, 0.72, cz, levelGroup); n.material = trainMats.net;
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) box(0.08, 0.72, 0.08, trainMats.post, cx + sx * (w / 2 - 0.05), 0.36, cz + sz * (d / 2 - 0.1), levelGroup); }
+  return o;
+}
+function obstaclePasses(o) {
+  if (o.need === 'jump') return player.jumpY > 0.3;
+  if (o.need === 'crouch') return player.stance !== 'stand' && player.eyeY < 1.25;
+  return player.stance === 'prone' && player.eyeY < 0.75;
+}
+function obstacleHit(x, z, r) {
+  for (const o of obstacles) if (x + r > o.x0 && x - r < o.x1 && z + r > o.z0 && z - r < o.z1 && !obstaclePasses(o)) { obstacleBlocked = o; return true; }
+  return false;
+}
+// Steel pop-up targets. Hit = it pings and falls, then pops back up. opts.hostage = white no-shoot target.
+function createPopTarget(id, x, z, yaw, opts = {}) {
+  const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = yaw;
+  const pivot = new THREE.Group(); pivot.position.y = 0.5; g.add(pivot);
+  const post = box(0.08, 0.5, 0.08, trainMats.post, 0, 0.25, -0.05, g); post.userData.hot = false;
+  const mat = opts.hostage ? trainMats.hostage : trainMats.steel;
+  const torso = box(0.55, 0.78, 0.04, mat, 0, 0.62, 0, pivot); torso.userData.zone = 'torso';
+  const head = box(0.26, 0.28, 0.04, opts.hostage ? trainMats.hostage : trainMats.head, 0, 1.2, 0, pivot); head.userData.zone = 'head';
+  const t = { id, group: g, pivot, meshes: [torso, head], x, z, up: opts.up !== false, raise: opts.up === false ? 0 : 1, autoReset: opts.autoReset ?? 1.2, downTimer: 0, hostage: !!opts.hostage, hits: 0 };
+  if (opts.hostage) { const tag = makeSign('NO SHOOT', 0.5, 0.14, '#ffffff', '#c00000', false); tag.position.set(0, 0.85, 0.03); pivot.add(tag); }
+  for (const m of t.meshes) m.userData.popTarget = t;
+  levelGroup.add(g); popTargets.push(t); return t;
+}
+function popTargetMeshes() { const out = []; for (const t of popTargets) if (t.up && t.raise > 0.7) out.push(...t.meshes); return out; }
+function hitPopTarget(t, zone, w, point) {
+  if (!t.up) return;
+  t.up = false; t.downTimer = t.autoReset; t.hits++;
+  spawnParticles(point, 0xffe0a0, 8, 3, 0.04);
+  playTone(t.hostage ? 400 : 2300, t.hostage ? 300 : 2150, 0.25, 0.22, 'triangle');
+  flashHitmarker(false);
+  trainEvent('pop', { id: t.id, zone, hostage: t.hostage, weapon: currentWeapon, aiming });
+}
+function updatePopTargets(dt) {
+  for (const t of popTargets) {
+    if (!t.up && t.autoReset > 0) { t.downTimer -= dt; if (t.downTimer <= 0) t.up = true; }
+    t.raise += ((t.up ? 1 : 0) - t.raise) * Math.min(1, dt * 9);
+    t.pivot.rotation.x = -(1 - t.raise) * 1.45;
+  }
+}
+function raiseTargets(ids, autoReset) { for (const t of popTargets) if (ids.includes(t.id)) { t.up = true; if (autoReset !== undefined) t.autoReset = autoReset; } }
+function dropTargets(ids) { for (const t of popTargets) if (!ids || ids.includes(t.id)) { t.up = false; t.autoReset = 0; } }
+// A yellow ring + light column on the floor: "go here".
+function setMarker(p) {
+  if (trainMarker) { levelGroup.remove(trainMarker); trainMarker = null; }
+  if (!p) return;
+  const g = new THREE.Group(); g.position.set(p.x, 0, p.z);
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.75, 1.0, 32), trainMats.marker); ring.rotation.x = -Math.PI / 2; ring.position.y = 0.03; g.add(ring);
+  const col = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, SETTINGS.wallHeight, 20, 1, true), trainMats.column); col.position.y = SETTINGS.wallHeight / 2; g.add(col);
+  levelGroup.add(g); trainMarker = g;
+}
+// Look-station panels: flat squares on the walls / ceiling / floor that light up red, then go green.
+function addLookPanel(x, y, z, nx, ny, nz) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 1.3), trainMats.panelOff);
+  m.position.set(x, y, z); m.lookAt(x + nx, y + ny, z + nz); levelGroup.add(m);
+  lookPanels.push({ mesh: m, pos: new THREE.Vector3(x, y, z) }); return m;
+}
+function aimingAt(p, tol) {
+  const f = camera.getWorldDirection(new THREE.Vector3()), to = new THREE.Vector3(p.x, p.y, p.z).sub(camera.position);
+  return to.length() > 0.2 && f.angleTo(to) < tol;
+}
+function addTrainSign(text, c, r, wc, wr, y = 2.2, w = 2.6, h = 0.5, bg = '#101418', fg = '#ffffff') { return onWallFace(makeSign(text, w, h, bg, fg), c, r, wc, wr, y); }
+function makeRolePlayer(x, z, yaw, label, patrol) {
+  const before = enemies.length;
+  createEnemy(x, z, { uniform: 0x9a3a2a, label });
+  const e = enemies[before]; if (!e) return null;
+  e.roleplayer = true; e.yaw = e.baseYaw = e.targetYaw = yaw; e.post = { x, z };
+  e.patrol = patrol ? { points: [{ x, z }, patrol], i: 1 } : null; e.static = false;
+  return e;
+}
+function resetRolePlayer(e) {
+  if (!e || e.state === 'dead') return;
+  e.state = 'idle'; e.detect = 0; e.returning = true; e.lastKnown = null; e.searchPoint = null; e.path = []; e.reaction = 1;
+}
+// ---- Build the course (called from buildLevel for Mission 0, after the zones are decorated) ----
+let trainRP = {}, trainMateSpots = [TP(22, 2), TP(23, 3)];
+function buildTraining() {
+  trainGates = {}; popTargets = []; lookPanels = []; trainMarker = null; trainRP = {};
+  for (let r = 0; r < worldRows; r++) for (let c = 0; c < worldCols; c++) { const ch = grid[r][c]; if (ch >= '1' && ch <= '9') createGate(ch, c, r); }
+  // Station 1: hurdles (r4), low bar + crawl net (r6)
+  addObstacle('jump', 25.85, 26.15, 16, 20); addObstacle('jump', 13.85, 14.15, 16, 20);
+  addObstacle('crouch', 9.8, 10.2, 24, 28); addObstacle('prone', 19.5, 23.5, 24, 28);
+  addTrainSign('HURDLES · JUMP', 9, 4, 9, 3, 2.4, 2.2, 0.42, '#1a1a1a', '#ffd23a');
+  addTrainSign('LOW BAR · CROUCH   ·   NET · CRAWL', 1, 6, 1, 7, 2.4, 3.2, 0.42, '#1a1a1a', '#ffd23a');
+  // Station 2: six panels (east, south, west, north walls, then ceiling and floor)
+  addLookPanel(71.9, 1.9, 22, -1, 0, 0); addLookPanel(58, 1.9, 27.9, 0, 0, -1); addLookPanel(44.1, 1.9, 10, 1, 0, 0); addLookPanel(58, 1.9, 4.1, 0, 0, 1);
+  addLookPanel(58, SETTINGS.wallHeight - 0.03, 16, 0, -1, 0); addLookPanel(58, 0.03, 21, 0, 1, 0);
+  // Station 3: a radio beacon (the compass exercise)
+  { const b = new THREE.Group(), p = TP(24, 6); b.position.set(p.x, 0, p.z);
+    box(0.5, 0.9, 0.5, propMat.dark, 0, 0.45, 0, b); const mast = box(0.06, 2.4, 0.06, propMat.metal, 0, 2.1, 0, b);
+    const lamp = box(0.18, 0.18, 0.18, new THREE.MeshBasicMaterial({ color: 0xff3030 }), 0, 3.3, 0, b); b.userData.lamp = lamp;
+    levelGroup.add(b); props.push({ x: p.x, z: p.z, r: 0.4 }); trainRP.beacon = b; }
+  // Station 4: firing line + three steel targets (16, 36, 66 m)
+  { const fl = box(0.12, 0.02, CELL * 6 - 0.4, trainMats.marker, 116, 0.02, 16, levelGroup); fl.material = new THREE.MeshBasicMaterial({ color: 0xffd23a });
+    for (const z of [8, 16, 24]) { const bench = box(0.6, 0.9, 1.6, propMat.desk, 117.2, 0.45, z, levelGroup); props.push({ x: 117.2, z, r: 0.5 }); }
+    createPopTarget('r16', 130, 10, -Math.PI / 2, { up: false }); createPopTarget('r36', 150, 14, -Math.PI / 2, { up: false }); createPopTarget('r66', 180, 18, -Math.PI / 2, { up: false });
+    for (const [t, x, z] of [['16 M', 130, 10], ['36 M', 150, 14], ['66 M', 180, 18]]) { const s = makeSign(t, 0.9, 0.3, '#202020', '#ffd23a'); s.position.set(x - 0.6, 0.2, z); s.rotation.set(-Math.PI / 2, 0, Math.PI / 2); levelGroup.add(s); } }
+  // Station 5: firing mat at the east end, steel at 50 / 100 / 200 m
+  { const mat = box(1.2, 0.04, 2.6, trainMats.mat, 217, 0.02, 36, levelGroup); trainRP.mat = { x: 217, z: 36 };
+    createPopTarget('l50', 168, 33.5, Math.PI / 2, { up: false }); createPopTarget('l100', 118, 38, Math.PI / 2, { up: false }); createPopTarget('l200', 18, 35, Math.PI / 2, { up: false });
+    addTrainSign('FIRING POINT · GO PRONE', 54, 9, 55, 9, 2.4, 2.4, 0.42, '#180a2a', '#c8a0ff'); }
+  // Station 6: a long table with every gun on it, the spare Colt, and steel to shoot at
+  { box(28, 0.9, 1.2, propMat.desk, 198, 0.45, 45.2, levelGroup); for (let x = 185; x <= 211; x += 2.5) props.push({ x, z: 45.2, r: 0.6 });
+    WEAPONS.forEach((w, i) => { const m = buildGunModel(w); m.visible = true; m.scale.setScalar(1.6); m.rotation.set(0, Math.PI / 2, Math.PI / 2 * 0.0); m.position.set(188 + i * 3.0, 1.0, 45.4); levelGroup.add(m);
+      const s = makeSign((i + 1) + " · " + w.name.toUpperCase(), 1.4, 0.22, '#2a0808', '#ffb0b0'); s.position.set(188 + i * 3.0, 1.35, 46.1); levelGroup.add(s); });
+    createPickup(200, 48.5, 'pistol2');
+    for (const z of [52, 60, 68, 76]) createPopTarget('k' + z, 182, z, Math.PI / 2, { up: true, autoReset: 0.6 }); }
+  // Station 7: a knife dummy + a patrolling role-player
+  { const before = enemies.length; createEnemy(158, 54, { uniform: 0x8a7a5a, label: 'Dummy', static: true });
+    const d = enemies[before]; if (d) { d.dummy = true; d.yaw = d.baseYaw = d.targetYaw = 0; d.health = 1e9; trainRP.dummy = d; }
+    trainRP.k1 = makeRolePlayer(142, 74, Math.PI / 2, 'Role-player', { x: 174, z: 74 }); }
+  // Station 8: one role-player at a window (back to you), one on patrol
+  { trainRP.g1 = makeRolePlayer(110, 49, Math.PI, 'Role-player', null);
+    trainRP.g2 = makeRolePlayer(103, 76, Math.PI / 2, "Role-player", { x: 132, z: 76 });
+    const win = box(2.4, 1.2, 0.1, new THREE.MeshBasicMaterial({ color: 0x7ab0ff }), 110, 1.7, 44.06, levelGroup); }
+  // Graduation hall: what's coming in the next update
+  addTrainSign('DEMOLITION · BREACHING · FINAL RUN — OPENING IN v0.6b', 12, 11, 12, 10, 2.5, 4.2, 0.5, '#1a1a1a', '#ffd23a');
+}
+// Fewer, well-placed lights for the big training hall (one or more per station).
+function trainingLamps() {
+  return [[5, 2], [14, 3], [22, 3], [32, 3], [41, 3], [50, 3], [8, 8], [27, 9], [46, 9], [49, 15], [39, 15], [29, 15], [12, 15], [4, 18]].map(([c, r]) => ({ c, r }));
+}
+// ---- CHIEF's stations. Each step: text (what to do), optional 'at' (marker / compass target),
+//      start / tick helpers, and check() = true when it's done. 'say' = CHIEF's reaction. ----
+const LOCKER_NOTES = [
+  'Colt M1911 .45 — big slow round, 7 shots, semi-auto, suppressed. Quiet and honest.',
+  'Glock 17 — 9 mm, 17 shots, semi-auto, light kick. Plastic, fantastic.',
+  'FN P90 — 50-round top magazine, full auto, tiny kick. The bullet hose.',
+  'M4 Carbine — 5.56, full auto, red dot. The all-rounder.',
+  'AKM — 7.62×39, full auto, hits harder and kicks more. Rugged as a tractor.',
+  'FN SCAR-H — 7.62 NATO battle rifle. Real flying bullets; one hit usually does it.',
+  'Barrett M107 — .50 BMG. Kills anything, punches through walls, wrecks vehicles. 2-step scope.',
+  'CheyTac M200 — .408 bolt-action, 2-step scope. Two kilometres in the right hands.',
+  'Remington 870 — 12-gauge pump, 8 pellets a shot. Brutal close, useless far. Also opens doors.',
+];
+const CHIEF_SPOTTED = ['He saw you. Back off; he\'ll reset. Pretend that never happened.', 'Spotted. In real life that\'s a closed casket. Yours.', 'Congratulations, you\'re a target. Back off and go again.'];
+const tapWord = () => devKind() === 'touch' ? 'tap' : 'click';
+const nearP = (p, d = 1.6) => !!p && dist2D(camera.position.x, camera.position.z, p.x, p.z) < d;
+const plain = html => String(html).replace(/<br>/g, ' ').replace(/<[^>]+>/g, '');
+function ev(k) { return (TRAIN && TRAIN.ev[k]) || 0; }
+function refillAll() { weaponState.forEach((s, i) => { s.ammo = magSizeOf(i); s.reserve = WEAPONS[i].reserve; }); reloadTimer = 0; }
+function rpAt(e) { return e && e.state !== 'dead' ? { x: e.group.position.x, z: e.group.position.z } : null; }
+function lockerList() { return WEAPONS.map((w, i) => (TRAIN.fired.has(i) ? '☑ ' : '☐ ') + (i + 1) + ' ' + w.name.split(' ')[0].replace('Remington', '870')).join(' · '); }
+function panelOn(k) { if (lookPanels[k]) lookPanels[k].mesh.material = trainMats.panelOn; }
+function lookPanelTick(S, dt, end) {
+  const p = lookPanels[S.k]; if (!p) return;
+  S.h = aimingAt(p.pos, 0.17) ? S.h + dt : 0;
+  if (S.h > 0.25) { p.mesh.material = trainMats.panelDone; SOUNDS.pickup(); S.k++; S.h = 0; if (S.k < end) panelOn(S.k); }
+}
+const STATIONS = [
+  { id: 'move', zone: 't_move', gate: '1', entry: [1, 1], name: 'MOVEMENT',
+    intro: 'Morning, Wraith. Welcome to Camp Halyard. I\'m Chief. I\'ve buried better recruits than you. Mostly figuratively. Let\'s start with walking.',
+    outro: 'Movement: passed. Barely. Through the door.',
+    steps: [
+      { text: () => `Walk to the yellow marker: ${K('move')}. Look around: ${K('look')}.`, at: TP(5, 1), check: () => nearP(TP(5, 1)), say: 'Look at that. Bipedal.' },
+      { text: S => `Sprint to the next marker: ${K('sprint')}.${S.slow ? ' <i>Sprint this time — back up and run at it.</i>' : ''}`, at: TP(9, 2), start: S => { S.sprint = 0; },
+        tick: (S, dt) => { if (player.sprinting) S.sprint += dt; S.slow = nearP(TP(9, 2), 2.1) && S.sprint <= 0.5; }, check: S => nearP(TP(9, 2), 2.1) && S.sprint > 0.5, say: 'Fast. Ish.' },
+      { text: () => `Down the corridor and west over the hurdles: ${K('jump')} jumps.`, at: TP(1, 4), check: () => nearP(TP(1, 4), 1.8), say: 'Graceful. Like a fridge falling down the stairs.' },
+      { text: () => `Low bar: crouch (${K('crouch')}) and go under it.`, at: TP(4, 6), check: () => nearP(TP(4, 6)), say: 'Stay low, live long.' },
+      { text: () => `Crawl net: go prone (${K('prone')}) and crawl under it. Then stand up (${K('stand')}).`, at: TP(7, 6), check: () => nearP(TP(7, 6)), say: 'Prone is slowest and hardest to spot. Remember that when the shooting starts.' },
+      { text: S => `Peek around corners: ${K('leanL')} leans left, ${K('leanR')} leans right. Your feet stay put; guards only see your head and shoulder. Lean both ways. ${S.l > 0.35 ? '✔ left ' : ''}${S.r > 0.35 ? '✔ right' : ''}`,
+        start: S => { S.l = 0; S.r = 0; }, tick: (S, dt) => { if (lean.dist < -0.25) S.l += dt; if (lean.dist > 0.25) S.r += dt; }, check: S => S.l > 0.35 && S.r > 0.35 },
+    ] },
+  { id: 'look', zone: 't_look', gate: '2', entry: [11, 6], name: 'LOOK',
+    intro: 'Eyes. You have two. Point them at each panel as it lights up red.', outro: 'Good. Now you can see what\'s killing you. Next door.',
+    steps: [
+      { text: S => `Look at the RED panel (${Math.min(S.k, 3) + 1}/4): ${K('look')}.`, at: S => lookPanels[S.k] && lookPanels[S.k].pos, label: 'PANEL',
+        start: S => { S.k = 0; S.h = 0; panelOn(0); }, tick: (S, dt) => lookPanelTick(S, dt, 4), check: S => S.k >= 4, say: 'Three-sixty. Nobody sneaks up on you now. In theory.' },
+      { text: S => S.k < 5 ? 'Look UP at the red panel on the ceiling.' : 'Now look DOWN at the red panel on the floor.', at: S => lookPanels[S.k] && lookPanels[S.k].pos, label: 'PANEL',
+        start: S => { S.k = 4; S.h = 0; panelOn(4); }, tick: (S, dt) => lookPanelTick(S, dt, 6), check: S => S.k >= 6 },
+      { text: () => `Sensitivity: pause with ${K('pause')}. The LOOK SENSITIVITY slider and the EDGE TURN switch are on the pause screen. Try a setting, then ${tapWord()} to resume.`,
+        check: () => ev('paused') > 0 && state === 'playing', say: 'Pick a speed you can aim with. Not the one that looks cool.' },
+    ] },
+  { id: 'comms', zone: 't_comms', gate: '3', entry: [19, 3], name: 'COMMS',
+    intro: 'Comms. HAWK and DOC are your squad. They follow you, they carry you out, and they never shut up.',
+    outro: 'From here on they follow you. Don\'t lose them; they know where the bar is.',
+    steps: [
+      { text: () => `Radio check: press ${K('radio')} to call your team.`, radio: true, check: () => ev('radio') > 0,
+        after: () => { radioSay('HAWK', 'Loud and clear, Wraith.', 4); setTimeout(() => { if (state === 'playing' && currentMission === 0) radioSay('DOC', 'Copy. Also loud.', 4); }, 1500); } },
+      { text: () => 'Friend or foe: aim at HAWK or DOC. The crosshair turns <b>GREEN</b> and says FRIENDLY over your own people — never fire on green. (They also step out of your line of fire.)',
+        start: S => { S.h = 0; }, tick: (S, dt) => { if (aimKind === 'friendly') S.h += dt; }, check: S => S.h > 0.25, say: 'Green means "don\'t". Our bullets just stop on them, but I\'ll still dock your pay.' },
+      { text: () => 'The yellow <b>◆</b> on the compass (top of the screen) points at your objective and shows how far it is. Follow it to the BEACON.', at: TP(24, 6), label: 'BEACON', check: () => nearP(TP(24, 6), 2.2) },
+      { text: () => `Map: ${K('map')} shows everywhere you've been (the game pauses). ${K('map')} again or ${tapWord()} to close it.`, check: () => ev('mapOpen') > 0 && state === 'playing', say: 'Lost is a state of mind. Usually a stupid one.' },
+      { text: () => `Objectives are listed top-left. Stuck for a while? HAWK or DOC radio a hint by themselves — or ask with ${K('radio')}. Ask now.`, radio: true, check: () => ev('radio') > 0,
+        after: () => radioSay('HAWK', 'Next stop is the RANGE, through the east door. Follow the ◆ and the yellow floor arrows.', 6) },
+    ] },
+  { id: 'range', zone: 't_range', gate: '4', entry: [27, 3], name: 'RANGE',
+    intro: 'The range. Steel pings when you hit it. Muzzle downrange, not at me. I have a pension.',
+    outro: 'Not bad. The steel will recover; your ego might not. The sniper lane is through the door at the far end.',
+    steps: [
+      { text: () => 'Step up to the firing line (yellow box). Colt drawn.', at: { x: 113.5, z: 16 }, label: 'FIRING LINE', start: () => { if (currentWeapon !== 0) switchWeapon(0); refillAll(); }, check: () => nearP({ x: 113.5, z: 16 }, 2.4) },
+      { text: () => `HIP FIRE — no aiming. ${K('fire')} and hit the NEAR steel (16 m) 3 times. Pistols are semi-automatic: one ${tapWord()} = one shot. (${ev('pop:r16:hip')}/3)`,
+        start: () => raiseTargets(['r16'], 0.7), check: () => ev('pop:r16:hip') >= 3, say: 'From the hip: fast, sloppy, fine up close.' },
+      { text: () => `AIM — ${K('aim')} raises the sights: tighter shots, slower feet. Hit the MIDDLE steel (36 m) twice while aiming. (${ev('pop:r36:aim')}/2)`,
+        start: () => raiseTargets(['r36'], 0.7), check: () => ev('pop:r36:aim') >= 2 },
+      { text: () => 'HEADSHOT — the FAR steel (66 m) has a head plate. Aim small and hit the head. In this game one head hit drops anyone.',
+        start: () => raiseTargets(['r66'], 0.7), check: () => ev('pop:r66:head') >= 1, say: 'Head plate. Lovely. Do that for real and Gravel might stop talking for once.' },
+      { text: () => `FULL AUTO — switch to the M4 (${KW(3)}) and ${K('hold')}: rifles keep firing while you hold. Put 8 rounds on any steel. (${ev('popW:3')}/8)`,
+        start: () => raiseTargets(['r16', 'r36', 'r66'], 0.12), check: () => ev('popW:3') >= 8, say: 'Short bursts. Ammo is heavy and Doc won\'t carry yours.' },
+      { text: () => `RELOAD — ${K('reload')}. Reload in a lull, not when the magazine is empty in a gunfight.`,
+        start: () => { const s = weaponState[currentWeapon]; s.ammo = Math.max(1, Math.floor(magSizeOf(currentWeapon) / 2)); }, check: () => ev('reload') > 0 },
+      { text: () => `SWITCHING — ${K('swap')}. Switch to the Glock 17 (${KW(1)}).`, check: () => currentWeapon === 1 },
+    ] },
+  { id: 'lane', zone: 't_lane', gate: '5', entry: [53, 8], name: 'SNIPER LANE',
+    intro: 'Sniper lane. Two hundred metres of fresh air and bad decisions. Get on the mat.',
+    outro: 'Two hundred metres. Gravel calls that a warm-up. Gravel is insufferable. The weapons locker is down the stairs.',
+    steps: [
+      { text: () => `Lie on the firing mat (${K('prone')}) and take the CheyTac (${KW(7)}).`, at: { x: 217, z: 36 }, label: 'FIRING MAT',
+        check: () => nearP({ x: 217, z: 36 }, 2.4) && player.stance === 'prone' && currentWeapon === 7 },
+      { text: S => `SCOPE — ${K('aim')}. Zoom with ${K('zoom')}; use both zoom levels. ${S.z1 ? '✔ zoom 1 ' : ''}${S.z2 ? '✔ zoom 2' : ''}`,
+        start: S => { S.z1 = S.z2 = 0; raiseTargets(['l50', 'l100', 'l200'], 1.0); }, tick: S => { if (aiming && zoomStep === 1) S.z1 = 1; if (aiming && zoomStep === 2) S.z2 = 1; }, check: S => S.z1 && S.z2 },
+      { text: () => `RANGEFINDER — put the crosshair on the 100 m steel and press ${K('lase')}.`, check: () => TRAIN.lastLase > 85 && TRAIN.lastLase < 115, say: 'Ninety-nine metres. Write it down. Or don\'t, it\'s a game.' },
+      { text: () => `ELEVATION — bullets drop, so the scope is dialled to a range. Someone left it at 500 m. Dial it to 100 m: ${K('dial')} (each click = 100 m). Now: ${fmtDist(zeroRange)}.`,
+        start: () => { zeroRange = 500; }, check: () => zeroRange === 100 },
+      { text: () => `Steady: ${K('breath')} holds your breath and stops the sway. Hit the 100 m steel.`, check: () => ev('pop:l100') > 0, say: 'Ping. That\'s the sound of a job done.' },
+      { text: () => `LONG SHOT — lase the 200 m steel, dial 200 m, breathe, squeeze. The bullet takes a moment to get there. (Dialled: ${fmtDist(zeroRange)})`, check: () => ev('pop:l200') > 0 },
+    ] },
+  { id: 'locker', zone: 't_locker', gate: '6', entry: [54, 11], name: 'WEAPONS LOCKER',
+    intro: 'The locker. Every toy we own. Try them all, then put them back where you found them. Ha. No.',
+    outro: 'Every gun has a job. Pick the right one and the job gets shorter.',
+    steps: [
+      { text: () => `Fire at least one shot with EVERY weapon (${K('swap')}). The steel is on the far wall.<br>${lockerList()}<br><i>${LOCKER_NOTES[currentWeapon] || ''}</i>`,
+        start: () => { TRAIN.fired = new Set(); refillAll(); }, check: () => WEAPONS.every((w, i) => TRAIN.fired.has(i)) },
+      { text: () => `DUAL PISTOLS — grab the spare Colt on the table, then fire both: ${K('fire')} alternates the guns, ${K('aim')} fires the left one, ${K('dual')} goes back to one gun.`,
+        at: { x: 200, z: 48.5 }, label: 'SPARE COLT', check: () => ev('dualShot') > 0, say: 'Akimbo. Terrible for accuracy, tremendous for morale.' },
+    ] },
+  { id: 'knife', zone: 't_knife', gate: '7', entry: [43, 15], name: 'KNIFE',
+    intro: 'Knife work. Quiet, personal, and the dry-cleaning bill is yours.', outro: 'Clean. He\'s fine. He\'s paid to lie down.',
+    steps: [
+      { text: () => `Slash the dummy twice: ${K('knife')}. From the FRONT it's a brawl — a real guard fights back and everyone near hears it. (${ev('knifeDummy')}/2)`,
+        at: { x: 158, z: 55.5 }, label: 'DUMMY', check: () => ev('knifeDummy') >= 2, say: 'The dummy has filed a complaint.' },
+      { text: () => `SILENT TAKEDOWN — crouch (${K('crouch')}: quieter, harder to see), get BEHIND the patrolling role-player and ${K('knife')}. If he spots you, back off; he resets.`,
+        at: () => rpAt(trainRP.k1), label: 'ROLE-PLAYER', start: () => resetRolePlayer(trainRP.k1), check: () => ev('rpKnife') > 0 },
+    ] },
+  { id: 'garrote', zone: 't_garrote', gate: '8', entry: [33, 15], name: 'GARROTE',
+    intro: 'The garrote: piano wire between two wooden handles. No noise, no blood, no second chances.',
+    outro: 'Quiet, tidy, deeply unpleasant. Graduation is through that door.',
+    steps: [
+      { text: () => `Get right behind the role-player at the window and ${K('garrote')} for about 2 seconds, until he goes limp. You can't move while you hold him. Let go early and he breaks free.`,
+        at: () => rpAt(trainRP.g1), label: 'ROLE-PLAYER', check: () => !!(trainRP.g1 && trainRP.g1.garroteKill), say: 'Textbook. Horrible, horrible textbook.' },
+      { text: () => 'Now the patrol. Same again. If anyone sees you mid-strangle, it\'s over.', at: () => rpAt(trainRP.g2), label: 'PATROL',
+        start: () => resetRolePlayer(trainRP.g2), check: () => !!(trainRP.g2 && trainRP.g2.garroteKill) },
+    ] },
+];
+// ---- The station engine ----
+var TRAIN = null;
+function resetTraining() {
+  TRAIN = { i: 0, step: 0, begun: false, done: STATIONS.map(() => false), skipped: STATIONS.map(() => false), ev: {}, S: {}, fired: new Set(), lastLase: 0,
+    stepT: 0, idle: 0, boxHTML: '', boxAt: 0, lastSkip: -1e9, startedAt: performance.now() };
+  setMarker(null);
+}
+function curStation() { return TRAIN && TRAIN.i < STATIONS.length ? STATIONS[TRAIN.i] : null; }
+function curStep() { const s = curStation(); return s && TRAIN.begun ? s.steps[TRAIN.step] : null; }
+function trainEvent(name, data) {
+  if (currentMission !== 0 || !TRAIN) return;
+  const E = TRAIN.ev, add = k => { E[k] = (E[k] || 0) + 1; };
+  add(name);
+  if (name === 'pop') { add('pop:' + data.id); add('pop:' + data.id + (data.aiming ? ':aim' : ':hip')); if (data.zone === 'head') add('pop:' + data.id + ':head'); add('popW:' + data.weapon); }
+  if (name === 'shot') TRAIN.fired.add(data);
+  if (name === 'lase') TRAIN.lastLase = data;
+}
+function beginStation() {
+  const s = curStation(); TRAIN.begun = true; TRAIN.step = 0;
+  radioSay('CHIEF', s.intro, 7); startStep();
+}
+function startStep() {
+  const st = curStep(); TRAIN.ev = {}; TRAIN.S = {}; TRAIN.stepT = 0; TRAIN.idle = 0;
+  if (st.start) st.start(TRAIN.S);
+  setMarker(st.at && typeof st.at === 'object' ? st.at : null);
+  noteProgress();
+}
+function finishStep() {
+  const s = curStation(), st = curStep();
+  playTone(880, 880, 0.08, 0.2, 'triangle'); playTone(1320, 1320, 0.12, 0.2, 'triangle', 0.08);
+  if (st.after) st.after();
+  else if (st.say && TRAIN.step < s.steps.length - 1) radioSay('CHIEF', st.say, 5);
+  TRAIN.step++;
+  if (TRAIN.step >= s.steps.length) completeStation(false, st.after ? '' : st.say); else startStep();
+}
+function completeStation(skipped, lastSay = '') {
+  const s = curStation(); if (!s) return;
+  TRAIN.done[TRAIN.i] = true; TRAIN.skipped[TRAIN.i] = skipped;
+  openGate(s.gate); setMarker(null);
+  if (s.id === 'comms') teammates.forEach(m => { m.hold = false; });
+  if (!skipped) setTimeout(() => { if (state === 'playing' && currentMission === 0) radioSay('CHIEF', (lastSay ? lastSay + ' ' : '') + s.outro, 7); }, s.id === 'comms' ? 4500 : 300);
+  TRAIN.i++; TRAIN.begun = false; TRAIN.step = 0;
+  if (TRAIN.i >= STATIONS.length) showMessage('ALL STATIONS DONE — walk onto the green GRADUATION pad', 4);
+  else showMessage('STATION ' + TRAIN.i + (skipped ? ' SKIPPED' : ' COMPLETE') + ' — next: ' + STATIONS[TRAIN.i].name, 2.5);
+  noteProgress();
+}
+function teleportTo(c, r) {
+  const p = TP(c, r), z = TRAIN_ZONES.find(q => c >= q.c0 && c <= q.c1 && r >= q.r0 && r <= q.r1) || TRAIN_ZONES[0];
+  const tx = (z.c0 + z.c1 + 1) / 2 * CELL, tz = (z.r0 + z.r1 + 1) / 2 * CELL;
+  clearLean(); camera.position.x = p.x; camera.position.z = p.z; player.velocity.set(0, 0, 0); player.stance = 'stand'; player.jumpY = 0; player.jumpV = 0;
+  camera.rotation.set(0, Math.atan2(-(tx - p.x), -(tz - p.z)), 0, 'YXZ');
+  teammates.forEach((m, i) => { if (!m.hold) { const q = randomFloorNear(p.x, p.z, 2.5); m.group.position.set(q.x, 0, q.z); m.path = []; } });
+}
+function skipStation() {
+  const s = curStation();
+  if (!s) { showMessage('Nothing left to skip — the graduation pad is open.', 2); return; }
+  radioSay('CHIEF', 'Skipping ' + s.name + '? Fine. I\'ll write "enthusiastic" on your file.', 5);
+  dropTargets(); if (garrote.active) garroteFail('skip');
+  completeStation(true);
+  const n = curStation();
+  if (n) teleportTo(...n.entry); else teleportTo(22, 15);
+}
+function skipPressed() {
+  const now = performance.now();
+  if (currentMission !== 0) return;
+  if (now - TRAIN.lastSkip < 1500) { TRAIN.lastSkip = -1e9; skipStation(); }
+  else { TRAIN.lastSkip = now; showMessage('Skip this station? Press ' + plain(K('skip')).replace(' twice', '') + ' again.', 1.5); }
+}
+function trainingDoneAll() { return !!TRAIN && TRAIN.done.every(Boolean); }
+function trainingObjective() {
+  if (!TRAIN) return null;
+  const s = curStation();
+  if (!s) return exitZone ? { x: exitZone.x, z: exitZone.z, label: 'GRADUATION' } : null;
+  if (!TRAIN.begun) { const p = TP(...s.entry); return { x: p.x, z: p.z, label: 'STATION ' + (TRAIN.i + 1) }; }
+  const st = curStep(); if (!st || !st.at) return null;
+  const p = typeof st.at === 'function' ? st.at(TRAIN.S) : st.at;
+  return p ? { x: p.x, z: p.z, label: st.label || 'MARKER' } : null;
+}
+function radioPressed() {
+  noteInput('radio');
+  if (currentMission === 0 && TRAIN) {
+    const st = curStep(); trainEvent('radio');
+    if (st && st.radio) return;                                    // the step was waiting for exactly this
+    const s = curStation();
+    radioSay('CHIEF', st ? plain(st.text(TRAIN.S)) : s ? 'Next: station ' + (TRAIN.i + 1) + ', ' + s.name + '. Follow the ◆.' : 'Graduation pad. Go. Before I change my mind.', 8);
+    return;
+  }
+  if (currentMission === 2) { windCall(); return; }
+  if (navInfo && elapsed - navInfo.lastHint > 8) giveHint(); else radioSay('HAWK', 'Just told you, Wraith. Follow the ◆.', 3);
+}
+function updateTraining(dt) {
+  if (currentMission !== 0 || !TRAIN) return;
+  updateGates(dt); updatePopTargets(dt);
+  if (trainRP.beacon) trainRP.beacon.userData.lamp.visible = (elapsed % 1) < 0.5;
+  for (const e of [trainRP.k1, trainRP.g1, trainRP.g2]) {
+    if (!e || e.state === 'dead') continue;
+    if (e.state === 'chase') { if (!e.spottedAt) { e.spottedAt = elapsed; radioSay('CHIEF', CHIEF_SPOTTED[Math.floor(Math.random() * CHIEF_SPOTTED.length)], 4); } else if (elapsed - e.spottedAt > 2.2) { resetRolePlayer(e); e.spottedAt = 0; } }
+  }
+  weaponState.forEach((s, i) => { if (s.reserve < WEAPONS[i].magSize * 2) s.reserve = WEAPONS[i].reserve; });   // training ammo never runs out
+  if (state !== 'playing') return;
+  const s = curStation();
+  if (s && !TRAIN.begun && zoneAtXZ(camera.position.x, camera.position.z).id === s.zone) beginStation();
+  const st = curStep();
+  if (st) {
+    TRAIN.stepT += dt; TRAIN.idle += dt;
+    if (st.tick) st.tick(TRAIN.S, dt);
+    if (st.check(TRAIN.S)) finishStep();
+    else if (TRAIN.idle > 50) { TRAIN.idle = 0; radioSay('CHIEF', 'Still waiting, Wraith. ' + plain(st.text(TRAIN.S)), 8); }
+  }
+  if (obstacleBlocked && elapsed - obstacleMsgAt > 2.5) {
+    obstacleMsgAt = elapsed;
+    showMessage({ jump: 'Hurdle — jump over it: ', crouch: 'Too low to walk under — crouch: ', prone: 'Crawl net — go prone: ' }[obstacleBlocked.need] + plain(K(obstacleBlocked.need)), 2);
+  }
+  obstacleBlocked = null;
+  updateTrainBox();
+}
+function updateTrainBox() {
+  const el = $('trainBox'), now = performance.now();
+  if (now - TRAIN.boxAt < 200) return; TRAIN.boxAt = now;
+  const s = curStation(), st = curStep();
+  let html;
+  if (!s) html = '<b>GRADUATION</b><br>All stations done. Walk onto the green pad (follow the ◆).';
+  else if (!st) html = `<b>NEXT: STATION ${TRAIN.i + 1} · ${s.name}</b><br>Follow the ◆ on the compass and the yellow floor arrows.`;
+  else html = `<b>STATION ${TRAIN.i + 1}/${STATIONS.length} · ${s.name}</b> &nbsp; <span class="tstep">step ${TRAIN.step + 1}/${s.steps.length}</span><br>${st.text(TRAIN.S)}`;
+  html += `<div class="tsmall">${K('radio')} = CHIEF repeats · ${K('skip')} = skip this station</div>`;
+  if (html !== TRAIN.boxHTML) { el.innerHTML = html; TRAIN.boxHTML = html; }
+}
+function trainingObjectivesHTML() {
+  let html = '<h3>CAMP HALYARD — TRAINING</h3>';
+  STATIONS.forEach((s, i) => {
+    const cur = i === TRAIN.i, mark = TRAIN.done[i] ? (TRAIN.skipped[i] ? '⤼' : '☑') : cur ? '▶' : '☐';
+    html += `<div class="${TRAIN.done[i] ? 'done' : ''}"${cur ? ' style="color:#ffd23a"' : ''}>${mark} ${i + 1} ${s.name}${TRAIN.skipped[i] ? ' (skipped)' : ''}</div>`;
+  });
+  const ready = trainingDoneAll();
+  html += `<div class="${ready ? '' : 'locked'}">${ready ? '☐ Graduation pad' : '🔒 Graduation (finish or skip every station)'}</div>`;
+  return html;
+}
+// #####################################################################
+// ##  SECTION 8d: GARROTE (v0.6) — H key (hold) / GARROTE button     ##
+// ##  Two wooden handles and a wire. Get right behind an UNAWARE     ##
+// ##  guard and HOLD: he struggles, you can't move, and after        ##
+// ##  SETTINGS.garroteTime seconds he goes limp. Silent, no blood.   ##
+// ##  Let go early, get shot or get seen by another guard, and he   ##
+// ##  breaks free and raises the alarm.                              ##
+// #####################################################################
+SETTINGS.garroteTime = 1.8; SETTINGS.garroteRange = 1.5;
+BASE_SETTINGS.garroteTime = 1.8; BASE_SETTINGS.garroteRange = 1.5;
+const GARROTE_QUIPS = ['Piano wire. He never did learn to play.', 'Shh. Shh. Shhhh. There we go.', 'Quiet as a library. A very violent library.', 'He\'s taking a long, permanent nap.'];
+const garrote = { active: false, target: null, t: 0, hp0: 100, cooldown: 0, anim: 0 };
+const garroteModel = new THREE.Group();
+{
+  const wood = new THREE.MeshStandardMaterial({ color: 0x8a5a30, roughness: 0.65 }), glove = new THREE.MeshStandardMaterial({ color: 0x20221e, roughness: 0.95 });
+  for (const s of [-1, 1]) {
+    const h = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.12, 10), wood); h.position.set(s * 0.17, -0.16, -0.42); h.rotation.z = s * 0.25; garroteModel.add(h);
+    const fist = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.07, 0.09), glove); fist.position.set(s * 0.17, -0.16, -0.4); garroteModel.add(fist);
+  }
+  const wire = new THREE.Mesh(new THREE.CylinderGeometry(0.0025, 0.0025, 0.34, 4), new THREE.MeshStandardMaterial({ color: 0xd8dde2, metalness: 0.9, roughness: 0.2 }));
+  wire.rotation.z = Math.PI / 2; wire.position.set(0, -0.11, -0.44); garroteModel.add(wire); garroteModel.userData.wire = wire;
+  garroteModel.visible = false; weaponScene.add(garroteModel);
+}
+function garroteTarget() {
+  const px = camera.position.x, pz = camera.position.z, feet = camera.position.y - player.eyeY;
+  let best = null, bd = Infinity;
+  for (const e of enemies) {
+    if (e.state === 'dead' || e.dummy) continue;
+    const ep = e.group.position, d = dist2D(px, pz, ep.x, ep.z);
+    if (d > SETTINGS.garroteRange || d >= bd || Math.abs(ep.y - feet) > 1.5) continue;
+    if (!hasLineOfSight(px, pz, ep.x, ep.z)) continue;
+    best = e; bd = d;
+  }
+  return best;
+}
+function garrotePress() {
+  if (state !== 'playing' || garrote.active || garrote.cooldown > 0 || killcam.active) return;
+  const e = garroteTarget();
+  if (!e) { showMessage('Garrote: get right behind an unaware guard, then ' + plain(K('garrote')) + '.', 2); return; }
+  if (e.state === 'chase') { showMessage('He knows you\'re there — the garrote only works on an UNAWARE guard.', 2); return; }
+  if (currentMission === 0 && e === trainRP.k1) { showMessage('Knife station — use the knife: ' + plain(K('knife')), 2); return; }
+  if (!isBehindUnaware(e)) { showMessage('Get BEHIND him first.', 1.5); return; }
+  garrote.active = true; garrote.target = e; garrote.t = 0; garrote.hp0 = player.health; garrote.anim = 0; garrote.chasers0 = enemies.filter(o => o.state === 'chase').length;
+  e.garroted = true; setZoom(0); mouseDown = false; touch.fire = false; clearLean();
+  playNoise(0.25, 0.08, 4000); playTone(70, 55, 0.4, 0.12, 'sawtooth');
+  noteInput('garrote');
+}
+function garroteFail(why) {
+  const e = garrote.target;
+  garrote.active = false; garrote.target = null; garrote.cooldown = 1.0;
+  if (!e) return;
+  e.garroted = false;
+  if (e.state !== 'dead' && why !== 'skip') { alertEnemy(e, true); e.staggerTimer = 0.5; }
+  if (why !== 'skip') showMessage(why === 'let go' ? 'You let go too early — he broke free!' : 'Interrupted — he broke free!', 2.5);
+  trainEvent('garroteFail');
+}
+function updateGarrote(dt) {
+  garrote.cooldown = Math.max(0, garrote.cooldown - dt);
+  garrote.anim = garrote.active ? Math.min(1, garrote.anim + dt * 6) : Math.max(0, garrote.anim - dt * 4);
+  garroteModel.visible = garrote.anim > 0.01;
+  if (garroteModel.visible) {
+    const k = garrote.anim, shake = garrote.active ? Math.sin(garrote.t * 38) * 0.008 * (1 - garrote.t / SETTINGS.garroteTime) : 0;
+    garroteModel.position.set(shake, -0.25 * (1 - k), 0); garroteModel.userData.wire.scale.y = 0.6 + 0.4 * k;
+    weaponRoot.visible = false; dualRoot.visible = false;
+  }
+  if (!garrote.active) return;
+  const e = garrote.target;
+  if (!e || e.state === 'dead' || state !== 'playing') { garrote.active = false; if (e) e.garroted = false; return; }
+  if (!(keys.KeyH || touch.garrote)) { garroteFail('let go'); return; }
+  if (player.health < garrote.hp0 || enemies.filter(o => o !== e && o.state === 'chase').length > garrote.chasers0) { garroteFail('interrupted'); return; }   // shot, or someone new saw you
+  garrote.t += dt;
+  // Hold him just in front of you, facing away; he thrashes, weaker and weaker.
+  const f = camera.getWorldDirection(new THREE.Vector3()); f.y = 0; f.normalize();
+  const tx = camera.position.x + f.x * 0.8, tz = camera.position.z + f.z * 0.8;
+  if (!circleHitsWall(tx, tz, 0.3)) { e.group.position.x += (tx - e.group.position.x) * Math.min(1, dt * 8); e.group.position.z += (tz - e.group.position.z) * Math.min(1, dt * 8); }
+  e.yaw = Math.atan2(f.x, f.z);
+  e.group.rotation.z = Math.sin(garrote.t * 22) * 0.14 * (1 - garrote.t / SETTINGS.garroteTime);
+  if (garrote.t >= SETTINGS.garroteTime) {
+    garrote.active = false; garrote.target = null; e.garroted = false; e.group.rotation.z = 0;
+    e.health = 0; e.garroteKill = true; lastHit = { zone: 'garrote', distance: 0.5 };
+    killEnemy(e, false, { garrote: true }); flashHitmarker(true);
+    trainEvent('garrote:' + (e === trainRP.g1 ? 'g1' : e === trainRP.g2 ? 'g2' : 'other'));
+  }
+}
+// ---- JUMP (Space / JUMP button, v0.6) ----
+SETTINGS.jumpSpeed = 4.6; SETTINGS.jumpGravity = 13; BASE_SETTINGS.jumpSpeed = 4.6; BASE_SETTINGS.jumpGravity = 13;
+player.jumpY = 0; player.jumpV = 0; player.sprinting = false;
+function tryJump() {
+  if (state !== 'playing' || garrote.active) return;
+  if (player.stance !== 'stand') { setStance('stand'); return; }               // first Space stands you up
+  if (player.jumpY > 0 || player.jumpV > 0) return;
+  player.jumpV = SETTINGS.jumpSpeed; playNoise(0.06, 0.08, 900); trainEvent('jump');
+}
+function updateJump(dt) {
+  if (player.jumpV === 0 && player.jumpY === 0) return;
+  player.jumpV -= SETTINGS.jumpGravity * dt; player.jumpY += player.jumpV * dt;
+  if (player.jumpY <= 0) { player.jumpY = 0; player.jumpV = 0; playNoise(0.05, 0.06, 600); }
+}
+// ---- Facility overview picture (for screenshots / the curious): roof off, camera high above ----
+let trainOverview = false;
+function trainingOverview(on) {
+  if (!levelGroup) return;
+  trainOverview = !!on; camera.far = on ? 1000 : 200; camera.updateProjectionMatrix();
+  levelGroup.traverse(o => { if (o.isMesh && o.userData.isFloor && o.rotation.x > 0) o.visible = !on; });
+  if (on) { camera.position.set(worldCols * CELL / 2, 150, worldRows * CELL / 2 + 70); camera.lookAt(worldCols * CELL / 2, 0, worldRows * CELL / 2 + 6); scene.fog.far = 1000; }
+  else { scene.fog.far = SETTINGS.fogFar; }
+}
+// Training floor arrows say GO instead of ELEV.
+const arrowTextureGo = makeCanvasTexture(128, (ctx, s) => {
+  ctx.clearRect(0, 0, s, s); ctx.fillStyle = 'rgba(255,210,40,0.92)';
+  ctx.beginPath(); ctx.moveTo(s / 2, 6); ctx.lineTo(s - 14, s * 0.48); ctx.lineTo(s * 0.64, s * 0.48); ctx.lineTo(s * 0.64, s - 8); ctx.lineTo(s * 0.36, s - 8); ctx.lineTo(s * 0.36, s * 0.48); ctx.lineTo(14, s * 0.48); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#222'; ctx.font = 'bold 18px monospace'; ctx.textAlign = 'center'; ctx.fillText('GO', s / 2, s * 0.8);
+});
+const arrowMaterialGo = new THREE.MeshStandardMaterial({ map: arrowTextureGo, transparent: true, depthWrite: false, roughness: 0.8, emissive: 0x332200, polygonOffset: true, polygonOffsetFactor: -2 });
+// Weapons you actually carry: Mission 2 = the two sniper rifles; elsewhere the 870 is a training/Black File extra.
+function weaponOwned(i) { return currentMission === 2 ? i < 8 : true; }
+function cycleWeapon(dir) { for (let k = 1; k <= WEAPONS.length; k++) { const n = (currentWeapon + dir * k + WEAPONS.length * 2) % WEAPONS.length; if (weaponOwned(n)) { switchWeapon(n); return; } } }
+
 loadFigures();
 // Build the level once so it shows behind the briefing screen, then start the loop.
 applyMission(chosenMission);
@@ -5692,6 +6474,10 @@ window.__game = {
   killcamStep: (n, dt = 0.05) => { for (let i = 0; i < n && killcam.active; i++) updateKillcam(dt); return killcam.phase; },
   tick: (n, dt = 0.05) => { for (let i = 0; i < n; i++) { for (const e of enemies) updateEnemy(e, dt); updateStealth(dt); updateHUD(dt); } },
   spotterText: () => hud.spotter.textContent, alertText: () => hud.alertText.textContent, lastKillBody: () => lastKillBody,
+  // v0.6 training / garrote hooks
+  training: () => TRAIN, STATIONS, skipStation, skipPressed, beginStation, popTargets: () => popTargets, trainRP: () => trainRP, garrote, garrotePress, updateGarrote, tryJump,
+  radioPressed, trainingOverview, teleportTo, curStep, trainGates: () => trainGates, obstacles: () => obstacles, chooseMission, currentWeapon: () => currentWeapon, aiming: () => aiming,
+  aimAt: (x, y, z) => { const d = new THREE.Vector3(x, y, z).sub(camera.position); camera.rotation.set(Math.asin(THREE.MathUtils.clamp(d.y / d.length(), -1, 1)), Math.atan2(-d.x, -d.z), 0, 'YXZ'); },
   onPlayerShotNoise, nvMode: () => nvMode, lastShot: () => ({ lastShotSpot, repeatShots }), setZoom, weapon: () => WEAPONS[currentWeapon], zoomStep: () => zoomStep,
 };
 </script>
