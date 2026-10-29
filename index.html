@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>OPERATION: BLACK FILE — v0.6.2</title>
+<title>OPERATION: BLACK FILE — v0.6.3</title>
 <link rel="icon" href="data:,">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <!--
@@ -153,6 +153,8 @@
   #tC4 { left: 16px; top: 165px; width: 56px; height: 48px; font-size: 11px; border-color: rgba(255,160,60,0.9); }
   #tTimed { left: 80px; top: 165px; width: 56px; height: 48px; font-size: 10px; border-color: rgba(255,160,60,0.9); }
   #tClack { left: 16px; top: 221px; width: 56px; height: 48px; font-size: 10px; border-color: rgba(255,80,60,0.95); }
+  #tFlash { left: 144px; top: 165px; width: 56px; height: 48px; font-size: 10px; border-color: rgba(255,255,255,0.9); }
+  #flashWhite { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 6; }
   #tWay { left: 80px; top: 221px; width: 56px; height: 48px; font-size: 9px; border-color: rgba(64,224,255,0.9); }
   #dangerTag { position: absolute; bottom: 150px; left: 50%; transform: translateX(-50%); display: none; font-size: 16px; font-weight: bold; text-align: center;
     color: #ffd080; background: rgba(30,10,0,0.75); border: 1px solid rgba(255,160,60,0.8); padding: 5px 12px; max-width: 80vw; }
@@ -262,6 +264,7 @@
   <div class="tbtn equiponly" id="tTimed">TIMED</div>
   <div class="tbtn equiponly" id="tClack">FIRE<br>C4</div>
   <div class="tbtn equiponly" id="tWay">WAY-<br>POINT</div>
+  <div class="tbtn equiponly" id="tFlash">FLASH</div>
   <div class="tbtn m2only" id="tRange">RANGE</div>
   <div class="tbtn m2only" id="tElevUp">ELEV +</div>
   <div class="tbtn m2only" id="tElevDn">ELEV −</div>
@@ -313,6 +316,7 @@
   <div class="panel" id="ammoBox"><div id="weaponName"></div><div id="weaponExtra"></div><div id="ammoText">12 / 48</div></div>
   <div id="message"></div>
   <div id="dangerTag"></div>
+  <div id="flashWhite"></div>
   <div id="quip"></div>
   <div id="crosshair"><div class="h l"></div><div class="h r"></div><div class="v t"></div><div class="v b"></div></div>
   <div id="friendTag"></div>
@@ -368,7 +372,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 // ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
 // ##  part failed and why.                                           ##
 // #####################################################################
-const VERSION = 'v0.6.2';
+const VERSION = 'v0.6.3';
 // v0.4.4: the game must only ever start ONCE per page (one canvas, one camera, one loop).
 // If this script somehow ran a second time, stop the second copy right here.
 window.__valkyrieBoots = (window.__valkyrieBoots || 0) + 1;
@@ -733,15 +737,15 @@ const KNIFE_QUIPS = [
 //   9. Final showdown  — corner The Conductor (and maybe unmask The Patron).
 const BRIEFINGS = {
   0: `<p><b>CAMP HALYARD — NAVAL SPECIAL WARFARE TRAINING ANNEX.</b> Before anyone hands you a Black File, CHIEF wants to see you can walk, talk and shoot without hurting yourself. Or him.</p>
-    <ul><li><b>10 stations</b> in a row: movement · look · comms · live-fire range · sniper lane · weapons locker · knife · garrote · <b>navigation maze</b> · <b>demolition range</b>.</li>
+    <ul><li><b>11 stations</b> in a row: movement · look · comms · live-fire range · sniper lane · weapons locker · knife · garrote · <b>navigation maze</b> · <b>demolition range</b> · <b>breaching shoot house</b> (door charge, shotgun, ram, torch, wall charge, flashbangs, team stack, hostages).</li>
     <li>CHIEF's box at the top of the screen tells you exactly what to press — worded for <b>your</b> device (Magic Keyboard + trackpad, mouse, or touch).</li>
     <li>Follow the yellow <b>◆</b> on the compass and the yellow rings on the floor. Steel doors open as you finish each station.</li>
     <li>Bored? <b>0 twice</b> (or SKIP twice) skips a station. Lost? <b>O</b> (or RADIO) and CHIEF repeats himself, loudly.</li>
     <li>Nobody here can hurt you. Ammo is free. Role-players in red are <b>not</b> targets.</li></ul>
-    <p style="color:#8a8"><i>Coming next: breaching shoot house (flashbangs, door charges, hostages) and a final timed run.</i></p>`,
+    <p style="color:#8a8"><i>Coming next: comms tradecraft and a final timed run.</i></p>`,
   1: `<p><b>Wraith,</b> VALKYRIE — a rogue breakaway faction of the Kantor Group mercenaries — runs a hardened facility out of an old bunker. Inside are files on their warlord, <b>THE CONDUCTOR</b>, and the Moscow money man behind him.</p>
     <ul><li>Infiltrate the Valkyrie facility.</li><li>Retrieve all <b>intel files</b> (glowing yellow folders).</li><li>Reach the <b>extraction elevator</b> (unlocks once the intel is secured).</li></ul>
-    <p>Stay hidden: crouch or go prone, shoot when a jet, artillery or the faulty generator covers the noise (your spotter will say <b>"Now!"</b>), then relocate. You start with a suppressed Colt M1911 — rumour says a <b>spare .45</b> is stashed in the <b>ARMORY</b>. New kit: the <b>garrote</b> (hold <b>H</b> right behind an unaware guard — silent, no blood) and a <b>Remington 870</b> shotgun (key <b>9</b>, loud). From training you carry <b>3 C4 charges</b>: <b>B</b> plants one, <b>Y</b> fires the clacker, <b>U</b> plants a 10-second timed charge (touch: C4 / FIRE C4 / TIMED). A blast kills anyone inside 6 m — including you — and every guard nearby comes to look. <b>I</b> toggles a waypoint light over your objective. This message will self-destruct.</p>
+    <p>Stay hidden: crouch or go prone, shoot when a jet, artillery or the faulty generator covers the noise (your spotter will say <b>"Now!"</b>), then relocate. You start with a suppressed Colt M1911 — rumour says a <b>spare .45</b> is stashed in the <b>ARMORY</b>. New kit: the <b>garrote</b> (hold <b>H</b> right behind an unaware guard — silent, no blood) and a <b>Remington 870</b> shotgun (key <b>9</b>, loud). From training you carry <b>3 C4 charges</b>: <b>B</b> plants one, <b>Y</b> fires the clacker, <b>U</b> plants a 10-second timed charge (touch: C4 / FIRE C4 / TIMED). A blast kills anyone inside 6 m — including you — and every guard nearby comes to look. Also <b>2 door charges</b> (B on a door — the ARMORY has a steel one; the 870 on its hinges or the ram, V, work too) and <b>3 flashbangs</b> (<b>G</b>: guards that see the bang are stunned for 4 s). <b>I</b> toggles a waypoint light over your objective. This message will self-destruct.</p>
     <p><b>Getting around:</b> the yellow <b>◆</b> on the compass (top of the screen) points at your next objective. Each area looks different — red-brick <b>OFFICES</b>, grey <b>WAREHOUSE</b>, blue <b>COMMS</b>, caged <b>ARMORY</b>, bright <b>ELEVATOR LOBBY</b> — and wall signs + yellow floor arrows lead to the elevator. Press <b>M</b> (or MAP) for a map of everywhere you've been. Lost for a couple of minutes? HAWK or DOC will radio a hint.</p>`,
   2: `<p><b>OPERATION: COLD HORIZON.</b> <i>(The compass ◆ points at the next target.)</i> The Black File intel led us to a Valkyrie airfield in the mountains. The Conductor's section leaders are meeting there tonight — and a convoy is loading out.</p>
     <ul><li>You and your spotter <b>GRAVEL</b> are in a ridge nest about <b>1,150 m</b> north of the compound.</li>
@@ -782,7 +786,7 @@ const MAP = [
   "#...G...#...#.G...B...#",
   "###.#####.#.#####.###.#",
   "#.A.#.....#.....#.#...#",
-  "#.###.#########.#.#.###",
+  "#.###S#########.#.#.###",
   "#.#G..#...I...#...#.GX#",
   "#.#D###.#####.#####.#.#",
   "#......A..G.......#.G.#",
@@ -1273,6 +1277,7 @@ function buildLevel() {
   }
   safe('zones', () => decorateZones());
   if (currentMission === 0) safe('training', () => buildTraining());   // v0.6 stations, doors, targets, role-players
+  if (currentMission === 0 || currentMission === 1) safe('breachDoors', () => buildBreachDoors());   // v0.6.3 breach doors (d s h w S on the map)
   finalizeTargets();
 }
 
@@ -1578,7 +1583,7 @@ document.addEventListener('keydown', e => {
   // don't remember the key as "held" (its key-up may never arrive while Cmd is down).
   if (e.metaKey || e.ctrlKey) return;
   noteInput('key ' + e.code);
-  if (e.code === 'Backquote' || e.code === 'KeyG') { if (!e.repeat) toggleDebug(); e.preventDefault(); return; }
+  if (e.code === 'Backquote') { if (!e.repeat) toggleDebug(); e.preventDefault(); return; }   // v0.6.3: G is now the flashbang; ` alone toggles DEBUG
   if (killcam.active) { e.preventDefault(); endKillcam(); return; }   // any key skips the kill cam
   if (e.code === 'KeyM' && (state === 'playing' || state === 'map')) { e.preventDefault(); if (!e.repeat) state === 'map' ? closeMap() : openMap(); return; }
   if (state === 'map') { e.preventDefault(); return; }                // map open: the game is frozen
@@ -1610,6 +1615,7 @@ document.addEventListener('keydown', e => {
   if (e.code === 'KeyU') plantCharge(true);                 // v0.6.2: plant a TIMED charge (10 s)
   if (e.code === 'KeyY') fireClacker();                     // v0.6.2: fire the clacker (all remote charges)
   if (e.code === 'KeyI') toggleWaypoint();                  // v0.6.2: waypoint light column on/off
+  if (e.code === 'KeyG') throwFlash();                      // v0.6.3: throw a flashbang
   if (e.code === 'KeyF') laseRange();
   if (e.code === 'KeyV') safe('knife', knifeAttack);
   if (e.code === 'KeyR') startReload();
@@ -2105,6 +2111,7 @@ function tryShoot() {
       const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
       spawnParticles(hit.point, 0xffcc66, 6, 3, 0.04, normal);
       if (hit.object.userData.generator) { sabotageGenerator(); break; }   // sabotage!
+      if (hit.object.userData.hinge !== undefined) breachHinge(hit.object, w, hit.distance);   // v0.6.3 shotgun breach
       addBulletHole(hit.point, normal);
       if (hit.object.userData.isFloor) break;
     }
@@ -2244,6 +2251,7 @@ function knifeAttack() {
   if (state !== 'playing' || knifeTimer > 0 || killcam.active) return;
   knifeTimer = SETTINGS.knifeCooldown; knifeAnim = 0.3;
   setZoom(0);
+  { const bd = breachAhead(); if (bd) { knifeTimer = 0.45; ramHit(bd); return; } }   // v0.6.3: facing a door = the ram
   SOUNDS.knifeSwish();
   const t = knifeTarget();
   if (!t) {                                                            // slashed thin air...
@@ -3315,7 +3323,11 @@ function updateTeammates(dt) {
     const d = dist2D(pos.x, pos.z, camera.position.x, camera.position.z);
     let move = { x: 0, z: 0 };
     const followDist = SETTINGS.teammateFollowDistance + i * 1.5;
-    if (m.hold) turnToward(m, Math.atan2(camera.position.x - pos.x, camera.position.z - pos.z), dt, 3);   // v0.6 training: wait in the comms room
+    if (m.goal) {                                          // v0.6.3: told to go somewhere (team stack) and hold
+      if (state === 'playing' && dist2D(pos.x, pos.z, m.goal.x, m.goal.z) > 0.3) move = steerTo(m, m.goal.x, m.goal.z, dt);
+      else turnToward(m, m.goal.yaw !== undefined ? m.goal.yaw : m.yaw, dt, 4);
+    }
+    else if (m.hold) turnToward(m, Math.atan2(camera.position.x - pos.x, camera.position.z - pos.z), dt, 3);   // v0.6 training: wait in the comms room
     else if (state === 'playing' && d > followDist) move = steerTo(m, camera.position.x, camera.position.z, dt);
     else {
       // Stopped: face the same way you're looking.
@@ -3668,7 +3680,7 @@ function updateHUD(dt) {
   if (w.zoomLevels.length > 1) extra += ` · ZOOM ${zoomStep}/${w.zoomLevels.length}`;
   if (w.penetration) extra += ' · PENETRATES';
   if (boltTimer > 0) extra += ' · BOLT';
-  if (equip.max) extra += ` · C4 ×${c4Text()} [${devKind() === 'touch' ? 'C4 / TIMED / FIRE C4' : 'B plant · U timed · Y fire'}]`;
+  if (equip.max) extra += ` · C4 ×${c4Text()}${equip.doorsMax ? ' · DOOR ×' + (equip.doors === Infinity ? '∞' : equip.doors) : ''}${equip.flashMax ? ' · FLASH ×' + (equip.flash === Infinity ? '∞' : equip.flash) : ''} [${devKind() === 'touch' ? 'C4 / TIMED / FIRE C4 / FLASH' : 'B plant · U timed · Y fire · G flash'}]`;
   hud.weaponExtra.textContent = extra;
   // Objective checklist
   let html = '<h3>MISSION OBJECTIVES</h3>';
@@ -3913,7 +3925,7 @@ touchButton('tJump', () => tryJump());
 touchButton('tGarrote', () => { touch.garrote = true; garrotePress(); }, () => { touch.garrote = false; });
 touchButton('tRadio', () => radioPressed());
 touchButton('tSkip', () => skipPressed());
-touchButton('tC4', () => plantCharge(false)); touchButton('tTimed', () => plantCharge(true)); touchButton('tClack', () => fireClacker()); touchButton('tWay', () => toggleWaypoint());
+touchButton('tC4', () => plantCharge(false)); touchButton('tTimed', () => plantCharge(true)); touchButton('tClack', () => fireClacker()); touchButton('tWay', () => toggleWaypoint()); touchButton('tFlash', () => throwFlash());
 touchButton('tPause', () => pauseGame('Paused'));
 touchButton('tStance', () => setStance({ stand: 'crouch', crouch: 'prone', prone: 'stand' }[player.stance]));
 touchButton('tNV', () => cycleNightVision());
@@ -5266,7 +5278,11 @@ const CONTROLS = [
     ['← →  or  J K', 'turn (hold to speed up)'],
     ['↑ ↓', 'look up / down · sniper rifles: scope elevation'],
     ['[ ]  or  ↑ ↓', 'scope elevation (sniper rifles)'],
-    ['` or G', 'DEBUG readout on / off'],
+    ['B / Y / U', 'plant C4 or a door charge (on a door) · fire the clacker · plant a 10-second timed charge'],
+    ['G', 'throw a flashbang (look away!)'],
+    ['V at a door', 'swing the ram (3 hits) · the 870 on both hinges also opens doors · hold H at a padlock = torch'],
+    ['I', 'waypoint light column over your objective'],
+    ['`', 'DEBUG readout on / off'],
     ['P', 'pause (Esc also works on keyboards that have it)'],
     ['Any key / click', 'skip the X-ray kill cam'],
   ]],
@@ -5623,7 +5639,7 @@ function startMission() {
   safe('start:audio', () => initAudio());
   safe('start:level', () => buildLevel());
   safe('start:reset', () => { resetPlayer(); resetWeapons(); resetMasking(); missionStartPose(); resetSpotter(); });
-  safe('start:demo', () => resetDemo());
+  safe('start:demo', () => { resetDemo(); resetBreach(); });
   hud.killFeed.innerHTML = '';
   mouseDown = false; setZoom(0); knifeTimer = 0; knifeAnim = 0;
   $('startScreen').style.display = $('endScreen').style.display = $('pauseScreen').style.display = 'none';
@@ -5867,6 +5883,8 @@ function underCrosshair() {
 // ##    #  wall   .  floor   P  start   X  graduation pad           ##
 // ##    1-8  station doors (open when that station is done/skipped) ##
 // ##    a  maze exit door (station 9)  r  demolition exit (station 10)##
+// ##    b  shoot-house door (station 10)   e  shoot-house exit (11)    ##
+// ##    d s h w  breach door: charge / shotgun / ram / marked wall    ##
 // #####################################################################
 const TRAIN_MAP = [
   "########################################################",
@@ -5902,16 +5920,16 @@ const TRAIN_MAP = [
   "#.#.#.....#.........#...#..a...........................#",
   "#.#.#####.#.#.#.#.#.###.#.##...........................#",
   "#.#...............#.......##...........................#",
-  "############################...........................#",
-  "############################...........................#",
-  "############################...........................#",
-  "############################...........................#",
-  "############################...........................#",
-  "############################...........................#",
-  "############################...........................#",
-  "############################...........................#",
-  "############################...........................#",
-  "############################...........................#",
+  "#####e######################...........................#",
+  "#.....#......#.......#.....#...........................#",
+  "#.....#......#.......d.....#...........................#",
+  "#............#########.....#...........................#",
+  "#.....#......#.......#.....#...........................#",
+  "###.######.#.w.......s.....b...........................#",
+  "#............#.......#.....#...........................#",
+  "#............#########.....#...........................#",
+  "#............#.......h.....#...........................#",
+  "#............#.......#.....#...........................#",
   "########################################################"
 ];
 // Each station area (map rectangles, like M1_ZONES). First match wins.
@@ -5926,6 +5944,7 @@ const TRAIN_ZONES = [
   { id: 't_garrote', name: 'STATION 8 · GARROTE',        c0: 24, c1: 33, r0: 11, r1: 21, color: '#d89a50', band: '#8a5a20', light: 0xfff4e8, lightPower: 6, banner: ['PIANO WIRE · TWO HANDLES · NO NOISE', '#2a1a08', '#e8b070'] },
   { id: 't_nav',     name: 'STATION 9 · NAVIGATION',     c0: 0,  c1: 27, r0: 22, r1: 33, color: '#60ff90', band: '#20a050', light: 0xf4fff6, lightPower: 6, banner: ['COMPASS · MAP · SIGNS · LANDMARKS', '#04200a', '#60ff90'] },
   { id: 't_demo',    name: 'STATION 10 · DEMOLITION',    c0: 28, c1: 55, r0: 22, r1: 43, color: '#ffa040', band: '#c06010', light: 0xfff4e8, lightPower: 6, banner: ['C4 · CLACKER · TIMED · DANGER CLOSE', '#2a1206', '#ffa040'] },
+  { id: 't_breach',  name: 'STATION 11 · BREACHING',     c0: 0,  c1: 27, r0: 34, r1: 43, color: '#ff7060', band: '#b03020', light: 0xfff0e8, lightPower: 6, banner: ['STACK · BREACH · BANG · CLEAR', '#2a0a06', '#ff9070'] },
   { id: 't_grad',    name: 'GRADUATION',                 c0: 0,  c1: 23, r0: 11, r1: 21, color: '#40ff70', band: '#20a040', light: 0xffffff, lightPower: 7, banner: ['CAMP HALYARD · GRADUATION', '#04200a', '#60ff80'] },
 ];
 // Clean training-facility look: pale painted blockwork with a coloured band per station, grey epoxy floor.
@@ -5989,7 +6008,7 @@ function createGate(ch, c, r) {
   const g = new THREE.Group(); g.position.set(x, 0, z); if (!along) g.rotation.y = Math.PI / 2;
   const door = new THREE.Mesh(new THREE.BoxGeometry(CELL, H, 0.25), trainMats.door); door.position.y = H / 2; g.add(door);
   for (const y of [0.25, H - 0.25]) { const s = new THREE.Mesh(new THREE.BoxGeometry(CELL, 0.3, 0.27), trainMats.stripe); s.position.y = y; door.add(s); s.position.y = y - H / 2; }
-  const lbl = 'STATION ' + ({ a: '9', r: '10' }[ch] || ch);
+  const lbl = 'STATION ' + ({ a: '9', r: '10', b: '10', e: '11' }[ch] || ch);
   const sign = makeSign(lbl + ' ▸ LOCKED', 2.2, 0.4, '#200808', '#ff6060'); sign.position.set(0, 1.7 - H / 2, 0.14); door.add(sign);
   const back = makeSign(lbl, 2.2, 0.4, '#200808', '#ff6060'); back.position.set(0, 1.7 - H / 2, -0.14); back.rotation.y = Math.PI; door.add(back);
   levelGroup.add(g); wallMeshes.push(door);
@@ -6091,7 +6110,7 @@ function resetRolePlayer(e) {
 let trainRP = {}, trainMateSpots = [TP(22, 2), TP(23, 3)];
 function buildTraining() {
   trainGates = {}; popTargets = []; lookPanels = []; trainMarker = null; trainRP = {};
-  for (let r = 0; r < worldRows; r++) for (let c = 0; c < worldCols; c++) { const ch = grid[r][c]; if ((ch >= '1' && ch <= '9') || ch === 'a' || ch === 'r') createGate(ch, c, r); }
+  for (let r = 0; r < worldRows; r++) for (let c = 0; c < worldCols; c++) { const ch = grid[r][c]; if ((ch >= '1' && ch <= '9') || ch === 'a' || ch === 'r' || ch === 'b' || ch === 'e') createGate(ch, c, r); }
   // Station 1: hurdles (r4), low bar + crawl net (r6)
   addObstacle('jump', 25.85, 26.15, 16, 20); addObstacle('jump', 13.85, 14.15, 16, 20);
   addObstacle('crouch', 9.8, 10.2, 24, 28); addObstacle('prone', 19.5, 23.5, 24, 28);
@@ -6129,14 +6148,15 @@ function buildTraining() {
     trainRP.g2 = makeRolePlayer(103, 76, Math.PI / 2, "Role-player", { x: 132, z: 76 });
     const win = box(2.4, 1.2, 0.1, new THREE.MeshBasicMaterial({ color: 0x7ab0ff }), 110, 1.7, 44.06, levelGroup); }
   // Graduation hall: what's coming in the next update
-  addTrainSign('BREACHING · FINAL RUN — OPENING SOON (v0.6.3)', 12, 11, 12, 10, 2.5, 4.2, 0.5, '#1a1a1a', '#ffd23a');
+  addTrainSign('FINAL RUN — OPENING SOON', 12, 11, 12, 10, 2.5, 4.2, 0.5, '#1a1a1a', '#ffd23a');
   addTrainSign('▼ STATION 9 · NAVIGATION MAZE', 3, 21, 3, 22, 2.6, 3.2, 0.45, '#04200a', '#60ff80');
   // v0.6.2: Station 9 maze + Station 10 demolition range (SECTION 21)
   safe('maze', () => buildMaze()); safe('demoRange', () => buildDemoRange());
+  safe('shootHouse', () => buildShootHouse());   // v0.6.3 station 11 (SECTION 22)
 }
 // Fewer, well-placed lights for the big training hall (one or more per station).
 function trainingLamps() {
-  return [[5, 2], [14, 3], [22, 3], [32, 3], [41, 3], [50, 3], [8, 8], [27, 9], [46, 9], [49, 15], [39, 15], [29, 15], [12, 15], [4, 18], [11, 24], [19, 28], [5, 30]].map(([c, r]) => ({ c, r }));
+  return [[5, 2], [14, 3], [22, 3], [32, 3], [41, 3], [50, 3], [8, 8], [27, 9], [46, 9], [49, 15], [39, 15], [29, 15], [12, 15], [4, 18], [11, 24], [19, 28], [5, 30], [17, 38], [6, 40]].map(([c, r]) => ({ c, r }));
 }
 // ---- CHIEF's stations. Each step: text (what to do), optional 'at' (marker / compass target),
 //      start / tick helpers, and check() = true when it's done. 'say' = CHIEF's reaction. ----
@@ -6166,6 +6186,11 @@ function lookPanelTick(S, dt, end) {
   if (S.h > 0.25) { p.mesh.material = trainMats.panelDone; SOUNDS.pickup(); S.k++; S.h = 0; if (S.k < end) panelOn(S.k); }
 }
 // v0.6.2 station 9/10 spots (used inside STATIONS, so they must come first)
+// v0.6.3 shoot-house spots: stack marks, doors, teammate stack positions
+const SH = {
+  stackD: { x: 89.5, z: 138.6 }, stackW: { x: 57.5, z: 149.6 }, mates: [{ x: 58.8, z: 149.0, yaw: -Math.PI / 2 }, { x: 60.2, z: 149.1, yaw: -Math.PI / 2 }],
+  doorD: { x: 89.5, z: 142 }, doorS: { x: 88.6, z: 154 }, doorH: { x: 88.6, z: 166 }, lock: { x: 76, z: 170.6 },
+};
 const NAV = { entry: [3, 22], A: TP(8, 28), lamp: TP(13, 30), exit: TP(26, 30) };
 const DEMO_AT = { jeep: { x: 143, z: 100 }, safe: { x: 122.5, z: 112 }, door: { x: 145.5, z: 146 }, wall: { x: 167, z: 160 }, chain: { x: 163.6, z: 103 }, tower: { x: 199.5, z: 150 }, gen: { x: 201.5, z: 118 } };
 const STATIONS = [
@@ -6283,9 +6308,9 @@ const STATIONS = [
         tick: (S, dt) => { S.left -= dt; if (S.left <= 0) { S.tries++; S.left = SETTINGS.navTime; teleportTo(...NAV.entry); radioSay('CHIEF', 'Time. Back to the start. Again. The arrows are green for a reason.', 5); } },
         check: () => nearP(NAV.exit, 2.6), after: () => radioSay('CHIEF', `Out in ${Math.round(SETTINGS.navTime - TRAIN.S.left)} seconds${waypoint.on ? ', with the waypoint on. Cheeky' : ''}.`, 5) },
     ] },
-  { id: 'demo', zone: 't_demo', gate: 'r', entry: [28, 30], name: 'DEMOLITION',
+  { id: 'demo', zone: 't_demo', gate: 'rb', entry: [28, 30], name: 'DEMOLITION',
     intro: 'Demolition. You carry plastic explosive — C4 — a remote clacker and timed fuses. C4 is very stable until it very much isn\'t. Count your fingers now, for comparison.',
-    get outro() { return `Demolition: done. Score ${demoScore.pts}${demoScore.close ? ', and ' + demoScore.close + ' danger-close. I\'ve seen tidier funerals' : ', and nobody danger-close. Lovely'}. You carry the kit into Black File: three charges. The exit is back through the garrote room.`; },
+    get outro() { return `Demolition: done. Score ${demoScore.pts}${demoScore.close ? ', and ' + demoScore.close + ' danger-close. I\'ve seen tidier funerals' : ', and nobody danger-close. Lovely'}. You carry the kit into Black File: three charges. Next: the shoot house, through the west door.`; },
     steps: [
       { text: () => `REMOTE C4 — walk up to the <b>JEEP</b>, face it and plant a charge: ${K('c4')}. A <b>RED</b> ring appears on the floor: that's the blast radius (${SETTINGS.c4Radius} m). Inside the <b>ORANGE</b> ring (${SETTINGS.c4Radius * 1.5} m) is DANGER CLOSE.${demoLine()}`,
         at: DEMO_AT.jeep, label: 'JEEP', check: () => ev('plant:jeep') > 0 || dT('jeep'), say: 'Charge set. Now leave. Briskly.' },
@@ -6302,9 +6327,45 @@ const STATIONS = [
         start: S => { S.t = dT('tower'); S.g = dT('gen'); }, tick: S => { if (ev('plant:tower')) S.t = 1; if (ev('plant:gen')) S.g = 1; },
         check: () => dT('tower') && dT('gen') },
     ] },
+  // ---- v0.6.3: Station 11 BREACHING (SECTION 22 has the doors, flashbangs, torch and the shoot house) ----
+  { id: 'breach', zone: 't_breach', gate: 'e', entry: [24, 38], name: 'BREACHING',
+    intro: 'The shoot house. Doors are where people die, Wraith — mostly the people standing in front of them. Four ways through: a charge, a shotgun, a ram, and a hole where there wasn\'t one.',
+    get outro() { return `Shoot house: clear. Breach score ${breachScore.pts}${breachScore.hostages ? ', and ' + breachScore.hostages + ' hostage hit. We\'ll talk about that' : ', no hostages hurt. Lovely'}. Door charges and flashbangs go with you into Black File. Out through the north door and the maze.`; },
+    steps: [
+      { text: () => `DOOR CHARGE — face DOOR 1 and plant a breaching charge: ${K('c4')}. It's small (${SETTINGS.doorChargeRadius} m) but it's still a bomb: stand on the yellow STACK mark BESIDE the door, never in front of it. Then ${K('clacker')}.${breachLine()}`,
+        at: SH.doorD, label: 'DOOR 1', check: () => bOpen('bd21_35'), say: 'Door: gone. Now the people behind it.' },
+      { text: () => `CLEAR ROOM 1 — two targets inside. Shoot both. (${popCount(['b1a', 'b1b'])}/2)${breachLine()}`,
+        start: () => raiseTargets(['b1a', 'b1b'], 0), check: () => popDown(['b1a', 'b1b']), after: () => { breachScore.pts += 100; radioSay('HAWK', 'Room one clear!', 3); } },
+      { text: () => `SHOTGUN BREACH — take the Remington 870 (${KW(8)}), put the muzzle within a metre or two of DOOR 2 and shoot BOTH hinges (black blocks on the left edge, top and bottom).${breachLine()}`,
+        at: SH.doorS, label: 'DOOR 2', check: () => bOpen('bd21_38'), say: 'Hinges first, questions later.' },
+      { text: () => `CLEAR ROOM 2 — one hostile and one <b>HOSTAGE</b> (white, NO SHOOT). Shoot only the hostile.${breachLine()}`,
+        start: () => raiseTargets(['b2a', 'b2q'], 0), tick: S => hostageCheck(S, ['b2a'], ['b2q']), check: () => popDown(['b2a']),
+        after: () => { dropTargets(['b2q']); breachScore.pts += 100; radioSay('DOC', 'Hostage is safe. Room two clear.', 3); } },
+      { text: () => `RAM — face DOOR 3 and hit it with the ram: ${K('ram')} (your knife key), three times. (A Halligan bar pries a door open quietly; the ram is quicker and louder.)${breachLine()}`,
+        at: SH.doorH, label: 'DOOR 3', check: () => bOpen('bd21_41'), say: 'Knock knock.' },
+      { text: () => `TORCH (optional) — the flashbangs are in a padlocked cage at the back of room 3. Face the padlock and ${K('torch')} for ${SETTINGS.torchTime} s to cut it. Don't fancy it? ${K('radio')} and CHIEF unlocks it for you.`,
+        at: { x: 77.6, z: 168.8 }, label: 'PADLOCK', radio: true, check: () => (cage && cage.open) || ev('radio') > 0, after: () => { if (cage && !cage.open) { openCage(); radioSay('CHIEF', 'Fine. Here. The torch is for people with patience.', 4); } else radioSay('CHIEF', 'Neat cut. Grab the bangs.', 3); } },
+      { text: S => `FLASHBANG — three targets pop up at the far end of room 3. Throw a flashbang at them (${K('flash')}) — it bounces off walls and pops after ${SETTINGS.flashFuse} s; LOOK AWAY when it does — then shoot all three while they're stunned (they wobble). (${popCount(['f1', 'f2', 'f3'])}/3)${S.need ? '<br><i>Flash them FIRST — targets reset.</i>' : ''}${breachLine()}`,
+        start: S => { S.fl = 0; raiseTargets(['f1', 'f2', 'f3'], 0); },
+        tick: S => { if (ev('flashTargets') > 0) S.fl = 1; if (!S.fl && popCount(['f1', 'f2', 'f3']) > 0) { S.need = 1; for (const t of popTargets) if (['f1', 'f2', 'f3'].includes(t.id)) t.hits = 0; raiseTargets(['f1', 'f2', 'f3'], 0); } },
+        check: S => S.fl && popDown(['f1', 'f2', 'f3']), after: () => { breachScore.pts += 100; radioSay('CHIEF', 'Bang, then bullets. In that order. Every time.', 4); } },
+      { text: () => `TEAM STACK — the marked wall in room 2 is your way into the kill house. Stand on the STACK mark beside it; HAWK and DOC stack up behind you. ${teammates.map((m, i) => (teamStackedOne(m, i) ? '✔ ' : '… ') + m.name).join(' · ')}`,
+        at: SH.stackW, label: 'STACK', start: () => stackTeam(SH.mates), check: () => nearP(SH.stackW, 1.3) && teamStacked(SH.mates),
+        after: () => { radioSay('HAWK', 'Stacked.', 2); setTimeout(() => { if (state === 'playing' && currentMission === 0) radioSay('DOC', 'Ready. Your call, Wraith.', 3); }, 1200); } },
+      { text: () => `WALL CHARGE — walk up and plant it on the marked wall (${K('c4')}), step back onto the stack mark (outside the ring), then ${K('clacker')}. HAWK and DOC go in on the bang.${breachLine()}`,
+        check: () => bOpen('bw13_38'), after: () => { stackTeam(null); radioSay('HAWK', 'Breach! Go, go, go!', 3); } },
+      { text: S => `CLEAR THE KILL HOUSE with HAWK and DOC — 6 hostiles, 2 <b>HOSTAGES</b> (white, NO SHOOT) in three rooms. Flash a room before you go in. Hostiles down: ${popCount(KH)}/6 · ${Math.floor(S.t || 0)} s${breachLine()}`,
+        start: S => { S.t = 0; for (const t of popTargets) if (KH.includes(t.id) || KQ.includes(t.id)) t.hits = 0; raiseTargets(KH.concat(KQ), 0); },
+        tick: (S, dt) => { S.t += dt; hostageCheck(S, KH, KQ); }, check: () => popDown(KH),
+        after: () => { dropTargets(KQ); const bonus = Math.max(0, 300 - Math.round(TRAIN.S.t) * 3); breachScore.pts += 300 + bonus; radioSay('HAWK', `Kill house clear! ${Math.round(TRAIN.S.t)} seconds.${bonus ? ' Speed bonus +' + bonus + '.' : ''}`, 4); } },
+    ] },
 ];
 const dT = id => { const t = demoTargets.find(q => q.id === id); return !!t && t.destroyed; };
 function demoLine() { return `<br><span class="tstep">Demolition score: ${demoScore.pts}${demoScore.chain ? ' · chain reactions ×' + demoScore.chain : ''}${demoScore.close ? ' · danger-close ×' + demoScore.close + ' (−50 each)' : ''}</span>`; }
+const KH = ['kh1', 'kh2', 'kh3', 'kh4', 'kh5', 'kh6'], KQ = ['kq1', 'kq2'];
+const bOpen = id => { const t = demoTargets.find(q => q.id === id); return !!t && !!t.open; };
+const popCount = ids => ids.filter(id => { const t = popTargets.find(q => q.id === id); return t && !t.up && t.hits > 0; }).length;
+function teamStackedOne(m, i) { const s = SH.mates[i] || SH.mates[SH.mates.length - 1]; return dist2D(m.group.position.x, m.group.position.z, s.x, s.z) < 0.8; }
 // ---- The station engine (also runs GRAVEL's SNIPER LESSON, mission 3) ----
 var TRAIN = null;
 function ST() { return currentMission === 3 ? LESSON : STATIONS; }          // the list of stations / lessons
@@ -6321,6 +6382,7 @@ function trainEvent(name, data) {
   if (!trainLike() || !TRAIN) return;
   const E = TRAIN.ev, add = k => { E[k] = (E[k] || 0) + 1; };
   add(name);
+  if (name === 'pop' && data.hostage) add('hostageHit');
   if (name === 'pop') { add('pop:' + data.id); add('pop:' + data.id + (data.aiming ? ':aim' : ':hip')); if (data.zone === 'head') add('pop:' + data.id + ':head'); add('popW:' + data.weapon); }
   if (name === 'shot') TRAIN.fired.add(data);
   if (name === 'lase') TRAIN.lastLase = data;
@@ -6346,7 +6408,8 @@ function finishStep() {
 function completeStation(skipped, lastSay = '') {
   const s = curStation(); if (!s) return;
   TRAIN.done[TRAIN.i] = true; TRAIN.skipped[TRAIN.i] = skipped;
-  if (s.gate) openGate(s.gate); setMarker(null);
+  if (s.gate) for (const ch of s.gate) openGate(ch);   // v0.6.3: a station can open more than one door
+  setMarker(null);
   if (s.id === 'comms') teammates.forEach(m => { m.hold = false; });
   const m = currentMission, who = coach();
   if (!skipped) setTimeout(() => { if (state === 'playing' && currentMission === m) radioSay(who, (lastSay ? lastSay + ' ' : '') + s.outro, 7); }, s.id === 'comms' ? 4500 : m === 3 && (s.id === 'drop' || s.id === 'rifles') ? 0 : 300);
@@ -6505,6 +6568,7 @@ function garroteTarget() {
 }
 function garrotePress() {
   if (state !== 'playing' || garrote.active || garrote.cooldown > 0 || killcam.active) return;
+  if (torchAhead()) return;                          // v0.6.3: holding H at the padlock = the torch (SECTION 22)
   const e = garroteTarget();
   if (!e) { showMessage('Garrote: get right behind an unaware guard, then ' + plain(K('garrote')) + '.', 2); return; }
   if (e.state === 'chase') { showMessage('He knows you\'re there — the garrote only works on an UNAWARE guard.', 2); return; }
@@ -6732,15 +6796,14 @@ function demoBlast(center, radius, o = {}) {
 }
 function detonate(c) {
   if (c.done) return; c.done = true; levelGroup.remove(c.group); levelGroup.remove(c.ring);
-  demoBlast(new THREE.Vector3(c.pos.x, Math.max(0.35, c.pos.y), c.pos.z), SETTINGS.c4Radius, { charge: c });
+  demoBlast(new THREE.Vector3(c.pos.x, Math.max(0.35, c.pos.y), c.pos.z), c.radius || SETTINGS.c4Radius, { charge: c, small: c.door });
   trainEvent('blast'); if (c.target) trainEvent('blast:' + c.target.id);
 }
 // ---- Planting ----
 const plantRay = new THREE.Raycaster();
 function plantCharge(timed) {
   if (state !== 'playing') return;
-  if (!equip.max) { showMessage('No demolition kit on this op.', 2); return; }
-  if (equip.c4 <= 0) { showMessage('Out of C4.', 2); return; }
+  if (!equip.max && !equip.doorsMax) { showMessage('No demolition kit on this op.', 2); return; }
   if (charges.filter(c => !c.done).length >= 8) { showMessage('That\'s enough charges for one bang. Fire them first (' + plain(K('clacker')) + ').', 2.5); return; }
   plantRay.setFromCamera({ x: 0, y: 0 }, camera); plantRay.far = 3.2;
   const objs = wallMeshes.concat(...demoTargets.filter(t => !t.destroyed).map(t => t.meshes));
@@ -6754,25 +6817,30 @@ function plantCharge(timed) {
     pos = new THREE.Vector3(camera.position.x + f.x * 0.8, 0.03, camera.position.z + f.z * 0.8); normal = new THREE.Vector3(0, 1, 0);
   }
   if (!target) { let bd = 1e9; for (const t of demoTargets) { if (t.destroyed) continue; const dd = dist2D(t.x, t.z, pos.x, pos.z) - t.r; if (dd < 1.4 && dd < bd) { bd = dd; target = t; } } }
+  // v0.6.3: on a door or a marked wall you use a (small) DOOR CHARGE if you have one
+  const doorJob = !!target && (target.kind === 'bdoor' || target.kind === 'bwall'), isDoor = doorJob && equip.doors > 0;
+  if (!isDoor && equip.c4 <= 0) { showMessage(equip.doors > 0 ? 'Out of C4. Door charges only go on doors and marked walls.' : 'Out of C4' + (equip.doorsMax ? ' and door charges.' : '.'), 2.5); return; }
   const g = new THREE.Group(); g.position.copy(pos).addScaledVector(normal, 0.035); g.lookAt(g.position.clone().add(normal));
+  if (isDoor) box(0.5, 0.08, 0.05, demoMats.barrel, 0, 0, 0, g);   // a red strip: the breaching (frame) charge
   box(0.28, 0.16, 0.06, demoMats.c4, 0, 0, 0, g); box(0.29, 0.03, 0.065, demoMats.tape, 0, 0.04, 0, g); box(0.29, 0.03, 0.065, demoMats.tape, 0, -0.04, 0, g);
   const det = box(0.07, 0.05, 0.04, timed ? demoMats.gen : demoMats.tape, 0.06, 0, 0.045, g); const led = box(0.025, 0.025, 0.02, demoMats.led, -0.06, 0.02, 0.04, g);
   levelGroup.add(g);
-  const R = SETTINGS.c4Radius, ring = new THREE.Group(); ring.position.set(pos.x, 0.04, pos.z);
+  const R = isDoor ? SETTINGS.doorChargeRadius : SETTINGS.c4Radius, ring = new THREE.Group(); ring.position.set(pos.x, 0.04, pos.z);
   const r1 = new THREE.Mesh(new THREE.RingGeometry(R - 0.18, R, 56), demoMats.ring); r1.rotation.x = -Math.PI / 2; ring.add(r1);
   const r2 = new THREE.Mesh(new THREE.RingGeometry(R * 1.5 - 0.1, R * 1.5, 56), demoMats.ringOuter); r2.rotation.x = -Math.PI / 2; ring.add(r2);
   levelGroup.add(ring);
-  const c = { pos: g.position.clone(), group: g, ring, led, timed, t: timed ? SETTINGS.c4Fuse : 0, beepAt: 0, target, done: false };
-  charges.push(c); if (equip.c4 !== Infinity) equip.c4--;
+  const c = { pos: g.position.clone(), group: g, ring, led, timed, t: timed ? SETTINGS.c4Fuse : 0, beepAt: 0, target, done: false, radius: R, door: isDoor };
+  charges.push(c); if (isDoor) { if (equip.doors !== Infinity) equip.doors--; } else if (equip.c4 !== Infinity) equip.c4--;
   playTone(1200, 1200, 0.04, 0.15, 'square'); playTone(1600, 1600, 0.04, 0.15, 'square', 0.08); playNoise(0.12, 0.08, 2000);
   const on = target ? ' on the ' + target.name : '';
-  showMessage(timed ? `TIMED CHARGE${on} — ${SETTINGS.c4Fuse} s. MOVE! Get outside the red ring.` : `C4 placed${on}. Get outside the red ring (${R} m), then fire it: ${plain(K('clacker'))}.${equip.max !== Infinity ? ' (' + equip.c4 + ' left)' : ''}`, 3);
+  if (isDoor) showMessage(`DOOR CHARGE on the ${target.kind === 'bwall' ? 'marked wall' : 'door'} (${R} m blast). Stand BESIDE it, outside the ring, then ${plain(K('clacker'))}.${equip.doors !== Infinity ? ' (' + equip.doors + ' door charges left)' : ''}`, 3);
+  else showMessage(timed ? `TIMED CHARGE${on} — ${SETTINGS.c4Fuse} s. MOVE! Get outside the red ring.` : `C4 placed${on}. Get outside the red ring (${R} m), then fire it: ${plain(K('clacker'))}.${equip.max !== Infinity ? ' (' + equip.c4 + ' left)' : ''}`, 3);
   trainEvent(timed ? 'timed' : 'plant'); if (target) trainEvent('plant:' + target.id);
   return c;
 }
 function fireClacker() {
   if (state !== 'playing') return;
-  if (!equip.max) { showMessage('No demolition kit on this op.', 2); return; }
+  if (!equip.max && !equip.doorsMax) { showMessage('No demolition kit on this op.', 2); return; }
   playTone(220, 140, 0.05, 0.35, 'square'); playNoise(0.05, 0.25, 3500); playTone(200, 130, 0.05, 0.3, 'square', 0.12); playNoise(0.05, 0.22, 3500, 0.12);   // clack-clack
   const live = charges.filter(c => !c.done && !c.timed);
   trainEvent('clack');
@@ -6796,11 +6864,12 @@ function updateWaypoint() {
 function updateDemo(dt) {
   if (state !== 'playing') return;
   for (let i = demoTimers.length - 1; i >= 0; i--) { const t = demoTimers[i]; if (t.m !== currentMission) { demoTimers.splice(i, 1); continue; } if (elapsed >= t.at) { demoTimers.splice(i, 1); safe('demoTimer', t.fn); } }
-  updateShake(dt); updateFires(dt); updateWaypoint();
+  updateShake(dt); updateFires(dt); updateWaypoint(); updateBreach(dt);
   for (const t of demoTargets) if (t.anim) t.anim(dt);
   let warn = '', R = SETTINGS.c4Radius;
   for (const c of charges) {
     if (c.done) continue;
+    R = c.radius || SETTINGS.c4Radius;
     const d = dist2D(c.pos.x, c.pos.z, camera.position.x, camera.position.z);
     if (c.timed) {
       c.t -= dt; c.beepAt -= dt;
@@ -6819,7 +6888,7 @@ function updateDemo(dt) {
 // ---- Demolition targets (the range, mission 0) ----
 function addDemoTarget(kind, id, name, x, z, r, build) {
   const g = new THREE.Group(); g.position.set(x, 0, z); levelGroup.add(g);
-  const t = { kind, id, name, x, z, r, group: g, meshes: [], destroyed: false, pending: false, hard: ['door', 'wall', 'tower'].includes(kind), props: [] };
+  const t = { kind, id, name, x, z, r, group: g, meshes: [], destroyed: false, pending: false, hard: ['door', 'wall', 'tower', 'bdoor', 'bwall'].includes(kind), props: [] };
   build(t, g, (w, h, d, mat, px, py, pz, parent = g) => box(w, h, d, mat, px, py, pz, parent));
   g.traverse(o => { if (o.isMesh) { o.userData.demoTarget = t; t.meshes.push(o); } });
   demoTargets.push(t); return t;
@@ -6832,6 +6901,7 @@ function destroyTarget(t, from, chained) {
   if (chained) { demoScore.chain++; showMessage(`CHAIN REACTION! ${t.name} went up too (+${pts})`, 2.5); }
   trainEvent('destroyed'); trainEvent('destroyed:' + t.id);
   const c = new THREE.Vector3(t.x, 1, t.z), away = new THREE.Vector3(t.x - from.x, 0, t.z - from.z); if (away.lengthSq() < 0.01) away.set(1, 0, 0); away.normalize();
+  if (DESTROY_EXTRA[t.kind]) { DESTROY_EXTRA[t.kind](t, away, from); return; }   // v0.6.3 breach doors / walls
   ({
     jeep: () => {   // the fuel tank goes, the jeep jumps and burns
       t.meshes.forEach(m => { if (m.material !== demoMats.tyre) m.material = demoMats.char; });
@@ -6966,6 +7036,273 @@ function navHint(target) {
   const word = COMPASS_WORDS[((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8];
   radioSay('HAWK', `Wraith, from where you are head ${word}. About ${Math.round(path.length * CELL)} m of corridor to the exit on the east side. At junctions, follow the green arrows.`, 8);
 }
+
+// #####################################################################
+// ##  SECTION 22: BREACHING & FLASHBANGS (v0.6.3)                    ##
+// ##  Breach doors on the map:  d = door-charge door  s = shotgun    ##
+// ##  door  h = ram door  w = marked wall (wall charge)  S = steel    ##
+// ##  door in Black File (any method). Every door can be opened by   ##
+// ##  ANY method; the letters only decide the sign and the lesson.    ##
+// ##   - DOOR / WALL CHARGE: B on the door (Y fires) — small 2.5 m    ##
+// ##     blast; stack BESIDE the door, not in front.                 ##
+// ##   - SHOTGUN: the 870 (key 9) on BOTH hinges, under 3 m.          ##
+// ##   - RAM: V (the knife key) three times, facing the door.         ##
+// ##   - TORCH: hold H at a padlock (3 s).                            ##
+// ##   - FLASHBANG: G throws one; 1.5 s fuse; bounces off walls.      ##
+// ##     Stuns targets / guards within ~7 m that can see it, and you  ##
+// ##     if you're looking at it.                                     ##
+// #####################################################################
+SETTINGS.doorChargeRadius = 2.5; SETTINGS.flashFuse = 1.5; SETTINGS.flashBlackFile = 3; SETTINGS.doorChargesBlackFile = 2; SETTINGS.torchTime = 3;
+Object.assign(PROMPTS, { flash: ['FLASH', 'G'], ram: ['KNIFE', 'V'], torch: ['hold GARROTE', 'hold H'] });
+const BREACH_KIND = { d: 'charge', s: 'shotgun', h: 'ram', w: 'wall', S: 'any' };
+const BREACH_LABEL = { charge: 'DOOR CHARGE', shotgun: 'SHOTGUN · HINGES', ram: 'RAM', any: 'STEEL DOOR · BREACH IT' };
+let flashes = [], breachScore = { pts: 0, hostages: 0 }, cage = null;
+const torch = { t: 0, msgAt: -1e9 };
+const breachMats = {
+  door: new THREE.MeshStandardMaterial({ color: 0x6a5038, roughness: 0.8 }), steel: new THREE.MeshStandardMaterial({ color: 0x7c8690, roughness: 0.4, metalness: 0.8 }),
+  hinge: new THREE.MeshStandardMaterial({ color: 0x202224, roughness: 0.4, metalness: 0.9 }), frame: concreteMaterial,
+  bang: new THREE.MeshStandardMaterial({ color: 0x3a4a2a, roughness: 0.6, metalness: 0.3 }), cage: new THREE.MeshStandardMaterial({ color: 0x8a9098, roughness: 0.4, metalness: 0.8, wireframe: true }),
+  lock: new THREE.MeshStandardMaterial({ color: 0xc0a040, roughness: 0.3, metalness: 0.9 }), mark: new THREE.MeshBasicMaterial({ color: 0xffd23a }),
+};
+function resetBreach() {
+  flashes = []; breachScore.pts = 0; breachScore.hostages = 0; torch.t = 0;
+  equip.doors = currentMission === 0 ? Infinity : currentMission === 1 ? SETTINGS.doorChargesBlackFile : 0;
+  equip.flash = equip.flashMax = currentMission === 0 ? Infinity : currentMission === 1 ? SETTINGS.flashBlackFile : 0;
+  equip.doorsMax = equip.doors;
+  const w = $('flashWhite'); if (w) w.style.opacity = 0; hud.whiteAlpha = 0;
+}
+// ---- Breach doors / walls (both are demolition targets so C4 and door charges find them) ----
+function buildBreachDoors() {
+  for (let r = 0; r < worldRows; r++) for (let c = 0; c < worldCols; c++) { const k = BREACH_KIND[grid[r][c]]; if (k) addBreach(k, c, r); }
+}
+function addBreach(kind, c, r) {
+  const { x, z } = TP(c, r), H = SETTINGS.wallHeight, along = isWall(c - 1, r) && isWall(c + 1, r);
+  let t;
+  if (kind === 'wall') {
+    t = addDemoTarget('bwall', 'bw' + c + '_' + r, 'MARKED WALL', x, z, 1.7, (t, g, bx) => {
+      t.whole = bx(CELL, H, CELL, brickMaterial, 0, H / 2, 0);
+      for (const s of [-1, 1]) {
+        const sg = makeSign('✕  WALL CHARGE HERE  ✕', 2.6, 0.42, '#ffd23a', '#101010', false); sg.position.set(along ? 0 : s * (CELL / 2 + 0.02), 1.7, along ? s * (CELL / 2 + 0.02) : 0);
+        sg.rotation.y = along ? (s > 0 ? 0 : Math.PI) : (s > 0 ? Math.PI / 2 : -Math.PI / 2); g.add(sg);
+        const ring = new THREE.Mesh(new THREE.RingGeometry(0.85, 1.0, 4), breachMats.mark); ring.position.copy(sg.position); ring.position.y = 1.0; ring.rotation.y = sg.rotation.y; ring.rotation.z = Math.PI / 4; g.add(ring);
+      }
+    });
+    wallMeshes.push(t.whole);
+  } else {
+    t = addDemoTarget('bdoor', 'bd' + c + '_' + r, kind === 'any' ? 'STEEL DOOR' : 'DOOR', x, z, 0.9, (t, g, bx) => {
+      if (!along) g.rotation.y = Math.PI / 2;           // local +z faces the +x side of a north-south wall
+      const jw = (CELL - 1.6) / 2;
+      t.jambs = [bx(jw, H, 0.5, breachMats.frame, -(0.8 + jw / 2), H / 2, 0), bx(jw, H, 0.5, breachMats.frame, 0.8 + jw / 2, H / 2, 0), bx(1.6, H - 2.3, 0.5, breachMats.frame, 0, 2.3 + (H - 2.3) / 2, 0)];
+      const pivot = new THREE.Group(); pivot.position.set(-0.8, 0, 0); g.add(pivot); t.pivot = pivot;
+      t.door = bx(1.58, 2.28, 0.1, kind === 'any' ? breachMats.steel : breachMats.door, 0.8, 1.14, 0, pivot);
+      bx(0.05, 0.05, 0.22, breachMats.hinge, 1.4, 1.05, 0, pivot);   // handle
+      t.hinges = [0.45, 1.85].map((y, i) => { const h = bx(0.09, 0.26, 0.2, breachMats.hinge, 0.04, y, 0, pivot); h.userData.hinge = i; return h; });
+      t.hingeHit = [0, 0]; t.ramHits = 0;
+      const sg = makeSign(BREACH_LABEL[kind], 1.8, 0.3, '#1a1a1a', '#ffd23a'); sg.position.set(0, 2.55, 0.27); g.add(sg);
+      const sb = makeSign(BREACH_LABEL[kind], 1.8, 0.3, '#1a1a1a', '#ffd23a'); sb.position.set(0, 2.55, -0.27); sb.rotation.y = Math.PI; g.add(sb);
+    });
+    wallMeshes.push(t.door, ...t.hinges, ...t.jambs);
+  }
+  t.method = kind; t.cell = [c, r]; t.along = along;
+  solid[r * worldCols + c] = 1;
+  return t;
+}
+function openBreach(t, how, away) {
+  if (t.open) return; t.open = true; t.destroyed = true; t.how = how;
+  const [c, r] = t.cell; solid[r * worldCols + c] = 0;
+  const gone = new Set([t.door, t.whole, ...(t.hinges || [])]); wallMeshes = wallMeshes.filter(m => !gone.has(m));
+  trainEvent('breach'); trainEvent('breach:' + t.id); trainEvent('breachHow:' + how);
+  if (currentMission !== 0) investigateNoise(t.x, t.z, how === 'ram' ? 30 : how === 'shotgun' ? 60 : 90);
+  if (t.kind === 'bwall') {
+    t.whole.visible = false; if (t.group) t.group.children.forEach(ch => { ch.visible = false; });   // signs + marks go with the wall
+    const p = new THREE.Vector3(t.x, 1.4, t.z), a = away || new THREE.Vector3(-1, 0, 0);
+    spawnDebris(p, 30, brickMaterial, 0.26, 7, a); spawnDebris(p, 10, concreteMaterial, 0.18, 4, a);
+    for (let i = 0; i < 3; i++) smokeAt(new THREE.Vector3(t.x, 0.8, t.z), 2.5);
+    return;
+  }
+  // a doorway with jambs: keep the player out of the jambs
+  const ax = t.along ? 1 : 0, az = t.along ? 0 : 1;
+  for (const s of [-1, 1]) { const p = { x: t.x + ax * s * 1.4, z: t.z + az * s * 1.4, r: 0.55 }; props.push(p); }
+  // which way is "into the room"? (away from you)
+  const into = away ? away.clone() : new THREE.Vector3(t.x - camera.position.x, 0, t.z - camera.position.z).normalize();
+  const local = t.group.worldToLocal(new THREE.Vector3(t.x, 0, t.z).add(into)).z < 0 ? -1 : 1;   // +1 = local +z side
+  const door = t.door, pivot = t.pivot;
+  if (how === 'ram') {           // slams open around its hinges
+    let a = 0; playNoise(0.3, 0.6, 700); playTone(90, 50, 0.4, 0.5, 'square'); addShake(0.012);
+    t.anim = dt => { a = Math.min(1.75, a + dt * 9); pivot.rotation.y = -local * a; if (a >= 1.75) { t.anim = null; playNoise(0.2, 0.3, 1200); } };
+  } else if (how === 'shotgun') {  // hinges gone: the door tips over into the room
+    let a = 0, w = 0; pivot.rotation.y = -local * 0.12;
+    t.anim = dt => { w += dt * 6; a = Math.min(Math.PI / 2, a + w * dt); door.rotation.x = local * a; door.position.y = 1.14 - Math.sin(a) * 1.0; door.position.z = local * Math.sin(a) * 1.1;
+      if (a >= Math.PI / 2) { t.anim = null; door.position.y = 0.06; playNoise(0.35, 0.5, 900); addShake(0.006); } };
+  } else {                         // charge: the door is blown off and flies into the room
+    const wp = new THREE.Vector3(); door.getWorldPosition(wp); const q = new THREE.Quaternion(); door.getWorldQuaternion(q);
+    pivot.remove(door); levelGroup.add(door); door.position.copy(wp); door.quaternion.copy(q);
+    const v = into.clone().multiplyScalar(9).add(new THREE.Vector3(0, 2.5, 0)), spin = new THREE.Vector3(Math.random() * 3, Math.random() * 4, 2 + Math.random() * 2);
+    t.anim = dt => { v.y -= 9.8 * dt; door.position.addScaledVector(v, dt); door.rotation.x += spin.x * dt; door.rotation.z += spin.z * dt;
+      if (isWallAt(door.position.x, door.position.z)) { v.x *= -0.3; v.z *= -0.3; door.position.addScaledVector(v, dt * 2); }
+      if (door.position.y < 0.08) { door.position.y = 0.08; v.multiplyScalar(0.4); v.y = Math.abs(v.y) * 0.3; spin.multiplyScalar(0.4); if (v.length() < 0.6) { door.rotation.set(-Math.PI / 2, door.rotation.y, 0); t.anim = null; playNoise(0.4, 0.3, 900); } } };
+    spawnDebris(new THREE.Vector3(t.x, 1.2, t.z), 12, breachMats.door, 0.14, 6, into);
+    t.hinges.forEach(h => (h.visible = false));
+  }
+}
+const DESTROY_EXTRA = {
+  bdoor: (t, away) => openBreach(t, 'charge', away),
+  bwall: (t, away) => openBreach(t, 'charge', away),
+};
+// ---- Shotgun on the hinges (called from tryShoot when a pellet hits a hinge) ----
+function breachHinge(mesh, w, dist) {
+  const t = mesh.userData.demoTarget; if (!t || t.open) return;
+  if (!w.pellets) { if (elapsed - torch.msgAt > 1.5) { torch.msgAt = elapsed; showMessage('Bullets just bounce off hinges. Breaching is a shotgun job: the 870 (' + plain(KW(8)) + '), muzzle almost touching.', 2.5); } return; }
+  if (dist > 3) { if (elapsed - torch.msgAt > 1.5) { torch.msgAt = elapsed; showMessage(`Too far (${dist.toFixed(1)} m). Shotgun breach = muzzle within a metre or two of the hinge.`, 2.2); } return; }
+  const i = mesh.userData.hinge; if (t.hingeHit[i]) return;
+  t.hingeHit[i] = 1; mesh.visible = false; spawnParticles(mesh.getWorldPosition(new THREE.Vector3()), 0xffe0a0, 12, 5, 0.04); playTone(1800, 600, 0.1, 0.2, 'square');
+  trainEvent('hinge');
+  if (t.hingeHit[0] && t.hingeHit[1]) openBreach(t, 'shotgun');
+  else showMessage('One hinge gone — now the ' + (t.hingeHit[0] ? 'TOP' : 'BOTTOM') + ' one.', 2);
+}
+// ---- Ram (V, the knife key, facing a door) ----
+const breachRay = new THREE.Raycaster();
+function breachAhead(range = 2.4) {
+  breachRay.setFromCamera({ x: 0, y: 0 }, camera); breachRay.far = range;
+  const doors = demoTargets.filter(t => t.kind === 'bdoor' && !t.open);
+  if (!doors.length) return null;
+  const hit = breachRay.intersectObjects(doors.flatMap(t => [t.door, ...t.hinges, ...t.jambs]), false)[0];
+  return hit ? hit.object.userData.demoTarget : null;
+}
+function ramHit(t) {
+  t.ramHits++; playNoise(0.25, 0.55, 600); playTone(80, 45, 0.3, 0.45, 'square'); addShake(0.01); flashHitmarker(false);
+  spawnParticles(new THREE.Vector3(t.x, 1.1, t.z), 0xb09070, 8, 3, 0.05);
+  trainEvent('ram');
+  if (currentMission !== 0) investigateNoise(t.x, t.z, 20);
+  if (t.ramHits >= 3) openBreach(t, 'ram'); else showMessage(`RAM: ${t.ramHits}/3 — again! (${plain(K('ram'))})`, 1.5);
+}
+// ---- Torch on the padlocked cage (hold H) ----
+function torchAhead() { return !!cage && !cage.open && nearP(cage.lockPos, 1.9) && aimingAt(cage.lockPos, 0.5); }
+function updateTorch(dt) {
+  if (!cage || cage.open) return;
+  const holding = (keys.KeyH || touch.garrote) && torchAhead();
+  if (!holding) return;
+  torch.t += dt;
+  if (Math.random() < dt * 30) spawnParticles(cage.lockPos, Math.random() < 0.5 ? 0xffffff : 0x80c0ff, 2, 3, 0.025);
+  if (Math.random() < dt * 8) playNoise(0.08, 0.06, 5000);
+  if (elapsed - torch.msgAt > 0.4) { torch.msgAt = elapsed; showMessage(`TORCH: cutting the padlock… ${Math.min(100, Math.round(torch.t / SETTINGS.torchTime * 100))}%`, 0.6); }
+  if (torch.t >= SETTINGS.torchTime) openCage();
+}
+function openCage() {
+  if (!cage || cage.open) return; cage.open = true; cage.lock.visible = false;
+  spawnParticles(cage.lockPos, 0xffe070, 16, 4, 0.03); playTone(600, 200, 0.3, 0.2, 'square');
+  let a = 0; cage.anim = dt => { a = Math.min(1.9, a + dt * 2.5); cage.gate.rotation.y = a; if (a >= 1.9) cage.anim = null; };
+  showMessage('Cage open: flashbangs! (' + plain(K('flash')) + ' throws one)', 2.5); trainEvent('cageOpen');
+}
+// ---- Flashbangs ----
+function throwFlash() {
+  if (state !== 'playing') return;
+  if (!equip.flashMax) { showMessage('No flashbangs on this op.', 2); return; }
+  if (equip.flash <= 0) { showMessage('Out of flashbangs.', 2); return; }
+  const f = camera.getWorldDirection(new THREE.Vector3());
+  const pos = camera.position.clone().addScaledVector(f, 0.4); pos.y -= 0.15;
+  const vel = f.clone().multiplyScalar(11).add(new THREE.Vector3(0, 2.2, 0));
+  const g = new THREE.Group(); const can = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.13, 10), breachMats.bang); can.rotation.z = Math.PI / 2; g.add(can);
+  g.position.copy(pos); levelGroup.add(g);
+  flashes.push({ pos, vel, t: SETTINGS.flashFuse, mesh: g });
+  if (equip.flash !== Infinity) equip.flash--;
+  playTone(2600, 2600, 0.03, 0.12, 'square'); playNoise(0.05, 0.1, 3000);
+  if (currentMission === 0 || currentMission === 1) radioSay('WRAITH', 'Bang out!', 1.5);
+  trainEvent('flashThrow');
+}
+function clearLine(ax, az, bx, bz) { return hasLineOfSight(ax, az, bx, bz); }
+function updateFlashes(dt) {
+  for (let i = flashes.length - 1; i >= 0; i--) {
+    const f = flashes[i]; f.t -= dt;
+    for (let k = 0; k < 3; k++) {
+      const h = dt / 3; f.vel.y -= 9.8 * h;
+      const nx = f.pos.x + f.vel.x * h, nz = f.pos.z + f.vel.z * h, ny = f.pos.y + f.vel.y * h;
+      if (isWallAt(nx, f.pos.z)) { f.vel.x *= -0.45; if (Math.abs(f.vel.x) > 1) playTone(1500, 1400, 0.03, 0.05, 'triangle'); } else f.pos.x = nx;
+      if (isWallAt(f.pos.x, nz)) { f.vel.z *= -0.45; if (Math.abs(f.vel.z) > 1) playTone(1500, 1400, 0.03, 0.05, 'triangle'); } else f.pos.z = nz;
+      const ceil = heightField ? 1e9 : SETTINGS.wallHeight - 0.08, floorY = (heightField ? groundAt(f.pos.x, f.pos.z) : 0) + 0.04;
+      if (ny < floorY) { f.pos.y = floorY; if (f.vel.y < -1.5) playTone(1300, 1200, 0.03, 0.05, 'triangle'); f.vel.y = -f.vel.y * 0.3; f.vel.x *= 0.65; f.vel.z *= 0.65; }
+      else if (ny > ceil && zoneAtXZ(f.pos.x, f.pos.z).id !== 't_demo') { f.vel.y = -Math.abs(f.vel.y) * 0.3; }
+      else f.pos.y = ny;
+    }
+    f.mesh.position.copy(f.pos); f.mesh.rotation.y += dt * 8;
+    if (f.t <= 0) { levelGroup.remove(f.mesh); flashes.splice(i, 1); flashBang(f.pos); }
+  }
+}
+function flashBang(p) {
+  const d = camera.position.distanceTo(p);
+  playNoise(0.4, Math.min(1.3, 1.6 * volumeFar(p.x, p.z)), 7000); playTone(3100, 2900, 1.4, 0.08 * Math.max(0.2, 1 - d / 30), 'sine');
+  explosionLight.color.set(0xffffff); explosionLight.position.copy(p); explosionLight.intensity = 900; later(0.4, () => explosionLight.color.set(0xffaa55));
+  spawnParticles(p, 0xffffff, 24, 6, 0.05); for (let i = 0; i < 3; i++) smokeAt(p, 1.2);
+  addShake(THREE.MathUtils.clamp(0.012 / Math.max(1, d / 4), 0.002, 0.02));
+  let n = 0;
+  for (const t of popTargets) if (t.up && dist2D(t.x, t.z, p.x, p.z) < 7 && clearLine(p.x, p.z, t.x, t.z)) { t.stunned = elapsed + 3.5; n++; }
+  if (currentMission !== 0) {
+    for (const e of enemies) {
+      if (e.state === 'dead' || e.roleplayer) continue;
+      const ep = e.group.position;
+      if (dist2D(ep.x, ep.z, p.x, p.z) < 8 && clearLine(p.x, p.z, ep.x, ep.z)) { e.staggerTimer = Math.max(e.staggerTimer, 4); e.flashedUntil = elapsed + 4; n++; trainEvent('flashGuard'); }
+    }
+    investigateNoise(p.x, p.z, 50);
+  }
+  // you: blinded if you were looking at it
+  if (d < 14 && clearLine(camera.position.x, camera.position.z, p.x, p.z)) {
+    const f = camera.getWorldDirection(new THREE.Vector3()), to = p.clone().sub(camera.position).normalize();
+    const facing = f.angleTo(to) < 1.0, amt = THREE.MathUtils.clamp((1.1 - d / 14) * (facing ? 1 : 0.3), 0, 1);
+    if (amt > 0.08) { hud.whiteAlpha = Math.max(hud.whiteAlpha || 0, amt); if (facing && d < 8) { showMessage('You looked at your own flashbang. Throw it, then look AWAY.', 2.5); trainEvent('flashedSelf'); } }
+  }
+  trainEvent('flash'); if (n) trainEvent('flashTargets');
+}
+// ---- Per frame (called from updateDemo) ----
+function updateBreach(dt) {
+  updateFlashes(dt); updateTorch(dt);
+  if (cage && cage.anim) cage.anim(dt);
+  for (const t of popTargets) if (t.stunned) { if (t.stunned > elapsed && t.up) t.pivot.rotation.z = Math.sin(elapsed * 22) * 0.18; else { t.pivot.rotation.z = 0; t.stunned = 0; } }
+  hud.whiteAlpha = Math.max(0, (hud.whiteAlpha || 0) - dt * 0.4);
+  const w = $('flashWhite'); if (w) { const a = Math.min(1, hud.whiteAlpha * 1.4); if (w._a !== a) { w._a = a; w.style.opacity = a; } }
+  // stacked teammates: walk to their spot and hold it
+}
+// ---- The shoot house (mission 0, station 11) ----
+function faceYaw(x, z, vx, vz) { return Math.atan2(vx - x, vz - z); }
+function buildShootHouse() {
+  const T = (id, x, z, vx, vz, o = {}) => createPopTarget(id, x, z, faceYaw(x, z, vx, vz), { up: false, autoReset: 0, ...o });
+  T('b1a', 60, 138, 86, 142); T('b1b', 67, 142.5, 86, 142);
+  T('b2a', 60, 151, 86, 154); T('b2q', 63, 157.5, 86, 154, { hostage: true });
+  T('f1', 58, 166, 86, 166); T('f2', 61, 169.5, 86, 166); T('f3', 64, 166.5, 86, 166);
+  T('kh1', 32, 140, 50, 154); T('kh2', 45, 138, 50, 154); T('kq1', 39, 146, 50, 154, { hostage: true });
+  T('kh3', 8, 140, 26, 146); T('kh4', 17, 149.5, 26, 146);
+  T('kh5', 12, 168, 50, 158); T('kh6', 41, 170, 50, 158); T('kq2', 27, 164, 50, 158, { hostage: true });
+  // cage with the flashbangs (torch the padlock)
+  { const g = new THREE.Group(); g.position.set(76, 0, 171); levelGroup.add(g);
+    for (const [x, z] of [[-1, -0.6], [1, -0.6], [-1, 0.6], [1, 0.6]]) box(0.06, 2.2, 0.06, propMat.metal, x, 1.1, z, g);
+    box(2.0, 2.2, 0.02, breachMats.cage, 0, 1.1, 0.6, g); box(0.02, 2.2, 1.2, breachMats.cage, -1, 1.1, 0, g); box(0.02, 2.2, 1.2, breachMats.cage, 1, 1.1, 0, g); box(2.0, 0.02, 1.2, breachMats.cage, 0, 2.2, 0, g);
+    const gate = new THREE.Group(); gate.position.set(-1, 0, -0.6); g.add(gate); box(2.0, 2.2, 0.02, breachMats.cage, 1, 1.1, 0, gate);
+    const lock = box(0.12, 0.16, 0.06, breachMats.lock, 1.9, 1.1, -0.04, gate);
+    for (let i = 0; i < 4; i++) box(0.12, 0.12, 0.25, breachMats.bang, -0.5 + i * 0.3, 0.9, 0.1, g);
+    box(1.6, 0.06, 0.8, propMat.dark, 0, 0.84, 0.1, g);
+    const sg = makeSign('FLASHBANGS · PADLOCKED · TORCH IT', 2.0, 0.3, '#1a1a1a', '#ffd23a'); sg.position.set(0, 2.45, -0.62); sg.rotation.y = Math.PI; g.add(sg);
+    props.push({ x: 76, z: 171, r: 1.1 });
+    cage = { group: g, gate, lock, lockPos: new THREE.Vector3(76.9, 1.1, 170.36), open: false, anim: null }; }
+  // stack markers painted on the floor, and the room signs
+  for (const p of [SH.stackD, SH.stackW]) { const s = makeSign('STACK HERE', 1.2, 0.3, '#1a1a1a', '#ffd23a'); s.position.set(p.x, 0.03, p.z); s.rotation.set(-Math.PI / 2, 0, 0); levelGroup.add(s); }
+  addTrainSign('SHOOT HOUSE · STACK · BREACH · CLEAR', 24, 34, 24, 33, 2.5, 3.4, 0.5, '#2a0a0a', '#ff9070');
+  addTrainSign('KILL HOUSE ▸ HOSTAGES INSIDE', 14, 39, 13, 39, 2.4, 2.6, 0.42, '#2a0a0a', '#ff9070');
+}
+// Teammates: go to a spot and hold it (team stack). goal = null -> follow you again.
+function stackTeam(spots) { teammates.forEach((m, i) => { m.goal = spots ? spots[i] || spots[spots.length - 1] : null; m.hold = false; }); }
+function teamStacked(spots) { return teammates.length > 0 && teammates.every((m, i) => { const s = spots[i] || spots[spots.length - 1]; return dist2D(m.group.position.x, m.group.position.z, s.x, s.z) < 0.8; }); }
+function popDown(ids) { return ids.every(id => { const t = popTargets.find(q => q.id === id); return t && !t.up && t.hits > 0; }); }
+function hostageCheck(S, ids, hostages) {   // a hostage got shot: penalty, reset the room
+  const hit = hostages.some(id => { const t = popTargets.find(q => q.id === id); return t && t.hits > (S.qh || 0) && !t.up; });
+  if (!hit) return;
+  breachScore.hostages++; breachScore.pts -= 100;
+  for (const id of hostages) { const t = popTargets.find(q => q.id === id); if (t) { t.hits = 0; } }
+  for (const t of popTargets) if (ids.includes(t.id) || hostages.includes(t.id)) { t.hits = 0; }
+  raiseTargets(ids.concat(hostages), 0);
+  hud.damageAlpha = 0.6; playTone(300, 200, 0.5, 0.3, 'sawtooth');
+  radioSay('CHIEF', 'NO-SHOOT! That was a hostage. You just killed somebody\'s dad. Room resets — again. (−100)', 6);
+  trainEvent('hostageHit');
+}
+function breachLine() { return `<br><span class="tstep">Breach score: ${breachScore.pts}${breachScore.hostages ? ' · hostages hit ×' + breachScore.hostages + ' (−100 each)' : ''}</span>`; }
 
 // #####################################################################
 // ##  SECTION 20: SNIPER LESSON — GRAVEL'S RANGE DAY (v0.6)          ##
@@ -7226,6 +7563,7 @@ window.__game = {
   // v0.6 training / garrote hooks
   training: () => TRAIN, STATIONS, LESSON, lessonTargets: () => lessonTargets, lessonCall: () => TRAIN && TRAIN.lastCall, setLessonWind, windHold, lessonClear, lessonLead: id => lead(id), skipStation, skipPressed, beginStation, popTargets: () => popTargets, trainRP: () => trainRP, garrote, garrotePress, updateGarrote, tryJump,
   demo: () => ({ charges, demoTargets, equip, demoScore, waypoint, shake, demoFires, demoTimers }), plantCharge, fireClacker, toggleWaypoint, detonate, demoBlast, NAV, DEMO_AT, findPath, isWall, cellOf,
+  breach: () => ({ flashes, breachScore, cage, torch, doors: demoTargets.filter(t => t.kind === 'bdoor' || t.kind === 'bwall') }), throwFlash, openBreach, breachAhead, SH, stackTeam,
   radioPressed, trainingOverview, teleportTo, curStep, trainGates: () => trainGates, obstacles: () => obstacles, chooseMission, currentWeapon: () => currentWeapon, aiming: () => aiming,
   aimAt: (x, y, z) => { const d = new THREE.Vector3(x, y, z).sub(camera.position); camera.rotation.set(Math.asin(THREE.MathUtils.clamp(d.y / d.length(), -1, 1)), Math.atan2(-d.x, -d.z), 0, 'YXZ'); },
   onPlayerShotNoise, nvMode: () => nvMode, lastShot: () => ({ lastShotSpot, repeatShots }), setZoom, weapon: () => WEAPONS[currentWeapon], zoomStep: () => zoomStep,
