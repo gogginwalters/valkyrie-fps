@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>OPERATION: BLACK FILE — v0.6.4</title>
+<title>OPERATION: BLACK FILE — v0.6.5</title>
 <link rel="icon" href="data:,">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <!--
@@ -170,7 +170,10 @@
   #tRadio { right: 128px; top: 110px; width: 48px; height: 48px; font-size: 10px; }
   #tSkip { right: 184px; top: 110px; width: 52px; height: 48px; font-size: 10px; border-color: rgba(255,210,60,0.9); }
   .missions { flex-wrap: wrap; }
-  #skipTrainBtn { margin: 8px 0 4px; padding: 6px 12px; font: inherit; font-size: 12px; background: #13200f; color: #cfc; border: 1px solid #4a4; cursor: pointer; touch-action: manipulation; }
+  #pickHint { color: #9f9; font-size: 13px; letter-spacing: 2px; margin-top: 6px; }
+  #pickHint.need { color: #ffd23a; font-size: 16px; font-weight: bold; animation: pickPulse 0.9s ease-in-out 3; }
+  @keyframes pickPulse { 50% { color: #fff; } }
+  #skipTrainBtn { margin: 18px 0 4px; padding: 6px 12px; font: inherit; font-size: 12px; background: #13200f; color: #cfc; border: 1px solid #4a4; cursor: pointer; touch-action: manipulation; }
 
   /* ---------- Full-screen menus (start / pause / end) ---------- */
   .screen { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
@@ -205,6 +208,7 @@
     <div class="stamp">TOP SECRET</div>
     <h1>OPERATION: BLACK FILE</h1>
     <h2 id="briefSub">TARGET: VALKYRIE</h2>
+    <div id="pickHint">CHOOSE YOUR MISSION — tap a card</div>
     <div class="missions">
       <label id="m0Card"><input type="radio" name="mission" value="0" checked><b>MISSION 00 — TRAINING</b><br>Camp Halyard: CHIEF teaches the basics. Every station skippable.</label>
       <label id="m1Card"><input type="radio" name="mission" value="1"><b>MISSION 01 — BLACK FILE</b><br>Indoor raid on a Valkyrie facility. Close quarters, stealth.</label>
@@ -212,8 +216,8 @@
       <label id="m2Card"><input type="radio" name="mission" value="2"><b>MISSION 02 — COLD HORIZON</b><br>Outdoor long-range sniper op. Ridge nest, 100–1,600 m.</label>
     </div>
     <button class="startBtn" id="startBtn">▶ CLICK OR TAP TO BEGIN MISSION</button>
-    <button id="skipTrainBtn">Skip training → go straight to Mission 01</button>
     <div id="briefText"></div>
+    <button id="skipTrainBtn">Skip training → go straight to Mission 01</button>
     <div class="modes">
       <b>DAMAGE MODEL</b>
       <label><input type="checkbox" id="optRealistic"> Realistic ballistics
@@ -374,7 +378,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 // ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
 // ##  part failed and why.                                           ##
 // #####################################################################
-const VERSION = 'v0.6.4';
+const VERSION = 'v0.6.5';
 // v0.4.4: the game must only ever start ONCE per page (one canvas, one camera, one loop).
 // If this script somehow ran a second time, stop the second copy right here.
 window.__valkyrieBoots = (window.__valkyrieBoots || 0) + 1;
@@ -5601,25 +5605,54 @@ function applyMission(m) {
   document.querySelectorAll('.equiponly').forEach(el => (el.style.display = m === 0 || m === 1 ? 'flex' : 'none'));   // v0.6.2 demolition kit + waypoint
   document.querySelectorAll('.trainonly').forEach(el => (el.style.display = m === 0 || (m === 3 && el.id === 'tSkip') ? 'flex' : 'none'));
   $('trainBox').style.display = m === 0 || m === 3 ? 'block' : 'none';
-  for (const k of [0, 1, 2, 3]) $('m' + k + 'Card').classList.toggle('sel', m === k);
+  for (const k of [0, 1, 2, 3]) $('m' + k + 'Card').classList.toggle('sel', missionPicked && m === k);
   $('briefText').innerHTML = BRIEFINGS[m];
 }
 // v0.4.6 (iPad fix): the chosen mission lives in a variable, not only in the radio button,
 // because on some iPads tapping the mission card never ticked its radio (always Mission 1).
-let chosenMission = 1;
+let chosenMission = 1, missionPicked = true;   // v0.6.5: false = plain link for a returning player: pick a card first
 const MISSION_NAMES = { 0: 'TRAINING', 1: 'BLACK FILE', 2: 'COLD HORIZON', 3: 'SNIPER LESSON' };
 function selectedMission() { return chosenMission; }
 function chooseMission(m, rebuild = true) {
   m = m === 2 || m === 0 || m === 3 ? m : 1;
   const changed = m !== chosenMission;
-  chosenMission = m;
-  document.querySelectorAll('input[name="mission"]').forEach(r => (r.checked = +r.value === m));
-  for (const k of [0, 1, 2, 3]) $('m' + k + 'Card').classList.toggle('sel', m === k);
-  $('startBtn').textContent = '▶ START: ' + MISSION_NAMES[m];
+  chosenMission = m; missionPicked = true;
+  showPicked();
   if (changed && rebuild && state === 'start') {
     applyMission(m); buildLevel(); resetPlayer(); resetWeapons(); resetMasking(); missionStartPose();
   }
 }
+function showPicked() {
+  const m = chosenMission, p = missionPicked;
+  document.querySelectorAll('input[name="mission"]').forEach(r => (r.checked = p && +r.value === m));
+  for (const k of [0, 1, 2, 3]) $('m' + k + 'Card').classList.toggle('sel', p && m === k);
+  $('startBtn').textContent = p ? '▶ START: ' + MISSION_NAMES[m] : '▲ PICK A MISSION ABOVE, THEN START';
+  $('skipTrainBtn').style.display = p && m === 0 ? '' : 'none';      // only useful while TRAINING is picked
+  $('pickHint').classList.toggle('need', !p);
+}
+// v0.6.5 iPad FIX: only a GENUINE tap counts. iPad Safari fires touchend (and pointerup) at the
+// end of a SCROLL too — so a finger that started scrolling the briefing on the "Skip training"
+// button (right under START) launched Black File, and one on a mission card switched missions.
+// A tap = one finger, moves < 12 px, lasts < 0.9 s, lifts on the same element. Clicks (mouse,
+// trackpad, or Safari's own click after a real tap) also count. Doubles within 0.7 s are dropped.
+function onTap(el, fn, opts = {}) {
+  let sx = 0, sy = 0, st = 0, armed = false, last = -1e9;
+  const fire = (how, e) => { const now = performance.now(); if (now - last < 700) return; if (opts.when && !opts.when()) { noteInput('ignored ' + el.id + ' (' + how + ')'); return; } last = now; fn(how, e); };
+  el.addEventListener('touchstart', e => { const t = e.changedTouches[0]; sx = t.clientX; sy = t.clientY; st = performance.now(); armed = e.touches.length === 1; }, { passive: true });
+  el.addEventListener('touchmove', e => { const t = e.changedTouches[0]; if (Math.hypot(t.clientX - sx, t.clientY - sy) > 12) armed = false; }, { passive: true });
+  el.addEventListener('touchcancel', () => { armed = false; });
+  el.addEventListener('touchend', e => {
+    const t = e.changedTouches[0], under = document.elementFromPoint(t.clientX, t.clientY);
+    const tap = armed && Math.hypot(t.clientX - sx, t.clientY - sy) <= 12 && performance.now() - st < 900 && (!under || el.contains(under));
+    armed = false;
+    if (!tap) { noteInput('drag on ' + el.id + ' ignored'); return; }
+    if (opts.prevent) e.preventDefault();
+    fire('tap', e);
+  }, { passive: !opts.prevent });
+  el.addEventListener('click', e => { if (opts.prevent) { e.preventDefault(); e.stopPropagation(); } fire('click', e); });
+}
+const startOpen = () => state === 'start' && $('startScreen').style.display !== 'none';
+const endOpen = () => (state === 'won' || state === 'lost') && $('endScreen').style.display !== 'none' && performance.now() - endShownAt > 700;
 // Put the player in the right starting pose for the mission.
 function missionStartPose() {
   zeroRange = 100; scopeState.breath = SETTINGS.holdBreathTime; scopeState.gasp = 0;
@@ -5638,6 +5671,10 @@ let startCalls = 0, startBlocked = 0, lastStartAt = -1e9;
 function startMission() {
   const now = performance.now();
   if (now - lastStartAt < 500) { startBlocked++; return; }
+  if (state === 'start' && !missionPicked) {                        // v0.6.5: plain link, nothing picked yet
+    noteInput('start without a mission'); $('pickHint').classList.remove('need'); void $('pickHint').offsetWidth; $('pickHint').classList.add('need');
+    $('pickHint').scrollIntoView({ block: 'center', behavior: 'smooth' }); return;
+  }
   lastStartAt = now; startCalls++;
   noteInput('start mission');
   // Each step in a safety net: even if one part fails on some browser, the game still
@@ -5709,10 +5746,11 @@ $('optNight').checked = SETTINGS.nightOps;
 $('optXray').checked = SETTINGS.xrayCam;
 $('optQuality').value = SETTINGS.graphicsQuality;
 // Picking a mission shows its briefing and builds it behind the start screen.
-document.querySelectorAll('input[name="mission"]').forEach(r => r.addEventListener('change', () => { if (r.checked) chooseMission(+r.value); }));
+document.querySelectorAll('input[name="mission"]').forEach(r => r.addEventListener('change', () => { if (r.checked && startOpen()) chooseMission(+r.value); }));
 // Tapping / clicking anywhere on a mission card picks it (pointer, touch AND click, whichever arrives).
-for (const [id, m] of [['m0Card', 0], ['m1Card', 1], ['m3Card', 3], ['m2Card', 2]]) for (const ev of ['pointerup', 'touchend', 'click'])
-  $(id).addEventListener(ev, () => { noteInput('mission card ' + m + ' (' + ev + ')'); chooseMission(m); });
+// v0.6.5: a genuine tap or click only, and only while the start screen is up (see onTap).
+for (const [id, m] of [['m0Card', 0], ['m1Card', 1], ['m3Card', 3], ['m2Card', 2]])
+  onTap($(id), how => { noteInput('mission card ' + m + ' (' + how + ')'); chooseMission(m); }, { when: startOpen });
 // A link can pick the mission: ...?mission=2  or  ...#m2
 {
   // v0.6: ...?mission=0 (or =training) = Training, =1 = Black File, =2 = Cold Horizon. The LAST mission= wins.
@@ -5720,21 +5758,28 @@ for (const [id, m] of [['m0Card', 0], ['m1Card', 1], ['m3Card', 3], ['m2Card', 2
   const all = [...location.search.matchAll(/mission=([a-z0-9]+)/gi)], q = all.length ? all[all.length - 1][1].toLowerCase() : null, h = (location.hash || '').toLowerCase();
   let done = false; try { done = !!localStorage.getItem('valkyrieTrainingDone'); } catch (err) {}
   const want = q === '3' || q === 'sniper' || q === 'lesson' || h === '#m3' || h === '#sniper' ? 3 : q === '2' || h === '#m2' || h === '#mission2' ? 2 : q === '1' || h === '#m1' || h === '#mission1' ? 1
-    : q === '0' || q === 'training' || h === '#m0' || h === '#training' ? 0 : done ? 1 : 0;
-  chosenMission = -1; chooseMission(want, false);     // the level itself is built once, below
+    : q === '0' || q === 'training' || h === '#m0' || h === '#training' ? 0 : done ? -1 : 0;
+  chosenMission = -1;
+  if (want >= 0) chooseMission(want, false);          // the level itself is built once, below
+  else { chooseMission(1, false); missionPicked = false; showPicked(); }   // v0.6.5: returning player, plain link: Black File behind the screen, but YOU pick
 }
-$('menuBtn').addEventListener('click', () => { $('endScreen').style.display = 'none'; $('startScreen').style.display = 'flex'; hud.root.style.display = 'none'; state = 'start'; });
+onTap($('menuBtn'), () => { $('endScreen').style.display = 'none'; $('startScreen').style.display = 'flex'; hud.root.style.display = 'none'; state = 'start'; showPicked(); }, { prevent: true, when: () => state === 'won' || state === 'lost' });
 $('startBtn').addEventListener('click', startMission);
-$('restartBtn').addEventListener('click', continueOrRestart);
+onTap($('restartBtn'), () => continueOrRestart(), { prevent: true, when: endOpen });
 // After training: CONTINUE goes on to Black File. Otherwise it replays the same mission.
 function continueOrRestart() {
   if (state === 'won' && currentMission === 0) { chooseMission(1, false); lastStartAt = -1e9; }
   if (state === 'won' && currentMission === 3) { chooseMission(2, false); lastStartAt = -1e9; }
   startMission();
 }
-$('skipTrainBtn').addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); noteInput('skip training'); chooseMission(1); startMission(); });
-$('skipTrainBtn').addEventListener('touchend', e => { e.preventDefault(); e.stopPropagation(); $('skipTrainBtn').click(); }, { passive: false });
-for (const id of ['restartBtn', 'menuBtn']) $(id).addEventListener('touchend', e => { e.preventDefault(); $(id).click(); }, { passive: false });
+// v0.6.5: Skip training needs a genuine tap AND a second tap to confirm (it sits below the briefing now).
+let skipArmedAt = -1e9;
+onTap($('skipTrainBtn'), () => {
+  const now = performance.now(), b = $('skipTrainBtn');
+  if (now - skipArmedAt > 4000) { skipArmedAt = now; b.textContent = 'Sure? Tap again to skip training and start Mission 01'; setTimeout(() => { if (performance.now() - skipArmedAt >= 3900) b.textContent = 'Skip training → go straight to Mission 01'; }, 4000); return; }
+  skipArmedAt = -1e9; b.textContent = 'Skip training → go straight to Mission 01';
+  noteInput('skip training'); chooseMission(1); startMission();
+}, { prevent: true, when: startOpen });
 $('pauseScreen').addEventListener('click', resumeGame);
 let lockedSince = 0;   // when pointer lock last really started (0 = not locked)
 controls.addEventListener('lock', () => {
