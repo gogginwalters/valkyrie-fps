@@ -387,7 +387,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 // ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
 // ##  part failed and why.                                           ##
 // #####################################################################
-const VERSION = 'v0.6.13';
+const VERSION = 'v0.6.14';
 // v0.6.6 MISSION UNLOCKS. Order: TRAINING (0) -> BLACK FILE (1) -> SNIPER LESSON (3) -> COLD HORIZON (2).
 // A new player has only TRAINING; winning a mission unlocks the next one (saved as valkyrieUnlocked =
 // how far along that list you've got, 0-3). Developer mode (?dev=1, remembered; ?dev=0 clears it)
@@ -1910,27 +1910,29 @@ function getGunGltf(path) {
   }
   return gunGltfCache.get(path);
 }
-function collectGunPoints(obj) {
+function collectGunPoints(obj, localSpace = null) {
   const pts = [];
   const v = new THREE.Vector3();
   obj.updateWorldMatrix(true, true);
+  const inverse = localSpace ? localSpace.matrixWorld.clone().invert() : null;
   obj.traverse(c => {
     if (!c.isMesh || !c.geometry || !c.geometry.attributes.position) return;
     const pos = c.geometry.attributes.position;
     const step = Math.max(1, Math.floor(pos.count / 2500));
     for (let i = 0; i < pos.count; i += step) {
       v.fromBufferAttribute(pos, i).applyMatrix4(c.matrixWorld);
+      if (inverse) v.applyMatrix4(inverse);
       pts.push(v.x, v.y, v.z);
     }
   });
   return pts;
 }
-function measureMeshBox(obj) {
+function measureMeshBox(obj, localSpace = null) {
   // World box from the mesh vertices themselves. Do not use Box3.setFromObject
   // on skinned FBX guns: that API counts bone scales twice, so the Barrett
   // shrinks to a speck and the AKM comes out huge.
   obj.updateWorldMatrix(true, true);
-  const pts = collectGunPoints(obj);
+  const pts = collectGunPoints(obj, localSpace);
   const box = new THREE.Box3();
   const v = new THREE.Vector3();
   for (let i = 0; i < pts.length; i += 3) box.expandByPoint(v.set(pts[i], pts[i + 1], pts[i + 2]));
@@ -1997,9 +1999,10 @@ function placeMuzzleExtras(g, w) {
   const keep = new Set([g.userData.flash, g.userData.suppressor]);
   const mesh = g.children.find(c => !keep.has(c));
   if (!mesh) return;
-  const box = measureMeshBox(mesh);
+  // Async loading happens after parenting: measure vertices in g, not world space.
+  const box = measureMeshBox(mesh, g);
   const size = box.getSize(new THREE.Vector3());
-  const pts = collectGunPoints(mesh);
+  const pts = collectGunPoints(mesh, g);
   const zCut = box.min.z + size.z * 0.08;
   let sy = 0, n = 0;
   for (let i = 0; i < pts.length; i += 3) {
@@ -2016,6 +2019,48 @@ function placeMuzzleExtras(g, w) {
   d.suppressor.visible = on;
   d.flash.position.set(0, d.muzzleY, d.muzzleZ - (on ? d.supLen + 0.02 : 0.03));
   d.flash.scale.setScalar(on ? 0.35 : 1);
+}
+function addBarrettScope(g, fitted) {
+  // Fitted gun-local dimensions; the optic never participates in rifle fitting.
+  const box = measureMeshBox(fitted, g);
+  const size = box.getSize(new THREE.Vector3());
+  const z = box.min.z + size.z * 0.66;
+  const x = (box.min.x + box.max.x) / 2;
+  const pts = collectGunPoints(fitted, g);
+  let railY = -Infinity;
+  for (let i = 0; i < pts.length; i += 3) {
+    if (Math.abs(pts[i + 2] - z) < size.z * 0.10 && Math.abs(pts[i] - x) < 0.045)
+      railY = Math.max(railY, pts[i + 1]);
+  }
+  if (!Number.isFinite(railY)) railY = box.max.y;
+  const optic = new THREE.Group();
+  optic.name = 'Barrett mounted scope';
+  optic.position.set(x, railY, z);
+  const metal = new THREE.MeshStandardMaterial({ color: 0x171b20, roughness: 0.38, metalness: 0.7 });
+  const glass = new THREE.MeshStandardMaterial({ color: 0x285565, roughness: 0.12, metalness: 0.65, emissive: 0x07151d });
+  const tube = (name, frontRadius, rearRadius, length, y, z, mat = metal) => {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(frontRadius, rearRadius, length, 24), mat);
+    m.name = name; m.rotation.x = -Math.PI / 2; m.position.set(0, y, z); optic.add(m);
+    return m;
+  };
+  const block = (sx, sy, sz, y, z) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), metal);
+    m.position.set(0, y, z); optic.add(m);
+  };
+  block(0.044, 0.014, 0.22, 0.005, 0); // rail overlaps receiver, no floating mount
+  for (const rz of [-0.075, 0.075]) {
+    block(0.032, 0.038, 0.025, 0.025, rz);
+    tube('scope ring', 0.026, 0.026, 0.024, 0.057, rz);
+  }
+  tube('scope main tube', 0.021, 0.021, 0.24, 0.057, 0);
+  tube('scope objective bell', 0.037, 0.021, 0.065, 0.057, -0.1525);
+  tube('scope objective lens', 0.033, 0.033, 0.003, 0.057, -0.186, glass);
+  tube('scope eyepiece', 0.028, 0.028, 0.065, 0.057, 0.145);
+  tube('scope eyepiece lens', 0.024, 0.024, 0.003, 0.057, 0.178, glass);
+  const turret = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.026, 20), metal);
+  turret.position.set(0, 0.088, -0.005); optic.add(turret);
+  g.add(optic);
+  g.userData.scope = optic;
 }
 function bakeSkinnedMeshes(root) {
   // Draw skinned FBX guns (AKM, Barrett) as regular meshes in their bind pose.
@@ -2046,6 +2091,7 @@ function attachGltfGun(g, w) {
     [...g.children].forEach(c => { if (!keep.has(c)) g.remove(c); });
     g.add(fitted);
     placeMuzzleExtras(g, w);
+    if (/Barrett/i.test(w.name)) addBarrettScope(g, fitted);
   }).catch(err => console.warn('Gun model failed to load, keeping the blocky fallback:', w.name, err));
 }
 // ---- Gun models: built from simple boxes and cylinders (one model per weapon) ----
