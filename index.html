@@ -6116,6 +6116,10 @@ function K(k) { const p = PROMPTS[k] || [k], d = devKind(); return '<b>' + (d ==
 function KW(n) { return devKind() === 'touch' ? '<b>GUN ▸</b> until the ' + WEAPONS[n].name : '<b>' + (n + 1) + '</b>'; }
 // ---- Training world pieces: doors, obstacles, steel targets, markers ----
 const TP = (c, r) => ({ x: c * CELL + CELL / 2, z: r * CELL + CELL / 2 });
+function faceWorld(x, y, z) {
+  const d = new THREE.Vector3(x, y, z).sub(camera.position), len = d.length() || 1;
+  camera.rotation.set(Math.asin(THREE.MathUtils.clamp(d.y / len, -1, 1)), Math.atan2(-d.x, -d.z), 0, 'YXZ');
+}
 let trainGates = {}, obstacles = [], popTargets = [], trainMarker = null, lookPanels = [];
 let obstacleMover = false, obstacleBlocked = null, obstacleMsgAt = -1e9;
 const stripeTexture = makeCanvasTexture(64, (ctx, s) => { for (let i = -s; i < s * 2; i += 16) { ctx.fillStyle = '#f0c020'; ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i + 8, 0); ctx.lineTo(i + 8 + s, s); ctx.lineTo(i + s, s); ctx.fill(); }
@@ -6137,12 +6141,15 @@ function createGate(ch, c, r) {
   const g = new THREE.Group(); g.position.set(x, 0, z); if (!along) g.rotation.y = Math.PI / 2;
   const door = new THREE.Mesh(new THREE.BoxGeometry(CELL, H, 0.25), trainMats.door); door.position.y = H / 2; g.add(door);
   for (const y of [0.25, H - 0.25]) { const s = new THREE.Mesh(new THREE.BoxGeometry(CELL, 0.3, 0.27), trainMats.stripe); s.position.y = y; door.add(s); s.position.y = y - H / 2; }
-  const lbl = ch === 'k' ? 'MAGLOCK' : ch === 'q' ? 'ROOM EXIT' : 'STATION ' + ({ a: '9', r: '10', b: '10', e: '11', f: '12', g: '13' }[ch] || ch);
+  // Doors are named for where they lead, not the station you are in — otherwise the locker
+  // door at the sniper mat says "STATION 5 ▸ LOCKED" and people try to range the target through it.
+  const GATE_DEST = { '1': '2 · LOOK', '2': '3 · COMMS', '3': '4 · RANGE', '4': '5 · SNIPER LANE', '5': '6 · WEAPONS LOCKER', '6': '7 · KNIFE', '7': '8 · GARROTE', '8': 'GRADUATION HALL', a: '9 · NAVIGATION', r: '10 · DEMOLITION', b: '10 · DEMOLITION', e: '11 · BREACHING', f: '12 · SIGNALS', g: '13 · FINAL RUN' };
+  const lbl = ch === 'k' ? 'MAGLOCK' : ch === 'q' ? 'ROOM EXIT' : 'NEXT: ' + (GATE_DEST[ch] || ch);
   const sign = makeSign(lbl + ' ▸ LOCKED', 2.2, 0.4, '#200808', '#ff6060'); sign.position.set(0, 1.7 - H / 2, 0.14); door.add(sign);
   const back = makeSign(lbl, 2.2, 0.4, '#200808', '#ff6060'); back.position.set(0, 1.7 - H / 2, -0.14); back.rotation.y = Math.PI; door.add(back);
   levelGroup.add(g); wallMeshes.push(door);
   solid[r * worldCols + c] = 1;
-  trainGates[ch] = { c, r, group: g, door, open: false, t: 0 };
+  trainGates[ch] = { c, r, group: g, door, open: false, t: 0, label: lbl };
 }
 function openGate(ch) {
   const gt = trainGates[ch]; if (!gt || gt.open) return;
@@ -6387,12 +6394,15 @@ const STATIONS = [
     steps: [
       { text: () => `Lie on the firing mat (${K('prone')}) and take the CheyTac (${KW(7)}).`, at: { x: 217, z: 36 }, label: 'FIRING MAT',
         check: () => nearP({ x: 217, z: 36 }, 2.4) && player.stance === 'prone' && currentWeapon === 7,
-        // The exit door (5) is SOUTH of the mat, not downrange. Face the steel WEST:
-        // walking in from gate 4 otherwise leaves players staring at the locked locker door.
-        after: () => { camera.lookAt(118, camera.position.y, 38); } },
+        // The locker door (5) is SOUTH of the mat (~6 m), not downrange. Face the steel WEST.
+        after: () => { faceWorld(118, 1.2, 38); } },
       { text: S => `SCOPE — ${K('aim')}. Zoom with ${K('zoom')}; use both zoom levels. ${S.z1 ? '✔ zoom 1 ' : ''}${S.z2 ? '✔ zoom 2' : ''}`,
         start: S => { S.z1 = S.z2 = 0; raiseTargets(['l50', 'l100', 'l200'], 1.0); }, tick: S => { if (aiming && zoomStep === 1) S.z1 = 1; if (aiming && zoomStep === 2) S.z2 = 1; }, check: S => S.z1 && S.z2 },
-      { text: () => `RANGEFINDER — face WEST down the open lane (not the locked exit door). Put the crosshair on the 100 m steel and press ${K('lase')}.`, check: () => TRAIN.lastLase > 85 && TRAIN.lastLase < 115, say: 'Ninety-nine metres. Write it down. Or don\'t, it\'s a game.' },
+      { text: () => `RANGEFINDER — look WEST down the long open lane. The locked door by the mat is the weapons locker — it stays shut until you finish. Put the crosshair on the 100 m steel and press ${K('lase')}.`,
+        at: { x: 118, z: 38, label: '100 M STEEL' },
+        start: () => { TRAIN.lastLase = 0; faceWorld(118, 1.2, 38); },
+        tick: S => { if (!S.doorHint && TRAIN.lastLase > 0 && TRAIN.lastLase < 30) { S.doorHint = 1; radioSay('CHIEF', 'That\'s the locker door, about six metres off the mat. It stays locked until you finish this lane. Turn around and look WEST, down the long hall — the 100 metre steel is that way.', 8); showMessage('Turn around — face WEST down the lane', 3); } },
+        check: () => TRAIN.lastLase > 85 && TRAIN.lastLase < 115, say: 'Ninety-nine metres. Write it down. Or don\'t, it\'s a game.' },
       { text: () => `ELEVATION — bullets drop, so the scope is dialled to a range. Someone left it at 500 m. Dial it to 100 m: ${K('dial')} (each click = 100 m). Now: ${fmtDist(zeroRange)}.`,
         start: () => { zeroRange = 500; }, check: () => zeroRange === 100 },
       { text: () => `Steady: ${K('breath')} holds your breath and stops the sway. Hit the 100 m steel.`, check: () => ev('pop:l100') > 0, say: 'Ping. That\'s the sound of a job done.' },
