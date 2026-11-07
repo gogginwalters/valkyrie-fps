@@ -1,0 +1,16 @@
+Valkyrie v0.6.7 sound effects. All source recordings are CC0 1.0 (public domain) from Freesound.org; trimmed/normalized.
+m1911.mp3      "9mm pistol shot" by michorvath        https://freesound.org/s/427592/
+glock.mp3      "barreta M9 shot" by haydensayshi123    https://freesound.org/s/138679/
+pistol_supp.mp3 "silenced pistol shot" by Clutvh       https://freesound.org/s/627087/
+smg_supp.mp3   "suppressed-submachinegun" by mnslugger20 https://freesound.org/s/242846/
+p90.mp3        "AR15 pistol shot" by michorvath        https://freesound.org/s/427598/
+m4.mp3         "M4 Assault rifle firing" by mnslugger20 https://freesound.org/s/259758/
+shotgun.mp3    "20 gauge shotgun gunshot" by michorvath https://freesound.org/s/427595/
+barrett.mp3    "50 cal shot" by ajhartman42295         https://freesound.org/s/668071/
+cheytac.mp3    "Sniper Shot" by LeMudCrab              https://freesound.org/s/163460/
+mag_out/mag_in/rifle_charge.mp3 "Mag reload" by SamsterBirdies https://freesound.org/s/363167/
+pistol_mag.mp3 "1911 Reload" by nioczkus               https://freesound.org/s/396331/
+pistol_slide.mp3 "Glock 19 Handgun Pistol Slide Cocking Sounds" by jackthemurray https://freesound.org/s/393734/
+pump.mp3       "Pump Action Shotgun Cycle" by Zott820  https://freesound.org/s/370344/
+bolt.mp3       "Mosin Nagant Bolt Action Cycle" by Zott820 https://freesound.org/s/370345/
+dry.mp3        "Dry Fire" by brianhanson2nd            https://freesound.org/s/171211/
