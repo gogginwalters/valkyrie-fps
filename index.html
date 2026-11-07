@@ -386,7 +386,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 // ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
 // ##  part failed and why.                                           ##
 // #####################################################################
-const VERSION = 'v0.6.11';
+const VERSION = 'v0.6.12';
 // v0.6.6 MISSION UNLOCKS. Order: TRAINING (0) -> BLACK FILE (1) -> SNIPER LESSON (3) -> COLD HORIZON (2).
 // A new player has only TRAINING; winning a mission unlocks the next one (saved as valkyrieUnlocked =
 // how far along that list you've got, 0-3). Developer mode (?dev=1, remembered; ?dev=0 clears it)
@@ -2005,11 +2005,49 @@ function placeMuzzleExtras(g, w) {
   d.flash.position.set(0, d.muzzleY, d.muzzleZ - (on ? d.supLen + 0.02 : 0.03));
   d.flash.scale.setScalar(on ? 0.35 : 1);
 }
+function bakeSkinnedMeshes(root) {
+  // Skinned FBX guns (AKM, Barrett) report the wrong size to Box3: one is measured
+  // ~100× too big and shrinks to a speck, the other is measured too small and
+  // shows up huge. Baking the rest pose into a regular mesh makes the size match
+  // what you actually see.
+  root.updateWorldMatrix(true, true);
+  const meshes = [];
+  root.traverse(o => { if (o.isSkinnedMesh) meshes.push(o); });
+  const v = new THREE.Vector3();
+  for (const mesh of meshes) {
+    mesh.updateMatrixWorld(true);
+    const geom = mesh.geometry.clone();
+    const pos = geom.attributes.position;
+    const arr = new Float32Array(pos.count * 3);
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i);
+      mesh.applyBoneTransform(i, v);
+      arr[i * 3] = v.x;
+      arr[i * 3 + 1] = v.y;
+      arr[i * 3 + 2] = v.z;
+    }
+    geom.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+    geom.computeVertexNormals();
+    geom.computeBoundingBox();
+    geom.computeBoundingSphere();
+    const plain = new THREE.Mesh(geom, mesh.material);
+    plain.name = mesh.name;
+    plain.frustumCulled = false;
+    plain.position.copy(mesh.position);
+    plain.quaternion.copy(mesh.quaternion);
+    plain.scale.copy(mesh.scale);
+    mesh.parent.add(plain);
+    mesh.parent.remove(mesh);
+  }
+}
 function attachGltfGun(g, w) {
   getGunGltf(w.gltf).then(gltf => {
-    // SkeletonUtils.clone keeps skinned models (the AKM) visible. Fit FIRST so a
-    // bad model never removes the blocky fallback before we know it worked.
-    const fitted = fitGltfGun(SkeletonUtils.clone(gltf.scene), w);
+    // SkeletonUtils.clone keeps skinned models visible. Bake their rest pose
+    // next so fitGltfGun measures the real size (see bakeSkinnedMeshes).
+    // Fit FIRST so a bad model never removes the blocky fallback.
+    const cloned = SkeletonUtils.clone(gltf.scene);
+    bakeSkinnedMeshes(cloned);
+    const fitted = fitGltfGun(cloned, w);
     const keep = new Set([g.userData.flash, g.userData.suppressor]);
     [...g.children].forEach(c => { if (!keep.has(c)) g.remove(c); });
     g.add(fitted);
