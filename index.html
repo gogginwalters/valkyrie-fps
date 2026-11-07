@@ -244,6 +244,7 @@
     </div>
     <div class="controls" id="controlsStart"></div>
     <div class="credits"><b>CREDITS</b><br>Soldier model: <b>"SWAT"</b> by <b>Quaternius</b> (quaternius.com, via poly.pizza) — CC0 1.0 public domain. Tinted and fitted with rifles in-game.<br>
+      Gun models: licensed low-poly firearms from Poly Pizza (AdamKokrito, Kristian M, J-Toastie, CreativeTrio, Pichuliru, austincford) — see models/guns/CREDITS.txt.<br>
       3D engine: <b>Three.js</b> (MIT licence). Everything else made in code for this game.</div>
     <p id="loadError">Could not load the 3D library (Three.js). Check your internet connection and refresh.</p>
   </div>
@@ -385,7 +386,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 // ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
 // ##  part failed and why.                                           ##
 // #####################################################################
-const VERSION = 'v0.6.8';
+const VERSION = 'v0.6.9';
 // v0.6.6 MISSION UNLOCKS. Order: TRAINING (0) -> BLACK FILE (1) -> SNIPER LESSON (3) -> COLD HORIZON (2).
 // A new player has only TRAINING; winning a mission unlocks the next one (saved as valkyrieUnlocked =
 // how far along that list you've got, 0-3). Developer mode (?dev=1, remembered; ?dev=0 clears it)
@@ -670,7 +671,9 @@ const HIT_ZONES = {
 // ---- WEAPONS: your armoury. Number keys 1-8 switch. Each references a CALIBER. ----
 // NOTE: real-world gun names are used here ONLY for James's personal testing.
 //       Swap them for made-up names (like GoldenEye's "PP7") before any commercial release.
-//   model        = which blocky 3D model to build: 'pistol', 'p90', 'rifle' or 'sniper'
+//   model        = which blocky 3D model to build if no gltf file: 'pistol', 'p90', 'rifle' or 'sniper'
+//   gltf         = optional path to a licensed real-firearm model (falls back to the blocky mesh)
+//   gltfRot      = optional [x, y, z] radians so the barrel points forward (−Z) and the magazine hangs down
 //   arcadeDamage = damage in ARCADE mode.      fireDelay = seconds between shots.
 //   automatic    = hold the mouse button to keep firing.
 //   suppressed   = starts with a suppressor fitted.   canSuppress = T key can add/remove it.
@@ -681,32 +684,32 @@ const HIT_ZONES = {
 //   kick = camera recoil.  length = gun model length.  sound = loudness/punch.
 //   color = metal colour, grip = grip/stock colour (hex numbers).
 const WEAPONS = [
-  { name: 'Colt M1911 .45', caliber: '.45 ACP', model: 'pistol', magSize: 7, reserve: 35, fireDelay: 0.2, reloadTime: 1.2,
+  { name: 'Colt M1911 .45', caliber: '.45 ACP', model: 'pistol', gltf: 'models/guns/m1911.glb', gltfRot: [0, Math.PI / 2, 0], magSize: 7, reserve: 35, fireDelay: 0.2, reloadTime: 1.2,
     arcadeDamage: 55, automatic: false, spread: 0.005, zoomLevels: [55], kick: 0.018, length: 0.3, sound: 1.1,
     color: 0x8a8d90, grip: 0x5a3820, suppressed: true, canSuppress: true },
-  { name: 'Glock 17', caliber: '9mm', model: 'pistol', magSize: 17, reserve: 68, fireDelay: 0.14, reloadTime: 1.1,
+  { name: 'Glock 17', caliber: '9mm', model: 'pistol', gltf: 'models/guns/glock.glb', gltfRot: [0, Math.PI / 2, 0], magSize: 17, reserve: 68, fireDelay: 0.14, reloadTime: 1.1,
     arcadeDamage: 52, automatic: false, spread: 0.004, zoomLevels: [55], kick: 0.012, length: 0.3, sound: 1.0,
     color: 0x242528, grip: 0x1b1b1d, suppressed: false, canSuppress: true },
   { name: 'FN P90', caliber: '5.7x28', model: 'p90', magSize: 50, reserve: 150, fireDelay: 0.067, reloadTime: 2.0,
     arcadeDamage: 51, automatic: true, spread: 0.012, zoomLevels: [50], kick: 0.006, length: 0.5, sound: 0.8,
     color: 0x2a2c2a, grip: 0x1c1d1c, suppressed: false, canSuppress: true },
-  { name: 'M4 Carbine', caliber: '5.56x45', model: 'rifle', magSize: 30, reserve: 90, fireDelay: 0.085, reloadTime: 1.9,
+  { name: 'M4 Carbine', caliber: '5.56x45', model: 'rifle', gltf: 'models/guns/m4.glb', gltfRot: [0, -Math.PI / 2, 0], magSize: 30, reserve: 90, fireDelay: 0.085, reloadTime: 1.9,
     arcadeDamage: 55, automatic: true, spread: 0.007, zoomLevels: [45], kick: 0.009, length: 0.75, sound: 1.2,
     color: 0x2b2c2e, grip: 0x2b2c2e, suppressed: false, canSuppress: true },
-  { name: 'AKM', caliber: '7.62x39', model: 'rifle', magSize: 30, reserve: 90, fireDelay: 0.1, reloadTime: 2.1,
+  { name: 'AKM', caliber: '7.62x39', model: 'rifle', gltf: 'models/guns/akm.glb', gltfRot: [0, -Math.PI / 2, 0], magSize: 30, reserve: 90, fireDelay: 0.1, reloadTime: 2.1,
     arcadeDamage: 60, automatic: true, spread: 0.009, zoomLevels: [48], kick: 0.011, length: 0.8, sound: 1.3,
     color: 0x3a3a3c, grip: 0x7a4520, curvedMag: true, suppressed: false, canSuppress: true },
-  { name: 'FN SCAR-H', caliber: '7.62x51', model: 'rifle', magSize: 20, reserve: 60, fireDelay: 0.16, reloadTime: 2.2,
+  { name: 'FN SCAR-H', caliber: '7.62x51', model: 'rifle', gltf: 'models/guns/scar.glb', gltfRot: [0, Math.PI / 2, 0], magSize: 20, reserve: 60, fireDelay: 0.16, reloadTime: 2.2,
     arcadeDamage: 100, automatic: true, spread: 0.006, zoomLevels: [35], kick: 0.022, length: 0.85, sound: 1.6,
     color: 0xa58c60, grip: 0x2a2a2a, suppressed: false, canSuppress: true, projectile: true },
-  { name: 'Barrett M107', caliber: '.50 BMG', model: 'sniper', magSize: 10, reserve: 30, fireDelay: 0.45, reloadTime: 2.8,
+  { name: 'Barrett M107', caliber: '.50 BMG', model: 'sniper', gltf: 'models/guns/barrett.glb', gltfRot: [0, 0, 0], magSize: 10, reserve: 30, fireDelay: 0.45, reloadTime: 2.8,
     arcadeDamage: 150, alwaysKills: true, automatic: false, spread: 0.0, zoomLevels: [8, 2.4], kick: 0.05, length: 1.15, sound: 2.0,
     color: 0x3a3d36, grip: 0x222222, scope: true, muzzleBrake: true, penetration: 1, suppressed: false, canSuppress: false, projectile: true },
-  { name: 'CheyTac M200 Intervention', caliber: '.408 CheyTac', model: 'sniper', magSize: 7, reserve: 21, fireDelay: 1.3, reloadTime: 3.0,
+  { name: 'CheyTac M200 Intervention', caliber: '.408 CheyTac', model: 'sniper', gltf: 'models/guns/cheytac.glb', gltfRot: [0, 0, 0], magSize: 7, reserve: 21, fireDelay: 1.3, reloadTime: 3.0,
     arcadeDamage: 140, alwaysKills: true, automatic: false, spread: 0.0, zoomLevels: [6, 1.6], kick: 0.045, length: 1.2, sound: 1.9,
     color: 0x4a4d40, grip: 0x30322a, scope: true, boltAction: true, suppressed: false, canSuppress: false, projectile: true },
   // v0.6: pump shotgun. 8 pellets per shot, brutal close up, weak past ~25 m. Also blows door hinges (breaching, v0.6b).
-  { name: 'Remington 870', caliber: '12 gauge', model: 'shotgun', magSize: 6, reserve: 30, fireDelay: 0.85, reloadTime: 2.6,
+  { name: 'Remington 870', caliber: '12 gauge', model: 'shotgun', gltf: 'models/guns/shotgun.glb', gltfRot: [0, 0, Math.PI / 2], magSize: 6, reserve: 30, fireDelay: 0.85, reloadTime: 2.6,
     arcadeDamage: 18, pellets: 8, automatic: false, spread: 0.045, zoomLevels: [55], kick: 0.06, length: 0.9, sound: 1.8,
     color: 0x2a2a2c, grip: 0x6a4424, pump: true, suppressed: false, canSuppress: false },
 ];
@@ -1883,6 +1886,131 @@ let lastShotInfo = null;
 const weaponRoot = new THREE.Group();          // moves around for recoil / bob
 weaponRoot.position.set(0.28, -0.28, -0.5);
 weaponScene.add(weaponRoot);
+// ---- Real licensed gun models (GLB). The boxy mesh stays as a fallback if a file fails to load. ----
+const gunGltfCache = new Map();
+function getGunGltf(path) {
+  if (!gunGltfCache.has(path)) {
+    gunGltfCache.set(path, new Promise((resolve, reject) => {
+      new GLTFLoader().load(path, gltf => {
+        gltf.scene.traverse(o => {
+          if (!o.isMesh) return;
+          o.frustumCulled = false;
+          const mats = [].concat(o.material || []);
+          for (const m of mats) {
+            if (!m) continue;
+            if ('metalness' in m && m.metalness > 0.8) m.metalness = 0.55;
+            if ('roughness' in m && m.roughness < 0.2) m.roughness = 0.35;
+          }
+        });
+        resolve(gltf);
+      }, undefined, reject);
+    }));
+  }
+  return gunGltfCache.get(path);
+}
+function collectGunPoints(obj) {
+  const pts = [];
+  const v = new THREE.Vector3();
+  obj.updateWorldMatrix(true, true);
+  obj.traverse(c => {
+    if (!c.isMesh || !c.geometry || !c.geometry.attributes.position) return;
+    const pos = c.geometry.attributes.position;
+    const step = Math.max(1, Math.floor(pos.count / 2500));
+    for (let i = 0; i < pos.count; i += step) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(c.matrixWorld);
+      pts.push(v.x, v.y, v.z);
+    }
+  });
+  return pts;
+}
+function endArea(pts, axis, useMin) {
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  for (let i = 0; i < pts.length; i += 3) {
+    minX = Math.min(minX, pts[i]); maxX = Math.max(maxX, pts[i]);
+    minY = Math.min(minY, pts[i + 1]); maxY = Math.max(maxY, pts[i + 1]);
+    minZ = Math.min(minZ, pts[i + 2]); maxZ = Math.max(maxZ, pts[i + 2]);
+  }
+  const minV = axis === 0 ? minX : axis === 1 ? minY : minZ;
+  const maxV = axis === 0 ? maxX : axis === 1 ? maxY : maxZ;
+  const span = maxV - minV || 1;
+  const lo = useMin ? minV : maxV - span * 0.14;
+  const hi = useMin ? minV + span * 0.14 : maxV;
+  let a0 = Infinity, a1 = -Infinity, b0 = Infinity, b1 = -Infinity, n = 0;
+  for (let i = 0; i < pts.length; i += 3) {
+    const val = pts[i + axis];
+    if (val < lo || val > hi) continue;
+    const ao = axis === 0 ? pts[i + 1] : pts[i];
+    const bo = axis === 2 ? pts[i + 1] : pts[i + 2];
+    a0 = Math.min(a0, ao); a1 = Math.max(a1, ao);
+    b0 = Math.min(b0, bo); b1 = Math.max(b1, bo);
+    n++;
+  }
+  if (!n) return Infinity;
+  return (a1 - a0) * (b1 - b0);
+}
+function fitGltfGun(scene, w) {
+  const inner = new THREE.Group();
+  inner.add(scene);
+  if (w.gltfRot) {
+    inner.rotation.set(w.gltfRot[0], w.gltfRot[1], w.gltfRot[2]);
+  } else {
+    const box = new THREE.Box3().setFromObject(inner);
+    const size = box.getSize(new THREE.Vector3());
+    if (size.x >= size.y && size.x >= size.z) inner.rotation.y = Math.PI / 2;
+    else if (size.y >= size.x && size.y >= size.z) inner.rotation.x = -Math.PI / 2;
+    inner.updateWorldMatrix(true, true);
+    const pts = collectGunPoints(inner);
+    if (endArea(pts, 2, false) < endArea(pts, 2, true) * 0.92) inner.rotateY(Math.PI);
+    inner.updateWorldMatrix(true, true);
+    const boxR = new THREE.Box3().setFromObject(inner);
+    const sizeR = boxR.getSize(new THREE.Vector3());
+    if (sizeR.x > sizeR.y * 1.15) inner.rotateZ(Math.PI / 2);
+  }
+  const target = w.length || 0.7;
+  const box2 = new THREE.Box3().setFromObject(inner);
+  const size2 = box2.getSize(new THREE.Vector3());
+  const longest = Math.max(size2.x, size2.y, size2.z) || 1;
+  inner.scale.setScalar(target / longest);
+  inner.updateWorldMatrix(true, true);
+  const box3 = new THREE.Box3().setFromObject(inner);
+  const size3 = box3.getSize(new THREE.Vector3());
+  const center = box3.getCenter(new THREE.Vector3());
+  inner.position.sub(center);
+  inner.position.z -= size3.z * 0.22;
+  inner.position.y -= size3.y * 0.08;
+  return inner;
+}
+function placeMuzzleExtras(g, w) {
+  const keep = new Set([g.userData.flash, g.userData.suppressor]);
+  const mesh = g.children.find(c => !keep.has(c));
+  if (!mesh) return;
+  const box = new THREE.Box3().setFromObject(mesh);
+  const size = box.getSize(new THREE.Vector3());
+  const pts = collectGunPoints(mesh);
+  const zCut = box.min.z + size.z * 0.08;
+  let sy = 0, n = 0;
+  for (let i = 0; i < pts.length; i += 3) {
+    if (pts[i + 2] <= zCut) { sy += pts[i + 1]; n++; }
+  }
+  g.userData.muzzleZ = box.min.z;
+  g.userData.muzzleY = n ? sy / n : box.min.y + size.y * 0.7;
+  g.userData.supLen = w.model === 'pistol' ? 0.12 : 0.18;
+  const d = g.userData;
+  d.suppressor.position.set(0, d.muzzleY, d.muzzleZ - d.supLen / 2);
+  const on = !!w.suppressed;
+  d.suppressor.visible = on;
+  d.flash.position.set(0, d.muzzleY, d.muzzleZ - (on ? d.supLen + 0.02 : 0.03));
+  d.flash.scale.setScalar(on ? 0.35 : 1);
+}
+function attachGltfGun(g, w) {
+  getGunGltf(w.gltf).then(gltf => {
+    const keep = new Set([g.userData.flash, g.userData.suppressor]);
+    [...g.children].forEach(c => { if (!keep.has(c)) g.remove(c); });
+    const fitted = fitGltfGun(gltf.scene.clone(true), w);
+    g.add(fitted);
+    placeMuzzleExtras(g, w);
+  }).catch(err => console.warn('Gun model failed to load, keeping the blocky fallback:', w.name, err));
+}
 // ---- Gun models: built from simple boxes and cylinders (one model per weapon) ----
 function buildGunModel(w) {
   const g = new THREE.Group();
@@ -1985,6 +2113,7 @@ function buildGunModel(w) {
   flash.visible = false; g.add(flash);
   g.userData = { flash, suppressor, muzzleZ, muzzleY, supLen, pump: g.userData.pump };
   g.visible = false;
+  if (w.gltf) attachGltfGun(g, w);
   return g;
 }
 const weaponModels = WEAPONS.map(w => { const m = buildGunModel(w); weaponRoot.add(m); return m; });

@@ -1,0 +1,31 @@
+Valkyrie v0.6.9 first-person gun models. Downloaded from Poly Pizza as GLB.
+Licensed CC0 or CC-BY as noted. Low-poly game models shaped like the named firearm
+(or an honest fallback, noted below). Not photoreal film scans.
+
+m1911.glb    "Colt 1911" by AdamKokrito — CC0
+             https://poly.pizza/m/zmuVJOUn4p
+glock.glb    "Glock" by J-Toastie — CC-BY
+             https://poly.pizza/m/q3lsX3tSta
+m4.glb       "M4" by Kristian M — CC-BY
+             A carry-handle M4 carbine. https://poly.pizza/m/9c_2lPvKB8u
+akm.glb      "AKM" by J-Toastie — CC-BY
+             https://poly.pizza/m/ZBBoDqAn0A
+scar.glb     "Scar-H" by Kristian M — CC-BY
+             https://poly.pizza/m/9A4jh0k82NZ
+shotgun.glb  "Shotgun" by CreativeTrio — CC0
+             FALLBACK: titled Shotgun, not branded Remington. Pump-action
+             silhouette matching a classic 870 (wood stock, mag tube, ribbed forend).
+             https://poly.pizza/m/CkSFaW2d7m
+barrett.glb  "Sniper Rifle West" by Pichuliru — CC0
+             FALLBACK: no licensed Barrett M107 / M82 model was available for
+             direct download. Semi-auto anti-materiel style rifle (box mag, long
+             barrel, muzzle device). https://poly.pizza/m/kwJawENuvA
+cheytac.glb  "Precision Rifle Chassis" by austincford — CC-BY
+             FALLBACK: no licensed CheyTac M200 model was available for direct
+             download. Modern chassis precision rifle. https://poly.pizza/m/XAhFlZjqoy
+
+The FN P90 keeps the in-code model for now: no licensed P90 GLB was available
+without a Sketchfab login.
+
+In-game: each model is scaled to that weapon's length, barrel pointed forward,
+and fitted with the existing muzzle flash and suppressor can.
