@@ -1,16 +1,42 @@
-Valkyrie v0.6.7 sound effects. All source recordings are CC0 1.0 (public domain) from Freesound.org; trimmed/normalized.
-m1911.mp3      "9mm pistol shot" by michorvath        https://freesound.org/s/427592/
-glock.mp3      "barreta M9 shot" by haydensayshi123    https://freesound.org/s/138679/
-pistol_supp.mp3 "silenced pistol shot" by Clutvh       https://freesound.org/s/627087/
-smg_supp.mp3   "suppressed-submachinegun" by mnslugger20 https://freesound.org/s/242846/
-p90.mp3        "AR15 pistol shot" by michorvath        https://freesound.org/s/427598/
-m4.mp3         "M4 Assault rifle firing" by mnslugger20 https://freesound.org/s/259758/
-shotgun.mp3    "20 gauge shotgun gunshot" by michorvath https://freesound.org/s/427595/
-barrett.mp3    "50 cal shot" by ajhartman42295         https://freesound.org/s/668071/
-cheytac.mp3    "Sniper Shot" by LeMudCrab              https://freesound.org/s/163460/
+Valkyrie v0.6.8 gunshots. Each weapon uses a recording of that firearm or caliber
+(or an honest fallback, noted below). Trimmed and loudness-limited from Freesound HQ previews.
+
+m1911.mp3    "Real Colt 45 M1911 (shot)" by Carmelomike
+             Recorded at a shooting range. CC-BY 3.0/4.0
+             https://freesound.org/s/255216/
+glock.mp3    "glock17_02.wav" by gezortenplotz
+             A Glock 17 9mm pistol fired at an outdoor range. CC-BY
+             https://freesound.org/s/34982/
+p90.mp3      "FN P90 (Full Auto)" by areniporgen
+             Real FN P90, exterior; one round cut from the burst. CC0
+             https://freesound.org/s/740896/
+m4.mp3       "M4A1 Rifle Shot 11" by qubodup
+             Extracted from USASA Fort Dix “Range 31 – M4A1 Zero and Grounding” (Jan 29, 2025). CC0
+             https://freesound.org/s/854232/
+akm.mp3      "ZM_018A_S06.wav" by _Linus_Sebastian
+             WASR-AK-47 7.62x39mm gunshot field test. CC0
+             https://freesound.org/s/493735/
+scar.mp3     "FN SCAR-H 7.62x51mm NATO Rifle" by AugustSandberg
+             Indoor at Nexus Shooting Range, Sony PCM-M10. CC0
+             https://freesound.org/s/231245/
+shotgun.mp3  "Remington 870" by areniporgen
+             Remington 870, exterior close, 12x70mm (12 gauge). CC0
+             https://freesound.org/s/702672/
+barrett.mp3  "Barrett M82A1 Sniper Shot from Wooden Platform..." by qubodup
+             Barrett M82A1 single shot (same rifle family as the M107). CC0
+             https://freesound.org/s/855593/
+cheytac.mp3  FALLBACK — no CC0 .408 CheyTac / M200 recording was available.
+             "405Win.wav" by Jon285: one shot from a .405 Winchester dangerous-game rifle. CC0
+             https://freesound.org/s/49513/
+
+Unchanged from v0.6.7:
+pistol_supp.mp3 "silenced pistol shot" by Clutvh — "1911 suppressed pistol shot" CC0
+                https://freesound.org/s/627087/
+smg_supp.mp3    "suppressed-submachinegun" by mnslugger20 — edited air-rifle dry fire (not a live suppressed rifle). CC0
+                https://freesound.org/s/242846/
 mag_out/mag_in/rifle_charge.mp3 "Mag reload" by SamsterBirdies https://freesound.org/s/363167/
-pistol_mag.mp3 "1911 Reload" by nioczkus               https://freesound.org/s/396331/
+pistol_mag.mp3 "1911 Reload" by nioczkus https://freesound.org/s/396331/
 pistol_slide.mp3 "Glock 19 Handgun Pistol Slide Cocking Sounds" by jackthemurray https://freesound.org/s/393734/
-pump.mp3       "Pump Action Shotgun Cycle" by Zott820  https://freesound.org/s/370344/
+pump.mp3       "Pump Action Shotgun Cycle" by Zott820 https://freesound.org/s/370344/
 bolt.mp3       "Mosin Nagant Bolt Action Cycle" by Zott820 https://freesound.org/s/370345/
-dry.mp3        "Dry Fire" by brianhanson2nd            https://freesound.org/s/171211/
+dry.mp3        "Dry Fire" by brianhanson2nd https://freesound.org/s/171211/

@@ -385,7 +385,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 // ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
 // ##  part failed and why.                                           ##
 // #####################################################################
-const VERSION = 'v0.6.7';
+const VERSION = 'v0.6.8';
 // v0.6.6 MISSION UNLOCKS. Order: TRAINING (0) -> BLACK FILE (1) -> SNIPER LESSON (3) -> COLD HORIZON (2).
 // A new player has only TRAINING; winning a mission unlocks the next one (saved as valkyrieUnlocked =
 // how far along that list you've got, 0-3). Developer mode (?dev=1, remembered; ?dev=0 clears it)
@@ -1037,7 +1037,7 @@ function initAudio_() {
   loadSfx();
 }
 // v0.6.7: real recorded gun sounds (all CC0 from Freesound, see sfx/CREDITS.txt).
-const SFX_NAMES = ['m1911','glock','pistol_supp','smg_supp','p90','m4','shotgun','barrett','cheytac',
+const SFX_NAMES = ['m1911','glock','pistol_supp','smg_supp','p90','m4','akm','scar','shotgun','barrett','cheytac',
   'mag_out','mag_in','rifle_charge','pistol_mag','pistol_slide','pump','bolt','dry'];
 const sfxBuf = {}; let sfxLoading = false, sfxVoices = 0;
 function loadSfx() {
@@ -1064,13 +1064,13 @@ function playSample(name, vol = 1, delay = 0, rate = 1) {
 }
 function gunSample(w) {
   const n = w.name;
-  if (w.suppressed) return w.model === 'pistol' ? ['pistol_supp', 1] : ['smg_supp', n.includes('P90') ? 1.1 : 0.95];
+  if (w.suppressed) return w.model === 'pistol' ? ['pistol_supp', 1] : ['smg_supp', 1];
   if (n.includes('M1911')) return ['m1911', 1];
   if (n.includes('Glock')) return ['glock', 1];
   if (n.includes('P90')) return ['p90', 1];
   if (n.includes('M4')) return ['m4', 1];
-  if (n.includes('AKM')) return ['m4', 0.9];
-  if (n.includes('SCAR')) return ['m4', 0.82];
+  if (n.includes('AKM')) return ['akm', 1];
+  if (n.includes('SCAR')) return ['scar', 1];
   if (n.includes('Barrett')) return ['barrett', 1];
   if (n.includes('CheyTac')) return ['cheytac', 1];
   if (w.pump) return ['shotgun', 1];
