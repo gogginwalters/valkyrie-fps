@@ -386,7 +386,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 // ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
 // ##  part failed and why.                                           ##
 // #####################################################################
-const VERSION = 'v0.6.9';
+const VERSION = 'v0.6.10';
 // v0.6.6 MISSION UNLOCKS. Order: TRAINING (0) -> BLACK FILE (1) -> SNIPER LESSON (3) -> COLD HORIZON (2).
 // A new player has only TRAINING; winning a mission unlocks the next one (saved as valkyrieUnlocked =
 // how far along that list you've got, 0-3). Developer mode (?dev=1, remembered; ?dev=0 clears it)
@@ -709,7 +709,7 @@ const WEAPONS = [
     arcadeDamage: 140, alwaysKills: true, automatic: false, spread: 0.0, zoomLevels: [6, 1.6], kick: 0.045, length: 1.2, sound: 1.9,
     color: 0x4a4d40, grip: 0x30322a, scope: true, boltAction: true, suppressed: false, canSuppress: false, projectile: true },
   // v0.6: pump shotgun. 8 pellets per shot, brutal close up, weak past ~25 m. Also blows door hinges (breaching, v0.6b).
-  { name: 'Remington 870', caliber: '12 gauge', model: 'shotgun', gltf: 'models/guns/shotgun.glb', gltfRot: [0, 0, Math.PI / 2], magSize: 6, reserve: 30, fireDelay: 0.85, reloadTime: 2.6,
+  { name: 'Remington 870', caliber: '12 gauge', model: 'shotgun', gltf: 'models/guns/shotgun.glb', gltfRot: [0, 0, -Math.PI / 2], magSize: 6, reserve: 30, fireDelay: 0.85, reloadTime: 2.6,
     arcadeDamage: 18, pellets: 8, automatic: false, spread: 0.045, zoomLevels: [55], kick: 0.06, length: 0.9, sound: 1.8,
     color: 0x2a2a2c, grip: 0x6a4424, pump: true, suppressed: false, canSuppress: false },
 ];
@@ -2004,9 +2004,11 @@ function placeMuzzleExtras(g, w) {
 }
 function attachGltfGun(g, w) {
   getGunGltf(w.gltf).then(gltf => {
+    // SkeletonUtils.clone keeps skinned models (the AKM) visible. Fit FIRST so a
+    // bad model never removes the blocky fallback before we know it worked.
+    const fitted = fitGltfGun(SkeletonUtils.clone(gltf.scene), w);
     const keep = new Set([g.userData.flash, g.userData.suppressor]);
     [...g.children].forEach(c => { if (!keep.has(c)) g.remove(c); });
-    const fitted = fitGltfGun(gltf.scene.clone(true), w);
     g.add(fitted);
     placeMuzzleExtras(g, w);
   }).catch(err => console.warn('Gun model failed to load, keeping the blocky fallback:', w.name, err));
@@ -5821,7 +5823,7 @@ function applyMission(m) {
 // v0.4.6 (iPad fix): the chosen mission lives in a variable, not only in the radio button,
 // because on some iPads tapping the mission card never ticked its radio (always Mission 1).
 let chosenMission = 1, missionPicked = true;   // v0.6.5: false = plain link for a returning player: pick a card first
-const MISSION_NAMES = { 0: 'TRAINING', 1: 'BLACK FILE', 2: 'COLD HORIZON', 3: 'SNIPER LESSON' };
+const MISSION_NAMES = { 0: 'CAMP HALYARD', 1: 'BLACK FILE', 2: 'COLD HORIZON', 3: 'SNIPER LESSON' };
 function selectedMission() { return chosenMission; }
 function chooseMission(m, rebuild = true) {
   m = m === 2 || m === 0 || m === 3 ? m : 1;
@@ -5854,6 +5856,10 @@ function showPicked() {
   document.querySelectorAll('input[name="mission"]').forEach(r => (r.checked = p && +r.value === m));
   for (const k of [0, 1, 2, 3]) $('m' + k + 'Card').classList.toggle('sel', p && m === k);
   $('startBtn').textContent = p ? '▶ START: ' + MISSION_NAMES[m] : '▲ PICK A MISSION ABOVE, THEN START';
+  const headlines = { 0: 'CAMP HALYARD TRAINING', 1: 'OPERATION: BLACK FILE', 2: 'OPERATION: COLD HORIZON', 3: 'SNIPER LESSON' };
+  const h1 = document.querySelector('#startScreen h1');
+  if (h1 && p) h1.textContent = headlines[m] || headlines[1];
+  document.title = (p ? (headlines[m] || 'VALKYRIE') : 'VALKYRIE') + ' — ' + VERSION;
   $('skipTrainBtn').style.display = DEV && p && m === 0 ? '' : 'none';   // v0.6.6: developer mode only
   showLocks();
   $('pickHint').classList.toggle('need', !p);
@@ -5982,11 +5988,16 @@ for (const [id, m] of [['m0Card', 0], ['m1Card', 1], ['m3Card', 3], ['m2Card', 2
   onTap($(id), how => { noteInput('mission card ' + m + ' (' + how + ')'); chooseMission(m); }, { when: startOpen });
 // A link can pick the mission: ...?mission=2  or  ...#m2
 {
-  // v0.6: ...?mission=0 (or =training) = Training, =1 = Black File, =2 = Cold Horizon. The LAST mission= wins.
-  // No choice in the link: Training first, until you've finished it once (then Black File).
-  const all = [...location.search.matchAll(/mission=([a-z0-9]+)/gi)], q = all.length ? all[all.length - 1][1].toLowerCase() : null, h = (location.hash || '').toLowerCase();
-  const want = q === '3' || q === 'sniper' || q === 'lesson' || h === '#m3' || h === '#sniper' ? 3 : q === '2' || h === '#m2' || h === '#mission2' ? 2 : q === '1' || h === '#m1' || h === '#mission1' ? 1
-    : q === '0' || q === 'training' || h === '#m0' || h === '#training' ? 0 : -1;
+  // v0.6.10: ...?mission=training (or 0 / halyard) = Camp Halyard. Hash #training works too.
+  // An explicit link always wins, even after you've already beaten training.
+  // No choice in the link: the furthest mission you've earned (Black File after training).
+  const params = new URLSearchParams(location.search);
+  const q = (params.get('mission') || '').toLowerCase();
+  const h = (location.hash || '').toLowerCase();
+  const fromName = { '0': 0, training: 0, train: 0, halyard: 0, camphalyard: 0, '1': 1, black: 1, blackfile: 1, mission1: 1, '2': 2, cold: 2, horizon: 2, mission2: 2, '3': 3, sniper: 3, lesson: 3 };
+  const want = Object.prototype.hasOwnProperty.call(fromName, q) ? fromName[q]
+    : (h === '#m3' || h === '#sniper' || h === '#lesson' ? 3 : h === '#m2' || h === '#mission2' || h === '#horizon' ? 2 : h === '#m1' || h === '#mission1' || h === '#blackfile' ? 1
+    : h === '#m0' || h === '#training' || h === '#halyard' ? 0 : -1);
   // v0.6.6: no mission in the link = the furthest mission you've earned, ticked, on the picker.
   // A link to a LOCKED mission falls back to the furthest one you've earned, with a short note.
   let m = want >= 0 ? want : earnedMission();
