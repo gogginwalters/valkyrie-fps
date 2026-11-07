@@ -386,7 +386,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 // ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
 // ##  part failed and why.                                           ##
 // #####################################################################
-const VERSION = 'v0.6.10';
+const VERSION = 'v0.6.11';
 // v0.6.6 MISSION UNLOCKS. Order: TRAINING (0) -> BLACK FILE (1) -> SNIPER LESSON (3) -> COLD HORIZON (2).
 // A new player has only TRAINING; winning a mission unlocks the next one (saved as valkyrieUnlocked =
 // how far along that list you've got, 0-3). Developer mode (?dev=1, remembered; ?dev=0 clears it)
@@ -514,7 +514,8 @@ const SETTINGS = {
   limbStaggerTime: 0.45,     // seconds a guard is staggered after a limb hit (realistic mode)
 
   // ---- Stealth (suppressors) ----
-  silencedAlertRadius: 6,    // suppressed shots only alert guards this close (or who can see you)
+  silencedAlertRadius: 6,    // suppressed rifles alert this far (or anyone who can see you);
+                             // pistol cans (Glock, M1911) use half of this — a 9mm rectangular can is much quieter
   suppressorDamageMult: 1.0, // v0.4.5: a suppressor no longer costs damage (it never cost a real .45 a whole extra shot)...
   suppressorRangeMult: 0.85, // ...and a little range (realistic mode falloff)
   alertShoutRadius: 8,       // an alerted guard warns friends this close
@@ -689,9 +690,9 @@ const WEAPONS = [
     color: 0x8a8d90, grip: 0x5a3820, suppressed: true, canSuppress: true },
   { name: 'Glock 17', caliber: '9mm', model: 'pistol', gltf: 'models/guns/glock.glb', gltfRot: [0, Math.PI / 2, 0], magSize: 17, reserve: 68, fireDelay: 0.14, reloadTime: 1.1,
     arcadeDamage: 52, automatic: false, spread: 0.004, zoomLevels: [55], kick: 0.012, length: 0.3, sound: 1.0,
-    color: 0x242528, grip: 0x1b1b1d, suppressed: false, canSuppress: true },
-  { name: 'FN P90', caliber: '5.7x28', model: 'p90', magSize: 50, reserve: 150, fireDelay: 0.067, reloadTime: 2.0,
-    arcadeDamage: 51, automatic: true, spread: 0.012, zoomLevels: [50], kick: 0.006, length: 0.5, sound: 0.8,
+    color: 0x242528, grip: 0x1b1b1d, suppressed: true, canSuppress: true },
+  { name: 'HK MP5', caliber: '9mm', model: 'rifle', gltf: 'models/guns/mp5.glb', gltfRot: [0, Math.PI / 2, 0], magSize: 30, reserve: 90, fireDelay: 0.075, reloadTime: 2.0,
+    arcadeDamage: 51, automatic: true, spread: 0.011, zoomLevels: [50], kick: 0.007, length: 0.55, sound: 0.9,
     color: 0x2a2c2a, grip: 0x1c1d1c, suppressed: false, canSuppress: true },
   { name: 'M4 Carbine', caliber: '5.56x45', model: 'rifle', gltf: 'models/guns/m4.glb', gltfRot: [0, -Math.PI / 2, 0], magSize: 30, reserve: 90, fireDelay: 0.085, reloadTime: 1.9,
     arcadeDamage: 55, automatic: true, spread: 0.007, zoomLevels: [45], kick: 0.009, length: 0.75, sound: 1.2,
@@ -1040,7 +1041,7 @@ function initAudio_() {
   loadSfx();
 }
 // v0.6.7: real recorded gun sounds (all CC0 from Freesound, see sfx/CREDITS.txt).
-const SFX_NAMES = ['m1911','glock','pistol_supp','smg_supp','p90','m4','akm','scar','shotgun','barrett','cheytac',
+const SFX_NAMES = ['m1911','glock','pistol_supp','smg_supp','mp5','m4','akm','scar','shotgun','barrett','cheytac',
   'mag_out','mag_in','rifle_charge','pistol_mag','pistol_slide','pump','bolt','dry'];
 const sfxBuf = {}; let sfxLoading = false, sfxVoices = 0;
 function loadSfx() {
@@ -1070,7 +1071,7 @@ function gunSample(w) {
   if (w.suppressed) return w.model === 'pistol' ? ['pistol_supp', 1] : ['smg_supp', 1];
   if (n.includes('M1911')) return ['m1911', 1];
   if (n.includes('Glock')) return ['glock', 1];
-  if (n.includes('P90')) return ['p90', 1];
+  if (n.includes('MP5')) return ['mp5', 1];
   if (n.includes('M4')) return ['m4', 1];
   if (n.includes('AKM')) return ['akm', 1];
   if (n.includes('SCAR')) return ['scar', 1];
@@ -1994,9 +1995,11 @@ function placeMuzzleExtras(g, w) {
   }
   g.userData.muzzleZ = box.min.z;
   g.userData.muzzleY = n ? sy / n : box.min.y + size.y * 0.7;
-  g.userData.supLen = w.model === 'pistol' ? 0.12 : 0.18;
+  const isGlock = /Glock/i.test(w.name);
+  g.userData.supLen = w.model === 'pistol' ? (isGlock ? 0.14 : 0.12) : 0.18;
+  g.userData.supOffsetY = isGlock ? 0.016 : 0;
   const d = g.userData;
-  d.suppressor.position.set(0, d.muzzleY, d.muzzleZ - d.supLen / 2);
+  d.suppressor.position.set(0, d.muzzleY + (d.supOffsetY || 0), d.muzzleZ - d.supLen / 2);
   const on = !!w.suppressed;
   d.suppressor.visible = on;
   d.flash.position.set(0, d.muzzleY, d.muzzleZ - (on ? d.supLen + 0.02 : 0.03));
@@ -2106,14 +2109,23 @@ function buildGunModel(w) {
     box(0.1, 0.11, 0.12, glove, 0, -0.13, 0.1, 0.3);
     muzzleZ = -0.26 - bl - (w.muzzleBrake ? 0.1 : 0); muzzleY = 0.015; suppR = 0.04;
   }
-  // Suppressor: a fat black can on the end of the barrel (shown/hidden with T).
-  const supLen = 0.18;
-  const suppressor = tube(suppR, supLen, black, 0, muzzleY, muzzleZ - supLen / 2);
+  // Suppressor: rifles/M1911 get a round can; the Glock gets a rectangular Osprey-style can.
+  const isGlock = /Glock/i.test(w.name);
+  const supLen = w.model === 'pistol' ? (isGlock ? 0.14 : 0.12) : 0.18;
+  const supOffsetY = isGlock ? 0.016 : 0;
+  let suppressor;
+  if (isGlock) {
+    suppressor = new THREE.Mesh(new THREE.BoxGeometry(0.034, 0.056, supLen), black);
+    suppressor.position.set(0, muzzleY + supOffsetY, muzzleZ - supLen / 2);
+    g.add(suppressor);
+  } else {
+    suppressor = tube(suppR, supLen, black, 0, muzzleY, muzzleZ - supLen / 2);
+  }
   // Muzzle flash: a bright star at the end of the barrel, hidden until you fire.
   const flash = new THREE.Mesh(new THREE.OctahedronGeometry(0.05 + w.length * 0.05),
     new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0.95 }));
   flash.visible = false; g.add(flash);
-  g.userData = { flash, suppressor, muzzleZ, muzzleY, supLen, pump: g.userData.pump };
+  g.userData = { flash, suppressor, muzzleZ, muzzleY, supLen, supOffsetY, pump: g.userData.pump };
   g.visible = false;
   if (w.gltf) attachGltfGun(g, w);
   return g;
@@ -3197,6 +3209,14 @@ function randomFloorNear(x, z, radius) {
   return { x, z };
 }
 
+function shotHearingRange(w) {
+  // How far a shot carries to targets/guards. A suppressed Glock (rectangular
+  // 9mm can) is much quieter than an open Glock or a suppressed rifle — nearby
+  // rooms stay unaware unless someone sees the muzzle flash.
+  if (!w.suppressed) return SETTINGS.enemyHearingRange * w.sound;
+  if (w.model === 'pistol') return SETTINGS.silencedAlertRadius * 0.5;
+  return SETTINGS.silencedAlertRadius;
+}
 // ---- SHOT LOCALIZATION: what guards learn when you fire ----
 // A guard who HEARS a shot only gets a rough "suspected area" around where you
 // fired. The guess gets worse with distance and better if you keep shooting
@@ -3207,7 +3227,7 @@ function onPlayerShotNoise(w) {
   if (lastShotSpot && dist2D(px, pz, lastShotSpot.x, lastShotSpot.z) < SETTINGS.sameSpotRadius) repeatShots++;
   else repeatShots = 0;
   lastShotSpot = { x: px, z: pz };
-  const hearing = w.suppressed ? SETTINGS.silencedAlertRadius : SETTINGS.enemyHearingRange * w.sound;
+  const hearing = shotHearingRange(w);
   for (const e of enemies) {
     if (e.state === 'dead' || e.state === 'chase') continue;
     const ex = e.group.position.x, ez = e.group.position.z, d = dist2D(ex, ez, px, pz);
@@ -5471,7 +5491,7 @@ const CONTROLS = [
     ['Move finger', 'look around'],
     ['Push pointer into the left / right edge', 'keeps turning while you keep pushing · stops when the pointer rests · off in a sniper scope · Edge turn on/off in settings'],
     ['2-finger swipe', 'look / turn — unlimited 360° (when the trackpad isn\'t captured) · in a sniper scope up/down zooms instead'],
-    ['Click (1 finger)', 'fire (pistols & rifles: one shot per click · P90 / M4 / AKM / SCAR: hold for auto)'],
+    ['Click (1 finger)', 'fire (pistols & rifles: one shot per click · MP5 / M4 / AKM / SCAR: hold for auto)'],
     ['2-finger click', 'aim / scope (snipers: again = 2nd zoom, again = off) · dual pistols: fire LEFT gun'],
     ['Click with dual pistols', 'fire — the two guns take turns (no aiming, wider spread, 14-round shared ammo)'],
     ['2-finger scroll', 'captured trackpad / mouse wheel: switch weapon · in a sniper scope: up = zoom in, down = zoom out (one swipe = one step)'],
@@ -6490,8 +6510,8 @@ function trainingLamps() {
 //      start / tick helpers, and check() = true when it's done. 'say' = CHIEF's reaction. ----
 const LOCKER_NOTES = [
   'Colt M1911 .45 — big slow round, 7 shots, semi-auto, suppressed. Quiet and honest.',
-  'Glock 17 — 9 mm, 17 shots, semi-auto, light kick. Plastic, fantastic.',
-  'FN P90 — 50-round top magazine, full auto, tiny kick. The bullet hose.',
+  'Glock 17 — 9 mm, 17 shots, semi-auto, rectangular suppressor. Quiet and light.',
+  'HK MP5 — 9 mm, 30-round magazine, full auto. Compact and controllable.',
   'M4 Carbine — 5.56, full auto, red dot. The all-rounder.',
   'AKM — 7.62×39, full auto, hits harder and kicks more. Rugged as a tractor.',
   'FN SCAR-H — 7.62 NATO battle rifle. Real flying bullets; one hit usually does it.',

@@ -24,8 +24,11 @@ cheytac.glb  "Precision Rifle Chassis" by austincford — CC-BY
              FALLBACK: no licensed CheyTac M200 model was available for direct
              download. Modern chassis precision rifle. https://poly.pizza/m/XAhFlZjqoy
 
-The FN P90 keeps the in-code model for now: no licensed P90 GLB was available
-without a Sketchfab login.
+mp5.glb      "Mp5" by AdamKokrito — CC-BY 3.0
+             Heckler & Koch MP5 (collapsing-stock / MP5A3 silhouette).
+             Replaces the old procedural FN P90 on key 3.
+             https://poly.pizza/m/q73J0Y8eko
 
 In-game: each model is scaled to that weapon's length, barrel pointed forward,
 and fitted with the existing muzzle flash and suppressor can.
+The Glock's suppressor is a rectangular Osprey-style can; other cans stay round.

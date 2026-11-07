@@ -7,9 +7,10 @@ m1911.mp3    "Real Colt 45 M1911 (shot)" by Carmelomike
 glock.mp3    "glock17_02.wav" by gezortenplotz
              A Glock 17 9mm pistol fired at an outdoor range. CC-BY
              https://freesound.org/s/34982/
-p90.mp3      "FN P90 (Full Auto)" by areniporgen
-             Real FN P90, exterior; one round cut from the burst. CC0
-             https://freesound.org/s/740896/
+mp5.mp3      "MP5 Submachine gun in doorway" by Franki-01234
+             Live Heckler & Koch MP5A3 9mm firing blanks; one round cut
+             from the burst. CC0
+             https://freesound.org/s/201667/
 m4.mp3       "M4A1 Rifle Shot 11" by qubodup
              Extracted from USASA Fort Dix “Range 31 – M4A1 Zero and Grounding” (Jan 29, 2025). CC0
              https://freesound.org/s/854232/
