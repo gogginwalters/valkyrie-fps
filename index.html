@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>OPERATION: BLACK FILE — v0.6.5</title>
+<title>OPERATION: BLACK FILE — v0.6.6</title>
 <link rel="icon" href="data:,">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <!--
@@ -171,6 +171,12 @@
   #tSkip { right: 184px; top: 110px; width: 52px; height: 48px; font-size: 10px; border-color: rgba(255,210,60,0.9); }
   .missions { flex-wrap: wrap; }
   #pickHint { color: #9f9; font-size: 13px; letter-spacing: 2px; margin-top: 6px; }
+  #lockNote { color: #ffb04a; font-size: 13px; min-height: 0; margin-top: 4px; }
+  #lockNote:empty { display: none; }
+  .missions label.locked { opacity: 0.45; border-style: dashed; cursor: not-allowed; filter: grayscale(0.8); }
+  .missions label.locked b::before { content: '🔒 '; }
+  .missions label .lockTxt { display: block; color: #ffb04a; font-size: 11px; margin-top: 3px; }
+  #devTag { color: #f6f; font-size: 11px; letter-spacing: 1px; margin-top: 4px; }
   #pickHint.need { color: #ffd23a; font-size: 16px; font-weight: bold; animation: pickPulse 0.9s ease-in-out 3; }
   @keyframes pickPulse { 50% { color: #fff; } }
   #skipTrainBtn { margin: 18px 0 4px; padding: 6px 12px; font: inherit; font-size: 12px; background: #13200f; color: #cfc; border: 1px solid #4a4; cursor: pointer; touch-action: manipulation; }
@@ -209,8 +215,9 @@
     <h1>OPERATION: BLACK FILE</h1>
     <h2 id="briefSub">TARGET: VALKYRIE</h2>
     <div id="pickHint">CHOOSE YOUR MISSION — tap a card</div>
+    <div id="lockNote"></div>
     <div class="missions">
-      <label id="m0Card"><input type="radio" name="mission" value="0" checked><b>MISSION 00 — TRAINING</b><br>Camp Halyard: CHIEF teaches the basics. Every station skippable.</label>
+      <label id="m0Card"><input type="radio" name="mission" value="0" checked><b>MISSION 00 — TRAINING</b><br>Camp Halyard: CHIEF teaches the basics. Start here.</label>
       <label id="m1Card"><input type="radio" name="mission" value="1"><b>MISSION 01 — BLACK FILE</b><br>Indoor raid on a Valkyrie facility. Close quarters, stealth.</label>
       <label id="m3Card"><input type="radio" name="mission" value="3"><b>SNIPER LESSON</b><br>Range day with GRAVEL. Exploding steel, 100–1,200 m.</label>
       <label id="m2Card"><input type="radio" name="mission" value="2"><b>MISSION 02 — COLD HORIZON</b><br>Outdoor long-range sniper op. Ridge nest, 100–1,600 m.</label>
@@ -378,7 +385,30 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 // ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
 // ##  part failed and why.                                           ##
 // #####################################################################
-const VERSION = 'v0.6.5';
+const VERSION = 'v0.6.6';
+// v0.6.6 MISSION UNLOCKS. Order: TRAINING (0) -> BLACK FILE (1) -> SNIPER LESSON (3) -> COLD HORIZON (2).
+// A new player has only TRAINING; winning a mission unlocks the next one (saved as valkyrieUnlocked =
+// how far along that list you've got, 0-3). Developer mode (?dev=1, remembered; ?dev=0 clears it)
+// unlocks everything and turns the skips back on.
+const MISSION_ORDER = [0, 1, 3, 2];
+let DEV = false, unlockedIdx = 0;
+try {
+  const dv = [...location.search.matchAll(/[?&]dev=([01])/gi)].pop();
+  if (dv) { if (dv[1] === '1') localStorage.setItem('valkyrieDev', '1'); else localStorage.removeItem('valkyrieDev'); }
+  DEV = localStorage.getItem('valkyrieDev') === '1';
+} catch (err) { DEV = /[?&]dev=1/.test(location.search); }
+try {
+  let n = Math.max(0, Math.min(3, Math.floor(+localStorage.getItem('valkyrieUnlocked') || 0)));
+  if (localStorage.getItem('valkyrieTrainingDone')) n = Math.max(n, 1);        // older saves: training done = Black File open
+  if (localStorage.getItem('valkyrieSniperLessonDone')) n = Math.max(n, 3);    // sniper lesson done = Cold Horizon open
+  unlockedIdx = n; localStorage.setItem('valkyrieUnlocked', String(n));
+} catch (err) { /* private mode: training only */ }
+const isUnlocked = m => DEV || MISSION_ORDER.indexOf(m) <= unlockedIdx;
+const earnedMission = () => MISSION_ORDER[unlockedIdx];               // furthest mission you've EARNED
+function unlockAfterWin(m) {
+  const next = MISSION_ORDER.indexOf(m) + 1;
+  if (next > unlockedIdx && next <= 3) { unlockedIdx = next; try { localStorage.setItem('valkyrieUnlocked', String(next)); } catch (err) {} }
+}
 // v0.4.4: the game must only ever start ONCE per page (one canvas, one camera, one loop).
 // If this script somehow ran a second time, stop the second copy right here.
 window.__valkyrieBoots = (window.__valkyrieBoots || 0) + 1;
@@ -746,7 +776,7 @@ const BRIEFINGS = {
     <ul><li><b>13 stations</b> in a row: movement · look · comms · live-fire range · sniper lane · weapons locker · knife · garrote · <b>navigation maze</b> · <b>demolition range</b> · <b>breaching shoot house</b> (door charge, shotgun, ram, torch, wall charge, flashbangs, team stack, hostages) · <b>signals</b> (bug a phone line, intercept a transmission, cut a jammer and a junction box, order HAWK to cover a door) · and a timed <b>FINAL RUN</b> that uses all of it, then graduation.</li>
     <li>CHIEF's box at the top of the screen tells you exactly what to press — worded for <b>your</b> device (Magic Keyboard + trackpad, mouse, or touch).</li>
     <li>Follow the yellow <b>◆</b> on the compass and the yellow rings on the floor. Steel doors open as you finish each station.</li>
-    <li>Bored? <b>0 twice</b> (or SKIP twice) skips a station. Lost? <b>O</b> (or RADIO) and CHIEF repeats himself, loudly.</li>
+    <li>Lost? <b>O</b> (or RADIO) and CHIEF repeats himself, loudly. Every station must be passed — no skipping.</li>
     <li>Nobody here can hurt you. Ammo is free. Role-players in red are <b>not</b> targets.</li></ul>
 `,
   1: `<p><b>Wraith,</b> VALKYRIE — a rogue breakaway faction of the Kantor Group mercenaries — runs a hardened facility out of an old bunker. Inside are files on their warlord, <b>THE CONDUCTOR</b>, and the Moscow money man behind him.</p>
@@ -764,7 +794,7 @@ const BRIEFINGS = {
     <ul><li>Plates at <b>100 · 300 · 500 · 800 · 1,000 · 1,200 m</b> (yellow signs). They pop back up a few seconds after a hit.</li>
     <li>8 short lessons: the scope and zoom · the rangefinder (F) · dialling elevation ([ ] or ↑ ↓) and why bullets drop · wind · breath (Shift) · trigger squeeze and follow-through · leading a moving target · CheyTac vs Barrett.</li>
     <li>GRAVEL calls every shot: "low left — dial UP 2 clicks". His box at the top says what to press, worded for <b>your</b> device.</li>
-    <li>Finish with a timed <b>3-plate qualifier</b>. <b>0 twice</b> (or SKIP twice) skips a lesson; <b>O</b> (or RADIO) and GRAVEL repeats himself.</li></ul>`,
+    <li>Finish with a timed <b>3-plate qualifier</b>. <b>O</b> (or RADIO) and GRAVEL repeats himself.</li></ul>`,
 };
 
 // #####################################################################
@@ -5272,7 +5302,7 @@ const CONTROLS = [
     ['H (hold)', 'garrote — right behind an unaware guard, hold ~2 s: silent, no blood (let go early = he breaks free)'],
     ['Space', 'jump (and stand up from crouch / prone)'],
     ['O', 'radio: CHIEF repeats the instruction (training) · HAWK/DOC hint (Black File) · GRAVEL wind call (Cold Horizon)'],
-    ['0 (twice)', 'training only: skip this station'],
+    ['0 (twice)', 'developer mode only (?dev=1): skip a training station'],
     ['R', 'reload'],
     ['1 – 9', 'pick weapon (9 = Remington 870 shotgun)'],
     [', and .', 'previous / next weapon'],
@@ -5603,7 +5633,7 @@ function applyMission(m) {
   camera.near = outdoors ? 0.1 : 0.05; camera.far = outdoors ? SETTINGS.viewDistance : 200; camera.updateProjectionMatrix();
   document.querySelectorAll('.m2only').forEach(el => (el.style.display = outdoors ? 'flex' : 'none'));
   document.querySelectorAll('.equiponly').forEach(el => (el.style.display = m === 0 || m === 1 ? 'flex' : 'none'));   // v0.6.2 demolition kit + waypoint
-  document.querySelectorAll('.trainonly').forEach(el => (el.style.display = m === 0 || (m === 3 && el.id === 'tSkip') ? 'flex' : 'none'));
+  document.querySelectorAll('.trainonly').forEach(el => (el.style.display = (m === 0 || (m === 3 && el.id === 'tSkip')) && (el.id !== 'tSkip' || DEV) ? 'flex' : 'none'));   // v0.6.6: SKIP button only in dev mode
   $('trainBox').style.display = m === 0 || m === 3 ? 'block' : 'none';
   for (const k of [0, 1, 2, 3]) $('m' + k + 'Card').classList.toggle('sel', missionPicked && m === k);
   $('briefText').innerHTML = BRIEFINGS[m];
@@ -5615,6 +5645,7 @@ const MISSION_NAMES = { 0: 'TRAINING', 1: 'BLACK FILE', 2: 'COLD HORIZON', 3: 'S
 function selectedMission() { return chosenMission; }
 function chooseMission(m, rebuild = true) {
   m = m === 2 || m === 0 || m === 3 ? m : 1;
+  if (!isUnlocked(m)) { showLockNote(lockReason(m)); noteInput('locked mission ' + m); showPicked(); return; }   // v0.6.6
   const changed = m !== chosenMission;
   chosenMission = m; missionPicked = true;
   showPicked();
@@ -5622,12 +5653,29 @@ function chooseMission(m, rebuild = true) {
     applyMission(m); buildLevel(); resetPlayer(); resetWeapons(); resetMasking(); missionStartPose();
   }
 }
+const MISSION_TITLES = { 0: 'Training', 1: 'Black File', 2: 'Cold Horizon', 3: 'the Sniper Lesson' };
+const lockReason = m => 'Locked — beat ' + MISSION_TITLES[MISSION_ORDER[MISSION_ORDER.indexOf(m) - 1]] + ' first';
+function showLocks() {
+  for (const k of [0, 1, 2, 3]) {
+    const card = $('m' + k + 'Card'), locked = !isUnlocked(k);
+    card.classList.toggle('locked', locked); card.setAttribute('aria-disabled', locked ? 'true' : 'false');
+    const r = card.querySelector('input'); if (r) r.disabled = locked;
+    let t = card.querySelector('.lockTxt');
+    if (locked && !t) { t = document.createElement('span'); t.className = 'lockTxt'; card.appendChild(t); }
+    if (t) t.textContent = locked ? lockReason(k) : '';
+  }
+  let tag = $('devTag');
+  if (DEV && !tag) { tag = document.createElement('div'); tag.id = 'devTag'; tag.textContent = 'DEV MODE — all missions unlocked, skips on (?dev=0 to turn off)'; $('lockNote').after(tag); }
+}
+let lockNoteTimer = 0;
+function showLockNote(txt) { $('lockNote').textContent = txt; clearTimeout(lockNoteTimer); lockNoteTimer = setTimeout(() => ($('lockNote').textContent = ''), 6000); }
 function showPicked() {
   const m = chosenMission, p = missionPicked;
   document.querySelectorAll('input[name="mission"]').forEach(r => (r.checked = p && +r.value === m));
   for (const k of [0, 1, 2, 3]) $('m' + k + 'Card').classList.toggle('sel', p && m === k);
   $('startBtn').textContent = p ? '▶ START: ' + MISSION_NAMES[m] : '▲ PICK A MISSION ABOVE, THEN START';
-  $('skipTrainBtn').style.display = p && m === 0 ? '' : 'none';      // only useful while TRAINING is picked
+  $('skipTrainBtn').style.display = DEV && p && m === 0 ? '' : 'none';   // v0.6.6: developer mode only
+  showLocks();
   $('pickHint').classList.toggle('need', !p);
 }
 // v0.6.5 iPad FIX: only a GENUINE tap counts. iPad Safari fires touchend (and pointerup) at the
@@ -5720,6 +5768,7 @@ function endGame(won) {
   $('endTitle').style.color = won ? '#7f7' : '#f66';
   $('endSubtitle').textContent = won ? (currentMission === 0 ? 'CHIEF: "Congratulations, Wraith. You are now marginally less likely to die. Black File is waiting."' : currentMission === 3 ? 'GRAVEL: "Measure, dial, breathe, squeeze, stay. Now do it when they shoot back."' : currentMission === 2 ? 'Exfil complete. The Conductor just lost an airfield.' : 'Extraction successful. Good work, Agent.')
     : (currentMission === 2 ? 'Wraith down. Gravel is going to be insufferable about this.' : 'Agent down. The intel is lost.');
+  if (won) unlockAfterWin(currentMission);                            // v0.6.6: winning opens the next mission
   if (won && currentMission === 0) { try { localStorage.setItem('valkyrieTrainingDone', '1'); } catch (err) {} }
   if (won && currentMission === 3) { try { localStorage.setItem('valkyrieSniperLessonDone', '1'); } catch (err) {} }
   const objLine = currentMission === 3
@@ -5756,12 +5805,14 @@ for (const [id, m] of [['m0Card', 0], ['m1Card', 1], ['m3Card', 3], ['m2Card', 2
   // v0.6: ...?mission=0 (or =training) = Training, =1 = Black File, =2 = Cold Horizon. The LAST mission= wins.
   // No choice in the link: Training first, until you've finished it once (then Black File).
   const all = [...location.search.matchAll(/mission=([a-z0-9]+)/gi)], q = all.length ? all[all.length - 1][1].toLowerCase() : null, h = (location.hash || '').toLowerCase();
-  let done = false; try { done = !!localStorage.getItem('valkyrieTrainingDone'); } catch (err) {}
   const want = q === '3' || q === 'sniper' || q === 'lesson' || h === '#m3' || h === '#sniper' ? 3 : q === '2' || h === '#m2' || h === '#mission2' ? 2 : q === '1' || h === '#m1' || h === '#mission1' ? 1
-    : q === '0' || q === 'training' || h === '#m0' || h === '#training' ? 0 : done ? -1 : 0;
+    : q === '0' || q === 'training' || h === '#m0' || h === '#training' ? 0 : -1;
+  // v0.6.6: no mission in the link = the furthest mission you've earned, ticked, on the picker.
+  // A link to a LOCKED mission falls back to the furthest one you've earned, with a short note.
+  let m = want >= 0 ? want : earnedMission();
+  if (!isUnlocked(m)) { showLockNote(lockReason(m) + ' — starting you on ' + MISSION_NAMES[earnedMission()] + '.'); m = earnedMission(); }
   chosenMission = -1;
-  if (want >= 0) chooseMission(want, false);          // the level itself is built once, below
-  else { chooseMission(1, false); missionPicked = false; showPicked(); }   // v0.6.5: returning player, plain link: Black File behind the screen, but YOU pick
+  chooseMission(m, false);          // the level itself is built once, below
 }
 onTap($('menuBtn'), () => { $('endScreen').style.display = 'none'; $('startScreen').style.display = 'flex'; hud.root.style.display = 'none'; state = 'start'; showPicked(); }, { prevent: true, when: () => state === 'won' || state === 'lost' });
 $('startBtn').addEventListener('click', startMission);
@@ -5775,6 +5826,7 @@ function continueOrRestart() {
 // v0.6.5: Skip training needs a genuine tap AND a second tap to confirm (it sits below the briefing now).
 let skipArmedAt = -1e9;
 onTap($('skipTrainBtn'), () => {
+  if (!DEV) return;
   const now = performance.now(), b = $('skipTrainBtn');
   if (now - skipArmedAt > 4000) { skipArmedAt = now; b.textContent = 'Sure? Tap again to skip training and start Mission 01'; setTimeout(() => { if (performance.now() - skipArmedAt >= 3900) b.textContent = 'Skip training → go straight to Mission 01'; }, 4000); return; }
   skipArmedAt = -1e9; b.textContent = 'Skip training → go straight to Mission 01';
@@ -6334,10 +6386,13 @@ const STATIONS = [
     outro: 'Two hundred metres. Gravel calls that a warm-up. Gravel is insufferable. The weapons locker is down the stairs.',
     steps: [
       { text: () => `Lie on the firing mat (${K('prone')}) and take the CheyTac (${KW(7)}).`, at: { x: 217, z: 36 }, label: 'FIRING MAT',
-        check: () => nearP({ x: 217, z: 36 }, 2.4) && player.stance === 'prone' && currentWeapon === 7 },
+        check: () => nearP({ x: 217, z: 36 }, 2.4) && player.stance === 'prone' && currentWeapon === 7,
+        // The exit door (5) is SOUTH of the mat, not downrange. Face the steel WEST:
+        // walking in from gate 4 otherwise leaves players staring at the locked locker door.
+        after: () => { camera.lookAt(118, camera.position.y, 38); } },
       { text: S => `SCOPE — ${K('aim')}. Zoom with ${K('zoom')}; use both zoom levels. ${S.z1 ? '✔ zoom 1 ' : ''}${S.z2 ? '✔ zoom 2' : ''}`,
         start: S => { S.z1 = S.z2 = 0; raiseTargets(['l50', 'l100', 'l200'], 1.0); }, tick: S => { if (aiming && zoomStep === 1) S.z1 = 1; if (aiming && zoomStep === 2) S.z2 = 1; }, check: S => S.z1 && S.z2 },
-      { text: () => `RANGEFINDER — put the crosshair on the 100 m steel and press ${K('lase')}.`, check: () => TRAIN.lastLase > 85 && TRAIN.lastLase < 115, say: 'Ninety-nine metres. Write it down. Or don\'t, it\'s a game.' },
+      { text: () => `RANGEFINDER — face WEST down the open lane (not the locked exit door). Put the crosshair on the 100 m steel and press ${K('lase')}.`, check: () => TRAIN.lastLase > 85 && TRAIN.lastLase < 115, say: 'Ninety-nine metres. Write it down. Or don\'t, it\'s a game.' },
       { text: () => `ELEVATION — bullets drop, so the scope is dialled to a range. Someone left it at 500 m. Dial it to 100 m: ${K('dial')} (each click = 100 m). Now: ${fmtDist(zeroRange)}.`,
         start: () => { zeroRange = 500; }, check: () => zeroRange === 100 },
       { text: () => `Steady: ${K('breath')} holds your breath and stops the sway. Hit the 100 m steel.`, check: () => ev('pop:l100') > 0, say: 'Ping. That\'s the sound of a job done.' },
@@ -6567,6 +6622,7 @@ function teleportTo(c, r) {
   teammates.forEach((m, i) => { if (!m.hold) { const q = randomFloorNear(p.x, p.z, 2.5); m.group.position.set(q.x, 0, q.z); m.path = []; } });
 }
 function skipStation() {
+  if (!DEV) return; // Station skips are developer-only, including debug calls.
   const s = curStation();
   if (!s) { showMessage(currentMission === 3 ? 'Nothing left to skip.' : 'Nothing left to skip — the graduation pad is open.', 2); return; }
   if (currentMission === 3) { radioSay('GRAVEL', 'Skipping ' + s.name + '. Your call, Wraith. The bullet won\'t skip it.', 4); completeStation(true); return; }
@@ -6579,6 +6635,7 @@ function skipStation() {
 function skipPressed() {
   const now = performance.now();
   if (!trainLike() || !TRAIN) return;
+  if (!DEV) { noteInput('skip refused (not dev)'); return; }      // v0.6.6: regular players can't skip
   if (now - TRAIN.lastSkip < 1500) { TRAIN.lastSkip = -1e9; skipStation(); }
   else { TRAIN.lastSkip = now; showMessage('Skip this station? Press ' + plain(K('skip')).replace(' twice', '') + ' again.', 1.5); }
 }
@@ -6647,14 +6704,14 @@ function updateTrainBox() {
   if (currentMission === 3) {
     html = !s ? '<b>QUALIFIED</b><br>Lesson complete.' : !st ? `<b>NEXT: LESSON ${TRAIN.i + 1} · ${s.name}</b><br>GRAVEL is getting the next one ready…`
       : `<b>GRAVEL · LESSON ${TRAIN.i + 1}/${LESSON.length} · ${s.name}</b> &nbsp; <span class="tstep">step ${TRAIN.step + 1}/${s.steps.length}</span><br>${st.text(TRAIN.S)}`;
-    html += `<div class="tsmall">${K('radio')} = GRAVEL repeats / wind call · ${K('skip')} = skip this lesson</div>`;
+    html += `<div class="tsmall">${K('radio')} = GRAVEL repeats / wind call${DEV ? ' · ' + K('skip') + ' = skip this lesson (dev)' : ''}</div>`;
     if (html !== TRAIN.boxHTML) { el.innerHTML = html; TRAIN.boxHTML = html; }
     return;
   }
   if (!s) html = '<b>GRADUATION</b><br>All stations done. Walk onto the green pad (follow the ◆).';
   else if (!st) html = `<b>NEXT: STATION ${TRAIN.i + 1} · ${s.name}</b><br>Follow the ◆ on the compass and the yellow floor arrows.`;
   else html = `<b>STATION ${TRAIN.i + 1}/${STATIONS.length} · ${s.name}</b> &nbsp; <span class="tstep">step ${TRAIN.step + 1}/${s.steps.length}</span><br>${st.text(TRAIN.S)}`;
-  html += `<div class="tsmall">${K('radio')} = CHIEF repeats · ${K('skip')} = skip this station</div>`;
+  html += `<div class="tsmall">${K('radio')} = CHIEF repeats${DEV ? ' · ' + K('skip') + ' = skip this station (dev)' : ''}</div>`;
   if (html !== TRAIN.boxHTML) { el.innerHTML = html; TRAIN.boxHTML = html; }
 }
 function trainingObjectivesHTML() {
@@ -7888,6 +7945,8 @@ window.__gameLoaded = true;
 if (!debugInfo.on) document.getElementById('debugHud').style.display = 'none';
 // Handy for testing in the browser console (F12), e.g.  __game.SETTINGS.enemyDamage = 0
 window.__game = {
+  endMission: won => endGame(won),
+  progress: () => ({ dev: DEV, unlockedIdx, unlocked: [0, 1, 2, 3].filter(isUnlocked) }),
   sig: () => SIG, fr: () => FR, orderCover, hjobAhead, coverOn, hawk, SIGAT, FRAT, cutJammer,
   SETTINGS, CALIBERS, WEAPONS, player, camera, startMission, switchWeapon,
   enemies: () => enemies, state: () => state, weaponState: () => weaponState, renderFrame: () => { updateFigureLOD(); renderer.render(scene, camera); }, figureLOD: () => enemies.filter(e => e.fig && e.fig.lod).length, glFinish: () => renderer.getContext().finish(), debugInfo, VERSION, aimOffset: () => aimOffset, lastShotInfo: () => lastShotInfo, lean, safeUnlock, endGame,
