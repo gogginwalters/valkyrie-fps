@@ -5,6 +5,7 @@
 <title>OPERATION: BLACK FILE — v0.6.6</title>
 <link rel="icon" href="data:,">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <!--
   =====================================================================
   OPERATION: BLACK FILE  (v0.5.3 — trackpad aim follows 1:1 (relative movement, coalesced events, hidden cursor), scope zoom on 2-finger up/down, look sens 1.6; v0.5.2 — trackpad no longer spins the view (edge turn only while moving, on/off switch, swipe momentum limit); v0.5.1 — semi-auto pistols, lean (Tab / E), fixed freeze at the elevator on iPad; v0.5 — real 3D soldiers, zone looks + signs, compass, map (M), radio hints, dual M1911s; v0.4.6 mission select fix for iPad, free 360° turning on iPad, retuned damage, friendly markers on your squad, sniper mission, knife, Magic Keyboard controls, iPad aim/layout fix + DEBUG readout)
@@ -386,7 +387,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 // ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
 // ##  part failed and why.                                           ##
 // #####################################################################
-const VERSION = 'v0.6.12';
+const VERSION = 'v0.6.13';
 // v0.6.6 MISSION UNLOCKS. Order: TRAINING (0) -> BLACK FILE (1) -> SNIPER LESSON (3) -> COLD HORIZON (2).
 // A new player has only TRAINING; winning a mission unlocks the next one (saved as valkyrieUnlocked =
 // how far along that list you've got, 0-3). Developer mode (?dev=1, remembered; ?dev=0 clears it)
@@ -1924,6 +1925,17 @@ function collectGunPoints(obj) {
   });
   return pts;
 }
+function measureMeshBox(obj) {
+  // World box from the mesh vertices themselves. Do not use Box3.setFromObject
+  // on skinned FBX guns: that API counts bone scales twice, so the Barrett
+  // shrinks to a speck and the AKM comes out huge.
+  obj.updateWorldMatrix(true, true);
+  const pts = collectGunPoints(obj);
+  const box = new THREE.Box3();
+  const v = new THREE.Vector3();
+  for (let i = 0; i < pts.length; i += 3) box.expandByPoint(v.set(pts[i], pts[i + 1], pts[i + 2]));
+  return box;
+}
 function endArea(pts, axis, useMin) {
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
   for (let i = 0; i < pts.length; i += 3) {
@@ -1955,7 +1967,7 @@ function fitGltfGun(scene, w) {
   if (w.gltfRot) {
     inner.rotation.set(w.gltfRot[0], w.gltfRot[1], w.gltfRot[2]);
   } else {
-    const box = new THREE.Box3().setFromObject(inner);
+    const box = measureMeshBox(inner);
     const size = box.getSize(new THREE.Vector3());
     if (size.x >= size.y && size.x >= size.z) inner.rotation.y = Math.PI / 2;
     else if (size.y >= size.x && size.y >= size.z) inner.rotation.x = -Math.PI / 2;
@@ -1963,17 +1975,17 @@ function fitGltfGun(scene, w) {
     const pts = collectGunPoints(inner);
     if (endArea(pts, 2, false) < endArea(pts, 2, true) * 0.92) inner.rotateY(Math.PI);
     inner.updateWorldMatrix(true, true);
-    const boxR = new THREE.Box3().setFromObject(inner);
+    const boxR = measureMeshBox(inner);
     const sizeR = boxR.getSize(new THREE.Vector3());
     if (sizeR.x > sizeR.y * 1.15) inner.rotateZ(Math.PI / 2);
   }
   const target = w.length || 0.7;
-  const box2 = new THREE.Box3().setFromObject(inner);
+  const box2 = measureMeshBox(inner);
   const size2 = box2.getSize(new THREE.Vector3());
   const longest = Math.max(size2.x, size2.y, size2.z) || 1;
   inner.scale.setScalar(target / longest);
   inner.updateWorldMatrix(true, true);
-  const box3 = new THREE.Box3().setFromObject(inner);
+  const box3 = measureMeshBox(inner);
   const size3 = box3.getSize(new THREE.Vector3());
   const center = box3.getCenter(new THREE.Vector3());
   inner.position.sub(center);
@@ -1985,7 +1997,7 @@ function placeMuzzleExtras(g, w) {
   const keep = new Set([g.userData.flash, g.userData.suppressor]);
   const mesh = g.children.find(c => !keep.has(c));
   if (!mesh) return;
-  const box = new THREE.Box3().setFromObject(mesh);
+  const box = measureMeshBox(mesh);
   const size = box.getSize(new THREE.Vector3());
   const pts = collectGunPoints(mesh);
   const zCut = box.min.z + size.z * 0.08;
@@ -2006,31 +2018,13 @@ function placeMuzzleExtras(g, w) {
   d.flash.scale.setScalar(on ? 0.35 : 1);
 }
 function bakeSkinnedMeshes(root) {
-  // Skinned FBX guns (AKM, Barrett) report the wrong size to Box3: one is measured
-  // ~100× too big and shrinks to a speck, the other is measured too small and
-  // shows up huge. Baking the rest pose into a regular mesh makes the size match
-  // what you actually see.
-  root.updateWorldMatrix(true, true);
+  // Draw skinned FBX guns (AKM, Barrett) as regular meshes in their bind pose.
+  // The skeleton is only there for attachment bones and must not be used for
+  // sizing or rendering, or one gun vanishes and the other looks gigantic.
   const meshes = [];
   root.traverse(o => { if (o.isSkinnedMesh) meshes.push(o); });
-  const v = new THREE.Vector3();
   for (const mesh of meshes) {
-    mesh.updateMatrixWorld(true);
-    const geom = mesh.geometry.clone();
-    const pos = geom.attributes.position;
-    const arr = new Float32Array(pos.count * 3);
-    for (let i = 0; i < pos.count; i++) {
-      v.fromBufferAttribute(pos, i);
-      mesh.applyBoneTransform(i, v);
-      arr[i * 3] = v.x;
-      arr[i * 3 + 1] = v.y;
-      arr[i * 3 + 2] = v.z;
-    }
-    geom.setAttribute('position', new THREE.BufferAttribute(arr, 3));
-    geom.computeVertexNormals();
-    geom.computeBoundingBox();
-    geom.computeBoundingSphere();
-    const plain = new THREE.Mesh(geom, mesh.material);
+    const plain = new THREE.Mesh(mesh.geometry, mesh.material);
     plain.name = mesh.name;
     plain.frustumCulled = false;
     plain.position.copy(mesh.position);
