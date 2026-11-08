@@ -8,7 +8,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <!--
   =====================================================================
-  OPERATION: BLACK FILE  (v0.6.19 — no extra two-finger look once trackpad look works (stops coasting), try fullscreen to hide the pointer; v0.6.18 — hide iPad cursor with a transparent pointer + kill leftover swipe drift; v0.6.17 — cursor/aim: OS cursor hidden over everything in play, relative trackpad look never stalls at screen edge, no edge-turn overshoot, steadier scoped aim; v0.5.3 — trackpad aim follows 1:1 (relative movement, coalesced events, hidden cursor), scope zoom on 2-finger up/down, look sens 1.6; v0.5.2 — trackpad no longer spins the view (edge turn only while moving, on/off switch, swipe momentum limit); v0.5.1 — semi-auto pistols, lean (Tab / E), fixed freeze at the elevator on iPad; v0.5 — real 3D soldiers, zone looks + signs, compass, map (M), radio hints, dual M1911s; v0.4.6 mission select fix for iPad, free 360° turning on iPad, retuned damage, friendly markers on your squad, sniper mission, knife, Magic Keyboard controls, iPad aim/layout fix + DEBUG readout)
+  OPERATION: BLACK FILE  (v0.6.20 — two-finger swipe never turns the view (stops leftover inertial drift); v0.6.19 — no extra two-finger look once trackpad look works (stops coasting), try fullscreen to hide the pointer; v0.6.18 — hide iPad cursor with a transparent pointer + kill leftover swipe drift; v0.6.17 — cursor/aim: OS cursor hidden over everything in play, relative trackpad look never stalls at screen edge, no edge-turn overshoot, steadier scoped aim; v0.5.3 — trackpad aim follows 1:1 (relative movement, coalesced events, hidden cursor), scope zoom on 2-finger up/down, look sens 1.6; v0.5.2 — trackpad no longer spins the view (edge turn only while moving, on/off switch, swipe momentum limit); v0.5.1 — semi-auto pistols, lean (Tab / E), fixed freeze at the elevator on iPad; v0.5 — real 3D soldiers, zone looks + signs, compass, map (M), radio hints, dual M1911s; v0.4.6 mission select fix for iPad, free 360° turning on iPad, retuned damage, friendly markers on your squad, sniper mission, knife, Magic Keyboard controls, iPad aim/layout fix + DEBUG readout)
   A tiny browser first-person shooter.
   - Mission structure & spy flavour inspired by GoldenEye 007 (N64)
   - Fast, aggressive maze shooting inspired by Wolfenstein 3D
@@ -392,7 +392,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 // ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
 // ##  part failed and why.                                           ##
 // #####################################################################
-const VERSION = 'v0.6.19';
+const VERSION = 'v0.6.20';
 // v0.6.6 MISSION UNLOCKS. Order: TRAINING (0) -> BLACK FILE (1) -> SNIPER LESSON (3) -> COLD HORIZON (2).
 // A new player has only TRAINING; winning a mission unlocks the next one (saved as valkyrieUnlocked =
 // how far along that list you've got, 0-3). Developer mode (?dev=1, remembered; ?dev=0 clears it)
@@ -498,7 +498,7 @@ const SETTINGS = {
   edgePitchSpeed: 0.8,       // ...but gentler
   swipeMaxDelta: 80,         // v0.5.2: one scroll event can't turn more than this many pixels' worth
   swipeMaxGesture: 3,        // v0.5.2: one swipe stops looking after this many seconds (no endless momentum)
-  scrollLooks: true,         // no pointer lock: two-finger trackpad swipe = look (unlimited 360°)
+  scrollLooks: false,        // v0.6.20: off — two-finger swipe-look was still drifting after lift
   scrollLookScale: 0.004,    // radians per scroll pixel
   keyTurnSpeed: 1.4,         // ← → / J K: starting turn speed (radians/second)...
   keyTurnMax: 3.2,           // ...speeding up to this while held
@@ -2315,10 +2315,10 @@ window.addEventListener('wheel', e => {
   e.preventDefault();
   if (e.ctrlKey) return;                               // pinch-zoom gesture: ignore
   const w = WEAPONS[currentWeapon];
-  // v0.6.19: once one-finger relative look works, do not also turn with two-finger
-  // swipe-look. That second path was why the view kept drifting after you stopped.
-  // Scoped two-finger up/down still zooms. Weapons stay on 1–8.
-  if (movementSeen && !(aiming && w.scope && w.projectile)) return;
+  // v0.6.20: two-finger swipe never turns the view. Safari keeps sending shrinking
+  // wheel events after you lift (inertia), and that was the leftover drift even when
+  // one-finger look was already working. Scoped up/down still zooms. Weapons stay on 1–8.
+  if (!(aiming && w.scope && w.projectile)) return;
   // v0.4.5: no pointer lock (iPad Safari never gives it) → two-finger swipe LOOKS, with no limit,
   // so a full 360° is easy. (Weapons: 1–8, , . or the GUN button.) Scoped sniper: up/down still dials.
   if (SETTINGS.scrollLooks && !controls.isLocked && !killcam.active && !movementSeen) {
@@ -4150,23 +4150,12 @@ window.addEventListener('pointermove', e => {
   usePointerLook = true;
   if (state === 'playing') setPlayCursor(true);
   const prev = noteMove(e);
-  // Sum every coalesced sample (some browsers deliver several finger samples in one event).
-  const list = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
-  let mx = 0, my = 0;
-  // v0.6.17 edge stall fix: once the browser has EVER reported movementX/Y we trust only that (it keeps
-  // coming when the OS cursor is pinned at the screen edge); the old code fell back to clientX deltas on a
-  // zero-movement event, which are 0 at the edge = view stalls. clientX deltas are used only on browsers
-  // that never report movement.
-  if (list.length > 1) {
-    let px = prev ? prev.x : list[0].clientX, py = prev ? prev.y : list[0].clientY, mvx = 0, mvy = 0, hasMv = false;
-    for (const c of list) { mvx += c.movementX || 0; mvy += c.movementY || 0; if (c.movementX || c.movementY) hasMv = true; }
-    if (hasMv) movementSeen = true;
-    if (hasMv || movementSeen) { mx = mvx; my = mvy; } else { const last = list[list.length - 1]; mx = last.clientX - px; my = last.clientY - py; }
-  } else {
-    mx = e.movementX || 0; my = e.movementY || 0;
-    if (mx || my) movementSeen = true;
-    else if (!movementSeen && prev) { mx = e.clientX - prev.x; my = e.clientY - prev.y; }
-  }
+  // v0.6.20: use this event's own movement only. Summing coalesced samples can
+  // count the same motion more than once on Safari and overshoot the view.
+  // v0.6.17: once movementX/Y has been seen, never fall back to clientX (0 at the edge = stall).
+  let mx = e.movementX || 0, my = e.movementY || 0;
+  if (mx || my) movementSeen = true;
+  else if (!movementSeen && prev) { mx = e.clientX - prev.x; my = e.clientY - prev.y; }
   fallbackLook(mx, my);
 }, { passive: true });
 document.addEventListener('mousemove', e => {
