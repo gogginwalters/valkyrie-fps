@@ -8,7 +8,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <!--
   =====================================================================
-  OPERATION: BLACK FILE  (v0.5.3 — trackpad aim follows 1:1 (relative movement, coalesced events, hidden cursor), scope zoom on 2-finger up/down, look sens 1.6; v0.5.2 — trackpad no longer spins the view (edge turn only while moving, on/off switch, swipe momentum limit); v0.5.1 — semi-auto pistols, lean (Tab / E), fixed freeze at the elevator on iPad; v0.5 — real 3D soldiers, zone looks + signs, compass, map (M), radio hints, dual M1911s; v0.4.6 mission select fix for iPad, free 360° turning on iPad, retuned damage, friendly markers on your squad, sniper mission, knife, Magic Keyboard controls, iPad aim/layout fix + DEBUG readout)
+  OPERATION: BLACK FILE  (v0.6.17 — cursor/aim: OS cursor hidden over everything in play, relative trackpad look never stalls at screen edge, no edge-turn overshoot, steadier scoped aim; v0.5.3 — trackpad aim follows 1:1 (relative movement, coalesced events, hidden cursor), scope zoom on 2-finger up/down, look sens 1.6; v0.5.2 — trackpad no longer spins the view (edge turn only while moving, on/off switch, swipe momentum limit); v0.5.1 — semi-auto pistols, lean (Tab / E), fixed freeze at the elevator on iPad; v0.5 — real 3D soldiers, zone looks + signs, compass, map (M), radio hints, dual M1911s; v0.4.6 mission select fix for iPad, free 360° turning on iPad, retuned damage, friendly markers on your squad, sniper mission, knife, Magic Keyboard controls, iPad aim/layout fix + DEBUG readout)
   A tiny browser first-person shooter.
   - Mission structure & spy flavour inspired by GoldenEye 007 (N64)
   - Fast, aggressive maze shooting inspired by Wolfenstein 3D
@@ -76,6 +76,8 @@
   .credits { margin-top: 14px; font-size: 11px; color: #9a9; line-height: 1.5; border-top: 1px dashed #4a5a4a; padding-top: 8px; }
   /* v0.5.3: no floating OS cursor over the game while you play (it's only a distraction: the crosshair is the aim) */
   body.inplay, body.inplay canvas, body.inplay #hud, body.inplay #hud * { cursor: none !important; }
+  /* v0.6.17 ("cursor detached"): hide the OS pointer over EVERY element while playing (scope overlay, radio, compass...), not just the canvas/HUD */
+  html.inplay, html.inplay body, html.inplay body * { cursor: none !important; }
   body.inplay { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
   #compass { position: absolute; top: 6px; left: 50%; transform: translateX(-50%); width: 460px; height: 40px; }
   #mapScreen { position: fixed; inset: 0; z-index: 60; display: none; background: rgba(0,10,0,0.92); align-items: center; justify-content: center; flex-direction: column;
@@ -387,7 +389,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 // ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
 // ##  part failed and why.                                           ##
 // #####################################################################
-const VERSION = 'v0.6.16';
+const VERSION = 'v0.6.17';
 // v0.6.6 MISSION UNLOCKS. Order: TRAINING (0) -> BLACK FILE (1) -> SNIPER LESSON (3) -> COLD HORIZON (2).
 // A new player has only TRAINING; winning a mission unlocks the next one (saved as valkyrieUnlocked =
 // how far along that list you've got, 0-3). Developer mode (?dev=1, remembered; ?dev=0 clears it)
@@ -488,7 +490,7 @@ const SETTINGS = {
   edgeTurn: true,            // v0.5.2: EDGE TURN on/off (start + pause screens, remembered on this device)
   edgeTurnZone: 0.06,        // pointer within this fraction of the screen width of the left/right edge = turn (was 0.12)
   edgeTurnSpeed: 1.4,        // radians/second at the very edge; gently less further in (was 2.0)
-  edgeTurnGrace: 0.35,       // v0.5.2: ONLY while the pointer really moves: this many seconds after the last movement it stops
+  edgeTurnGrace: 0.12,       // v0.5.2: ONLY while the pointer really moves: this many seconds after the last movement it stops
   edgePitchZone: 0.04,       // same for the top/bottom edge (look up/down)...
   edgePitchSpeed: 0.8,       // ...but gentler
   swipeMaxDelta: 80,         // v0.5.2: one scroll event can't turn more than this many pixels' worth
@@ -2656,7 +2658,8 @@ function updateWeapon(dt) {
   // Aiming zooms the camera in (scoped weapons zoom a lot).
   const targetFov = aiming ? w.zoomLevels[Math.min(zoomStep, w.zoomLevels.length) - 1] : BASE_FOV;
   if (Math.abs(camera.fov - targetFov) > 0.1) { camera.fov += (targetFov - camera.fov) * Math.min(1, dt * 14); camera.updateProjectionMatrix(); }
-  controls.pointerSpeed = SETTINGS.mouseSensitivity * (camera.fov / BASE_FOV);
+  // v0.6.17: zoomed aim is steadier — on top of the FOV scaling, ADS is 0.85x and a sniper scope 0.6x as fast
+  controls.pointerSpeed = SETTINGS.mouseSensitivity * (camera.fov / BASE_FOV) * (aiming ? (w.scope ? 0.6 : 0.85) : 1);
   hud.scope.style.display = aiming && w.scope ? 'block' : 'none';
   updateScope(dt, w);          // sway, hold breath, mil-dot reticle, scope readout (SECTION 16)
 
@@ -4117,7 +4120,7 @@ document.addEventListener('mousemove', () => { if (controls.isLocked && touch.ac
 // Pointer events are used when the browser has them (with every coalesced sample, so fast flicks
 // aren't under-counted); plain mouse events are the fallback. A sudden jump reported right around a
 // click is ignored (Safari sometimes does that), so firing never jolts the aim.
-let usePointerLook = false, lastButtonAt = -1e9, lookStats = { events: 0, px: 0 };
+let movementSeen = false, usePointerLook = false, lastButtonAt = -1e9, lookStats = { events: 0, px: 0 };
 function fallbackLook(mx, my) {
   if (state !== 'playing' || controls.isLocked || touch.active || killcam.active || cameFromTouch()) return;
   if (!mx && !my) return;
@@ -4139,13 +4142,19 @@ window.addEventListener('pointermove', e => {
   // Sum every coalesced sample (some browsers deliver several finger samples in one event).
   const list = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
   let mx = 0, my = 0;
+  // v0.6.17 edge stall fix: once the browser has EVER reported movementX/Y we trust only that (it keeps
+  // coming when the OS cursor is pinned at the screen edge); the old code fell back to clientX deltas on a
+  // zero-movement event, which are 0 at the edge = view stalls. clientX deltas are used only on browsers
+  // that never report movement.
   if (list.length > 1) {
     let px = prev ? prev.x : list[0].clientX, py = prev ? prev.y : list[0].clientY, mvx = 0, mvy = 0, hasMv = false;
     for (const c of list) { mvx += c.movementX || 0; mvy += c.movementY || 0; if (c.movementX || c.movementY) hasMv = true; }
-    if (hasMv) { mx = mvx; my = mvy; } else { const last = list[list.length - 1]; mx = last.clientX - px; my = last.clientY - py; }
+    if (hasMv) movementSeen = true;
+    if (hasMv || movementSeen) { mx = mvx; my = mvy; } else { const last = list[list.length - 1]; mx = last.clientX - px; my = last.clientY - py; }
   } else {
     mx = e.movementX || 0; my = e.movementY || 0;
-    if (!mx && !my && prev) { mx = e.clientX - prev.x; my = e.clientY - prev.y; }
+    if (mx || my) movementSeen = true;
+    else if (!movementSeen && prev) { mx = e.clientX - prev.x; my = e.clientY - prev.y; }
   }
   fallbackLook(mx, my);
 }, { passive: true });
@@ -4173,6 +4182,9 @@ function edgeTurn(dt) {
   if (!SETTINGS.edgeTurn || !lastMouseXY || controls.isLocked || touch.active || killcam.active || cameFromTouch()) return;
   if (performance.now() - lastRealMoveAt > SETTINGS.edgeTurnGrace * 1000) { debugInfo.edge = 'idle'; return; }
   if (aiming && WEAPONS[currentWeapon].scope) { debugInfo.edge = 'scoped'; return; }
+  // v0.6.17: when the browser reports relative movement, look already follows the finger past the edge;
+  // edge-turn on top of it was EXTRA rotation (kept turning after the finger stopped = overshoot).
+  if (movementSeen) { debugInfo.edge = 'relative'; return; }
   const W = window.innerWidth, H = window.innerHeight, x = lastMouseXY.x, y = lastMouseXY.y;
   const ez = W * SETTINGS.edgeTurnZone, pz = H * SETTINGS.edgePitchZone;
   const ramp = d => { const t = THREE.MathUtils.clamp(1 - d / ez, 0, 1); return t * t; };   // gentle 0..1 (slow at the inner edge)
@@ -6178,7 +6190,7 @@ let elapsed = 0;
 let bodyInPlay = false;
 function gameLoop() {
   const inPlay = state === 'playing';
-  if (inPlay !== bodyInPlay) { bodyInPlay = inPlay; document.body.classList.toggle('inplay', inPlay); }
+  if (inPlay !== bodyInPlay) { bodyInPlay = inPlay; document.body.classList.toggle('inplay', inPlay); document.documentElement.classList.toggle('inplay', inPlay); }
   const dt = Math.min(clock.getDelta(), 0.05);   // cap so a lag spike can't push you through walls
   elapsed += dt;
   safe('fit', () => fitRenderer());
