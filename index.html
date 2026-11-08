@@ -8,7 +8,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <!--
   =====================================================================
-  OPERATION: BLACK FILE  (v0.6.17 — cursor/aim: OS cursor hidden over everything in play, relative trackpad look never stalls at screen edge, no edge-turn overshoot, steadier scoped aim; v0.5.3 — trackpad aim follows 1:1 (relative movement, coalesced events, hidden cursor), scope zoom on 2-finger up/down, look sens 1.6; v0.5.2 — trackpad no longer spins the view (edge turn only while moving, on/off switch, swipe momentum limit); v0.5.1 — semi-auto pistols, lean (Tab / E), fixed freeze at the elevator on iPad; v0.5 — real 3D soldiers, zone looks + signs, compass, map (M), radio hints, dual M1911s; v0.4.6 mission select fix for iPad, free 360° turning on iPad, retuned damage, friendly markers on your squad, sniper mission, knife, Magic Keyboard controls, iPad aim/layout fix + DEBUG readout)
+  OPERATION: BLACK FILE  (v0.6.18 — hide iPad cursor with a transparent pointer + kill leftover swipe drift; v0.6.17 — cursor/aim: OS cursor hidden over everything in play, relative trackpad look never stalls at screen edge, no edge-turn overshoot, steadier scoped aim; v0.5.3 — trackpad aim follows 1:1 (relative movement, coalesced events, hidden cursor), scope zoom on 2-finger up/down, look sens 1.6; v0.5.2 — trackpad no longer spins the view (edge turn only while moving, on/off switch, swipe momentum limit); v0.5.1 — semi-auto pistols, lean (Tab / E), fixed freeze at the elevator on iPad; v0.5 — real 3D soldiers, zone looks + signs, compass, map (M), radio hints, dual M1911s; v0.4.6 mission select fix for iPad, free 360° turning on iPad, retuned damage, friendly markers on your squad, sniper mission, knife, Magic Keyboard controls, iPad aim/layout fix + DEBUG readout)
   A tiny browser first-person shooter.
   - Mission structure & spy flavour inspired by GoldenEye 007 (N64)
   - Fast, aggressive maze shooting inspired by Wolfenstein 3D
@@ -74,10 +74,12 @@
   #weaponName { font-size: 13px; color: #9c9; }
   #weaponExtra { font-size: 12px; color: #cc9; margin-top: 2px; }
   .credits { margin-top: 14px; font-size: 11px; color: #9a9; line-height: 1.5; border-top: 1px dashed #4a5a4a; padding-top: 8px; }
-  /* v0.5.3: no floating OS cursor over the game while you play (it's only a distraction: the crosshair is the aim) */
-  body.inplay, body.inplay canvas, body.inplay #hud, body.inplay #hud * { cursor: none !important; }
-  /* v0.6.17 ("cursor detached"): hide the OS pointer over EVERY element while playing (scope overlay, radio, compass...), not just the canvas/HUD */
-  html.inplay, html.inplay body, html.inplay body * { cursor: none !important; }
+  /* v0.5.3 / v0.6.17 / v0.6.18: hide the OS pointer while playing. iPad Safari often
+     ignores cursor:none, so also use a blank 32×32 cursor image (Safari rejects tiny ones). */
+  html.inplay, html.inplay body, html.inplay *,
+  html.inplay *:hover, html.inplay *:active, html.inplay *:focus {
+    cursor: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAGklEQVR42u3BAQEAAACCIP+vbkhAAQAAAO8GECAAAcm1w7EAAAAASUVORK5CYII=") 0 0, none !important;
+  }
   body.inplay { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
   #compass { position: absolute; top: 6px; left: 50%; transform: translateX(-50%); width: 460px; height: 40px; }
   #mapScreen { position: fixed; inset: 0; z-index: 60; display: none; background: rgba(0,10,0,0.92); align-items: center; justify-content: center; flex-direction: column;
@@ -389,7 +391,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 // ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
 // ##  part failed and why.                                           ##
 // #####################################################################
-const VERSION = 'v0.6.17';
+const VERSION = 'v0.6.18';
 // v0.6.6 MISSION UNLOCKS. Order: TRAINING (0) -> BLACK FILE (1) -> SNIPER LESSON (3) -> COLD HORIZON (2).
 // A new player has only TRAINING; winning a mission unlocks the next one (saved as valkyrieUnlocked =
 // how far along that list you've got, 0-3). Developer mode (?dev=1, remembered; ?dev=0 clears it)
@@ -2324,9 +2326,12 @@ window.addEventListener('wheel', e => {
     const now = performance.now(), mag = Math.hypot(e.deltaX, e.deltaY);
     if (now - swipe.last > 150) { swipe.start = now; swipe.shrink = 0; swipe.prev = 0; swipe.dead = false; }
     swipe.last = now;
-    if (mag < swipe.prev * 0.97) swipe.shrink++; else if (mag > swipe.prev * 1.05) swipe.shrink = 0;
+    // Inertia after you lift your fingers: WebKit marks those leftover wheel events
+    // as not cancelable, and the deltas shrink. Kill both so the view doesn't keep drifting.
+    if (e.cancelable === false) swipe.dead = true;
+    if (swipe.prev && mag < swipe.prev * 0.97) swipe.shrink++; else if (mag > swipe.prev * 1.05) swipe.shrink = 0;
     swipe.prev = mag;
-    if (swipe.shrink >= 5 || now - swipe.start > SETTINGS.swipeMaxGesture * 1000) swipe.dead = true;
+    if (swipe.shrink >= 2 || now - swipe.start > SETTINGS.swipeMaxGesture * 1000) swipe.dead = true;
     if (swipe.dead) { noteInput('swipe momentum ignored'); return; }
     const cl = v => THREE.MathUtils.clamp(v, -SETTINGS.swipeMaxDelta, SETTINGS.swipeMaxDelta);
     turnCamera(scopedSniper && Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? 0 : cl(e.deltaX) * k, scopedSniper ? 0 : cl(e.deltaY) * k);   // scoped: an up/down swipe only zooms
@@ -4138,6 +4143,7 @@ function noteMove(e) {
 window.addEventListener('pointermove', e => {
   if (e.pointerType !== 'mouse' && e.pointerType !== 'pen') return;
   usePointerLook = true;
+  if (state === 'playing') setPlayCursor(true);
   const prev = noteMove(e);
   // Sum every coalesced sample (some browsers deliver several finger samples in one event).
   const list = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
@@ -4166,7 +4172,10 @@ document.addEventListener('mousemove', e => {
   if (!mx && !my && prev) { mx = e.clientX - prev.x; my = e.clientY - prev.y; }
   fallbackLook(mx, my);
 });
-for (const ev of ['mousedown', 'mouseup', 'pointerdown', 'pointerup']) window.addEventListener(ev, () => { lastButtonAt = performance.now(); }, { capture: true, passive: true });
+for (const ev of ['mousedown', 'mouseup', 'pointerdown', 'pointerup']) window.addEventListener(ev, e => {
+  lastButtonAt = performance.now();
+  if (ev === 'pointerdown' && state === 'playing' && e.pointerType === 'mouse') lockMouse();
+}, { capture: true, passive: true });
 let lastMouseXY = null, lastRealMoveAt = -1e9;
 // The cursor left the page (or the window lost focus): stop edge-turning.
 document.addEventListener('mouseleave', () => { lastMouseXY = null; });
@@ -5903,8 +5912,20 @@ function lockMouse() {
   try {
     const req = el.requestPointerLock || el.webkitRequestPointerLock;
     if (!req) { noteLock('not supported by this browser'); return; }
-    const p = req.call(el); if (p && p.catch) p.catch(() => {});
+    let p;
+    try { p = req.call(el, { unadjustedMovement: true }); }
+    catch (err) { p = req.call(el); }
+    if (p && p.catch) p.catch(() => {});
   } catch (err) { /* ignore */ }
+}
+const HIDDEN_CURSOR = 'url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAGklEQVR42u3BAQEAAACCIP+vbkhAAQAAAO8GECAAAcm1w7EAAAAASUVORK5CYII=") 0 0, none';
+function setPlayCursor(on) {
+  const v = on ? HIDDEN_CURSOR : '';
+  const pri = on ? 'important' : '';
+  document.documentElement.style.setProperty('cursor', v, pri);
+  document.body.style.setProperty('cursor', v, pri);
+  const canvas = renderer && renderer.domElement;
+  if (canvas) canvas.style.setProperty('cursor', v, pri);
 }
 function releaseInputs() { mouseDown = false; touch.fire = false; touch.leanL = touch.leanR = false; touch.garrote = false; pressPending = false; setZoom(0); for (const k in keys) keys[k] = false; }
 function pauseGame(text) {
@@ -6190,7 +6211,7 @@ let elapsed = 0;
 let bodyInPlay = false;
 function gameLoop() {
   const inPlay = state === 'playing';
-  if (inPlay !== bodyInPlay) { bodyInPlay = inPlay; document.body.classList.toggle('inplay', inPlay); document.documentElement.classList.toggle('inplay', inPlay); }
+  if (inPlay !== bodyInPlay) { bodyInPlay = inPlay; document.body.classList.toggle('inplay', inPlay); document.documentElement.classList.toggle('inplay', inPlay); setPlayCursor(inPlay); }
   const dt = Math.min(clock.getDelta(), 0.05);   // cap so a lag spike can't push you through walls
   elapsed += dt;
   safe('fit', () => fitRenderer());
