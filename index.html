@@ -387,7 +387,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 // ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
 // ##  part failed and why.                                           ##
 // #####################################################################
-const VERSION = 'v0.6.15';
+const VERSION = 'v0.6.16';
 // v0.6.6 MISSION UNLOCKS. Order: TRAINING (0) -> BLACK FILE (1) -> SNIPER LESSON (3) -> COLD HORIZON (2).
 // A new player has only TRAINING; winning a mission unlocks the next one (saved as valkyrieUnlocked =
 // how far along that list you've got, 0-3). Developer mode (?dev=1, remembered; ?dev=0 clears it)
@@ -2021,26 +2021,36 @@ function placeMuzzleExtras(g, w) {
   d.flash.scale.setScalar(on ? 0.35 : 1);
 }
 function addBarrettScope(g, fitted) {
-  // Sit the optic on the tallest stretch (the receiver), not over the skinny
-  // barrel at the height of a nearby peak — that left a visible gap.
+  // Mount on the typical receiver deck, not the single tallest spike (a rear
+  // sight or handle). That spike put the whole optic several inches too high.
   const box = measureMeshBox(fitted, g);
   const size = box.getSize(new THREE.Vector3());
   const x = (box.min.x + box.max.x) / 2;
   const pts = collectGunPoints(fitted, g);
-  let railY = -Infinity;
-  let z = box.min.z + size.z * 0.72;
-  const halfWin = size.z * 0.07;
-  for (let t = 0.52; t <= 0.84; t += 0.02) {
+  const samples = [];
+  const halfWin = size.z * 0.045;
+  for (let t = 0.48; t <= 0.76; t += 0.02) {
     const cz = box.min.z + size.z * t;
     let top = -Infinity;
     for (let i = 0; i < pts.length; i += 3) {
       if (Math.abs(pts[i + 2] - cz) < halfWin && Math.abs(pts[i] - x) < 0.04)
         top = Math.max(top, pts[i + 1]);
     }
-    if (top > railY + 0.002) { railY = top; z = cz; }
+    if (Number.isFinite(top)) samples.push({ t, z: cz, top });
   }
-  if (!Number.isFinite(railY)) railY = box.max.y;
-  const sink = 0.022;
+  const tops = samples.map(s => s.top).sort((a, b) => a - b);
+  const deck = tops.length ? tops[Math.floor(tops.length * 0.5)] : box.max.y;
+  let best = null;
+  let bestScore = Infinity;
+  for (const s of samples) {
+    if (s.top - deck > 0.025) continue;
+    const score = Math.abs(s.top - deck) + Math.abs(s.t - 0.60) * 0.02;
+    if (score < bestScore) { bestScore = score; best = s; }
+  }
+  if (!best) best = { z: box.min.z + size.z * 0.60, top: deck };
+  const railY = best.top;
+  const z = best.z;
+  const sink = 0.016;
   const optic = new THREE.Group();
   optic.name = 'Barrett mounted scope';
   optic.position.set(x, railY - sink, z);
@@ -2055,20 +2065,20 @@ function addBarrettScope(g, fitted) {
     const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), metal);
     m.position.set(0, y, z); optic.add(m);
   };
-  // Receiver top is at y = sink in optic space. Rail and rings must straddle it.
-  block(0.052, 0.028, 0.28, sink - 0.004, 0);
-  for (const rz of [-0.07, 0.07]) {
-    block(0.036, 0.058, 0.03, sink + 0.02, rz);
-    tube('scope ring', 0.026, 0.026, 0.026, sink + 0.055, rz);
+  // Lower rings: tube center sits about 3.4 cm above the deck, not 5.5 cm.
+  block(0.05, 0.022, 0.26, sink - 0.006, 0);
+  for (const rz of [-0.065, 0.065]) {
+    block(0.034, 0.04, 0.028, sink + 0.012, rz);
+    tube('scope ring', 0.024, 0.024, 0.024, sink + 0.034, rz);
   }
-  const ty = sink + 0.055;
-  tube('scope main tube', 0.021, 0.021, 0.24, ty, 0);
-  tube('scope objective bell', 0.037, 0.021, 0.065, ty, -0.1525);
-  tube('scope objective lens', 0.033, 0.033, 0.003, ty, -0.186, glass);
-  tube('scope eyepiece', 0.028, 0.028, 0.065, ty, 0.145);
-  tube('scope eyepiece lens', 0.024, 0.024, 0.003, ty, 0.178, glass);
-  const turret = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.026, 20), metal);
-  turret.position.set(0, ty + 0.031, -0.005); optic.add(turret);
+  const ty = sink + 0.034;
+  tube('scope main tube', 0.02, 0.02, 0.22, ty, 0);
+  tube('scope objective bell', 0.034, 0.02, 0.055, ty, -0.138);
+  tube('scope objective lens', 0.03, 0.03, 0.003, ty, -0.166, glass);
+  tube('scope eyepiece', 0.026, 0.026, 0.055, ty, 0.132);
+  tube('scope eyepiece lens', 0.022, 0.022, 0.003, ty, 0.16, glass);
+  const turret = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.022, 20), metal);
+  turret.position.set(0, ty + 0.028, -0.004); optic.add(turret);
   g.add(optic);
   g.userData.scope = optic;
 }
