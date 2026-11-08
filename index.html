@@ -8,7 +8,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <!--
   =====================================================================
-  OPERATION: BLACK FILE  (v0.6.18 — hide iPad cursor with a transparent pointer + kill leftover swipe drift; v0.6.17 — cursor/aim: OS cursor hidden over everything in play, relative trackpad look never stalls at screen edge, no edge-turn overshoot, steadier scoped aim; v0.5.3 — trackpad aim follows 1:1 (relative movement, coalesced events, hidden cursor), scope zoom on 2-finger up/down, look sens 1.6; v0.5.2 — trackpad no longer spins the view (edge turn only while moving, on/off switch, swipe momentum limit); v0.5.1 — semi-auto pistols, lean (Tab / E), fixed freeze at the elevator on iPad; v0.5 — real 3D soldiers, zone looks + signs, compass, map (M), radio hints, dual M1911s; v0.4.6 mission select fix for iPad, free 360° turning on iPad, retuned damage, friendly markers on your squad, sniper mission, knife, Magic Keyboard controls, iPad aim/layout fix + DEBUG readout)
+  OPERATION: BLACK FILE  (v0.6.19 — no extra two-finger look once trackpad look works (stops coasting), try fullscreen to hide the pointer; v0.6.18 — hide iPad cursor with a transparent pointer + kill leftover swipe drift; v0.6.17 — cursor/aim: OS cursor hidden over everything in play, relative trackpad look never stalls at screen edge, no edge-turn overshoot, steadier scoped aim; v0.5.3 — trackpad aim follows 1:1 (relative movement, coalesced events, hidden cursor), scope zoom on 2-finger up/down, look sens 1.6; v0.5.2 — trackpad no longer spins the view (edge turn only while moving, on/off switch, swipe momentum limit); v0.5.1 — semi-auto pistols, lean (Tab / E), fixed freeze at the elevator on iPad; v0.5 — real 3D soldiers, zone looks + signs, compass, map (M), radio hints, dual M1911s; v0.4.6 mission select fix for iPad, free 360° turning on iPad, retuned damage, friendly markers on your squad, sniper mission, knife, Magic Keyboard controls, iPad aim/layout fix + DEBUG readout)
   A tiny browser first-person shooter.
   - Mission structure & spy flavour inspired by GoldenEye 007 (N64)
   - Fast, aggressive maze shooting inspired by Wolfenstein 3D
@@ -77,7 +77,8 @@
   /* v0.5.3 / v0.6.17 / v0.6.18: hide the OS pointer while playing. iPad Safari often
      ignores cursor:none, so also use a blank 32×32 cursor image (Safari rejects tiny ones). */
   html.inplay, html.inplay body, html.inplay *,
-  html.inplay *:hover, html.inplay *:active, html.inplay *:focus {
+  html.inplay *:hover, html.inplay *:active, html.inplay *:focus,
+  html:fullscreen, html:fullscreen *, html:-webkit-full-screen, html:-webkit-full-screen * {
     cursor: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAGklEQVR42u3BAQEAAACCIP+vbkhAAQAAAO8GECAAAcm1w7EAAAAASUVORK5CYII=") 0 0, none !important;
   }
   body.inplay { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
@@ -391,7 +392,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 // ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
 // ##  part failed and why.                                           ##
 // #####################################################################
-const VERSION = 'v0.6.18';
+const VERSION = 'v0.6.19';
 // v0.6.6 MISSION UNLOCKS. Order: TRAINING (0) -> BLACK FILE (1) -> SNIPER LESSON (3) -> COLD HORIZON (2).
 // A new player has only TRAINING; winning a mission unlocks the next one (saved as valkyrieUnlocked =
 // how far along that list you've got, 0-3). Developer mode (?dev=1, remembered; ?dev=0 clears it)
@@ -2314,9 +2315,13 @@ window.addEventListener('wheel', e => {
   e.preventDefault();
   if (e.ctrlKey) return;                               // pinch-zoom gesture: ignore
   const w = WEAPONS[currentWeapon];
+  // v0.6.19: once one-finger relative look works, do not also turn with two-finger
+  // swipe-look. That second path was why the view kept drifting after you stopped.
+  // Scoped two-finger up/down still zooms. Weapons stay on 1–8.
+  if (movementSeen && !(aiming && w.scope && w.projectile)) return;
   // v0.4.5: no pointer lock (iPad Safari never gives it) → two-finger swipe LOOKS, with no limit,
   // so a full 360° is easy. (Weapons: 1–8, , . or the GUN button.) Scoped sniper: up/down still dials.
-  if (SETTINGS.scrollLooks && !controls.isLocked && !killcam.active) {
+  if (SETTINGS.scrollLooks && !controls.isLocked && !killcam.active && !movementSeen) {
     const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1;
     const k = SETTINGS.scrollLookScale * SETTINGS.mouseSensitivity * (camera.fov / BASE_FOV) * unit;
     const scopedSniper = aiming && w.scope && w.projectile;
@@ -4174,7 +4179,7 @@ document.addEventListener('mousemove', e => {
 });
 for (const ev of ['mousedown', 'mouseup', 'pointerdown', 'pointerup']) window.addEventListener(ev, e => {
   lastButtonAt = performance.now();
-  if (ev === 'pointerdown' && state === 'playing' && e.pointerType === 'mouse') lockMouse();
+  if (ev === 'pointerdown' && state === 'playing' && e.pointerType === 'mouse') capturePointer();
 }, { capture: true, passive: true });
 let lastMouseXY = null, lastRealMoveAt = -1e9;
 // The cursor left the page (or the window lost focus): stop edge-turning.
@@ -5918,6 +5923,19 @@ function lockMouse() {
     if (p && p.catch) p.catch(() => {});
   } catch (err) { /* ignore */ }
 }
+function tryFullscreen() {
+  // Some iPad Safari builds hide their trackpad pointer in fullscreen, or at least
+  // let cursor:none work. Harmless if the browser refuses.
+  const el = document.documentElement;
+  if (document.fullscreenElement || document.webkitFullscreenElement) return;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (!req) return;
+  try {
+    const p = req.call(el);
+    if (p && p.catch) p.catch(() => {});
+  } catch (err) { /* ignore */ }
+}
+function capturePointer() { lockMouse(); tryFullscreen(); setPlayCursor(true); }
 const HIDDEN_CURSOR = 'url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAGklEQVR42u3BAQEAAACCIP+vbkhAAQAAAO8GECAAAcm1w7EAAAAASUVORK5CYII=") 0 0, none';
 function setPlayCursor(on) {
   const v = on ? HIDDEN_CURSOR : '';
@@ -5942,7 +5960,7 @@ function resumeGame() {
   if (state !== 'paused') return;
   state = 'playing'; $('pauseScreen').style.display = 'none';
   if (cameFromTouch()) touch.active = true;   // finger tap: play on with touch controls
-  else lockMouse();                            // click: also try to capture the pointer
+  else capturePointer();                       // click: capture pointer + try fullscreen
 }
 // Mission-specific settings + renderer setup (sky, shadows, view distance).
 function applyMission(m) {
@@ -6083,7 +6101,7 @@ function startMission() {
     : currentMission === 2 ? 'Operation COLD HORIZON. Lase (F), dial ([ ] or ↑ ↓), breathe (Shift), send it.' : 'Mission start. Find the intel. Your squad (green ▼ HAWK, DOC) follows you — guards are deeper in. (V = knife, hold H = garrote)', 3.5);
   if (currentMission === 0 || currentMission === 3) { const m = currentMission; setTimeout(() => { if (state === 'playing' && currentMission === m && TRAIN && !TRAIN.begun) beginStation(); }, 600); }
   if (cameFromTouch()) touch.active = true;   // started with a tap: show the touch buttons
-  else lockMouse();                           // started with a click: capture mouse/trackpad
+  else capturePointer();                      // started with a click: capture mouse/trackpad
 }
 // v0.5.1 FREEZE FIX: iPad Safari has no pointer lock at all, so the old unconditional
 // controls.unlock() threw an error right here -> the game had already stopped ('won') but the
