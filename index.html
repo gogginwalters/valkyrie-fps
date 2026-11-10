@@ -8,7 +8,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <!--
   =====================================================================
-  OPERATION: BLACK FILE  (v0.6.21 — navigation: the compass ◆ is always on in every mission (no more no-compass maze steps), maze exit door marked + explained (opens by itself on the timed run), more green floor arrows; real fire rates for every gun (MP5 800, M4 800, AKM 600, SCAR-H 600 rpm; realistic pistol, Barrett, CheyTac and 870 pace); v0.6.20 — two-finger swipe never turns the view (stops leftover inertial drift); v0.6.19 — no extra two-finger look once trackpad look works (stops coasting), try fullscreen to hide the pointer; v0.6.18 — hide iPad cursor with a transparent pointer + kill leftover swipe drift; v0.6.17 — cursor/aim: OS cursor hidden over everything in play, relative trackpad look never stalls at screen edge, no edge-turn overshoot, steadier scoped aim; v0.5.3 — trackpad aim follows 1:1 (relative movement, coalesced events, hidden cursor), scope zoom on 2-finger up/down, look sens 1.6; v0.5.2 — trackpad no longer spins the view (edge turn only while moving, on/off switch, swipe momentum limit); v0.5.1 — semi-auto pistols, lean (Tab / E), fixed freeze at the elevator on iPad; v0.5 — real 3D soldiers, zone looks + signs, compass, map (M), radio hints, dual M1911s; v0.4.6 mission select fix for iPad, free 360° turning on iPad, retuned damage, friendly markers on your squad, sniper mission, knife, Magic Keyboard controls, iPad aim/layout fix + DEBUG readout)
+  OPERATION: BLACK FILE  (v0.6.22 — every door sign names where that side really leads + what opens it, garrote-room door to Demolition opens after the maze, locked doors/exits/breach doors explain themselves on every level, elevator LOCKED/OPEN sign, HUD boxes never overlap (iPad sizes), fire-rate texts match the real rates; v0.6.21 — navigation: the compass ◆ is always on in every mission (no more no-compass maze steps), maze exit door marked + explained (opens by itself on the timed run), more green floor arrows; real fire rates for every gun (MP5 800, M4 800, AKM 600, SCAR-H 600 rpm; realistic pistol, Barrett, CheyTac and 870 pace); v0.6.20 — two-finger swipe never turns the view (stops leftover inertial drift); v0.6.19 — no extra two-finger look once trackpad look works (stops coasting), try fullscreen to hide the pointer; v0.6.18 — hide iPad cursor with a transparent pointer + kill leftover swipe drift; v0.6.17 — cursor/aim: OS cursor hidden over everything in play, relative trackpad look never stalls at screen edge, no edge-turn overshoot, steadier scoped aim; v0.5.3 — trackpad aim follows 1:1 (relative movement, coalesced events, hidden cursor), scope zoom on 2-finger up/down, look sens 1.6; v0.5.2 — trackpad no longer spins the view (edge turn only while moving, on/off switch, swipe momentum limit); v0.5.1 — semi-auto pistols, lean (Tab / E), fixed freeze at the elevator on iPad; v0.5 — real 3D soldiers, zone looks + signs, compass, map (M), radio hints, dual M1911s; v0.4.6 mission select fix for iPad, free 360° turning on iPad, retuned damage, friendly markers on your squad, sniper mission, knife, Magic Keyboard controls, iPad aim/layout fix + DEBUG readout)
   A tiny browser first-person shooter.
   - Mission structure & spy flavour inspired by GoldenEye 007 (N64)
   - Fast, aggressive maze shooting inspired by Wolfenstein 3D
@@ -61,7 +61,7 @@
   #debugHud .err { color: #ff6b6b; }
   .panel { position: absolute; background: rgba(0, 12, 0, 0.55); border: 1px solid rgba(120, 255, 120, 0.35);
     padding: 10px 14px; text-shadow: 0 0 4px #000; }
-  #objectives { top: 16px; left: 16px; min-width: 260px; font-size: 14px; }
+  #objectives { top: 16px; left: 16px; min-width: min(260px, 30vw); max-width: min(330px, 32vw); font-size: 14px; box-sizing: border-box; }   /* v0.6.22: narrower so the centre column fits on iPad */
   #objectives h3 { margin: 0 0 6px; font-size: 13px; letter-spacing: 2px; color: #8f8; }
   #objectives .done { color: #6f6; text-decoration: line-through; opacity: 0.8; }
   #objectives .locked { color: #f88; }
@@ -69,7 +69,7 @@
   #healthBox { bottom: 16px; left: 16px; width: 240px; }
   #healthBar { height: 12px; background: #300; margin-top: 6px; border: 1px solid #555; }
   #healthFill { height: 100%; width: 100%; background: linear-gradient(90deg, #c22, #e55); }
-  #ammoBox { bottom: 16px; right: 16px; text-align: right; min-width: 200px; }
+  #ammoBox { bottom: 16px; right: 16px; text-align: right; min-width: 200px; max-width: calc(100vw - 330px); box-sizing: border-box; }   /* v0.6.22: never runs into the health box */
   #ammoText { font-size: 34px; font-weight: bold; color: #fff; }
   #weaponName { font-size: 13px; color: #9c9; }
   #weaponExtra { font-size: 12px; color: #cc9; margin-top: 2px; }
@@ -392,7 +392,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 // ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
 // ##  part failed and why.                                           ##
 // #####################################################################
-const VERSION = 'v0.6.21';
+const VERSION = 'v0.6.22';
 // v0.6.6 MISSION UNLOCKS. Order: TRAINING (0) -> BLACK FILE (1) -> SNIPER LESSON (3) -> COLD HORIZON (2).
 // A new player has only TRAINING; winning a mission unlocks the next one (saved as valkyrieUnlocked =
 // how far along that list you've got, 0-3). Developer mode (?dev=1, remembered; ?dev=0 clears it)
@@ -1661,7 +1661,9 @@ function decorateZones() {
     const lamp = box(0.3, 0.12, 0.06, new THREE.MeshBasicMaterial({ color: 0xff3030 }), 0, 2.95, 0.02, doors);
     onWallFace(doors, ex, ez, ex + dc, ez + dr, 0);
     onWallFace(makeSign(currentMission === 0 ? 'GRADUATION' : 'EXTRACTION ELEVATOR', 2.4, 0.4, '#04140a', '#40ff70'), ex, ez, ex + dc, ez + dr, 3.25);
-    exitZone.doorLamp = lamp; break;
+    exitZone.doorLamp = lamp;
+    exitZone.statusSign = onWallFace(makeSign('LOCKED', 2.4, 0.34, '#200808', '#ff6060'), ex, ez, ex + dc, ez + dr, 1.7); exitZone.statusSign.translateZ(0.06); exitZone.statusOpen = null;   // v0.6.22
+    break;
   }
   // The way into the lobby: the open square next to the lobby that's outside it.
   let gate = null;
@@ -3938,6 +3940,18 @@ function createPickup(x, z, type) {
   pickups.push({ mesh, type, taken: false });
 }
 
+// v0.6.22: why the exit is still shut, and what to do (all levels).
+function exitLockedText() {
+  if (currentMission === 0 || currentMission === 3) { const n = TRAIN ? TRAIN.done.filter(d => !d).length : 0; return `GRADUATION LOCKED — ${n} station${n === 1 ? '' : 's'} still to do. Follow the yellow ◆ to the next one.`; }
+  if (currentMission === 2) { const left = sniperObjectives().filter(o => !o.done && !o.bonus).length; return `LZ NOT READY — ${left} objective${left === 1 ? '' : 's'} left (see the list, top left). Follow the yellow ◆.`; }
+  const n = intelItems.filter(i => !i.collected).length;
+  return `ELEVATOR LOCKED — ${n} intel file${n === 1 ? '' : 's'} still to find. Follow the yellow ◆; it opens when you have them all.`;
+}
+function setExitStatusSign(open) {
+  const e = exitZone; if (!e || !e.statusSign) return;
+  const txt = open ? (currentMission === 0 ? 'OPEN · STEP ON THE GREEN PAD' : 'OPEN · STEP ON THE GREEN PAD') : (currentMission === 0 ? 'LOCKED · FINISH EVERY STATION' : 'LOCKED · FIND ALL THE INTEL');
+  e.statusSign.material = makeSign(txt, 2.4, 0.34, open ? '#04200a' : '#200808', open ? '#40ff70' : '#ff6060').material; e.statusOpen = open;
+}
 function allIntelCollected() { return objectivesComplete(); }
 
 function updateObjectives(dt, time) {
@@ -3979,10 +3993,10 @@ function updateObjectives(dt, time) {
       exitZone.padMat.color.set(0x30ff60); exitZone.beamMat.color.set(0x30ff60);
     }
     exitZone.beamMat.opacity = 0.12 + Math.sin(time * 4) * 0.05;
-    if (Math.hypot(exitZone.x - px, exitZone.z - pz) < exitZone.radius) {
-      if (exitZone.unlocked) endGame(true);
-      else if (time - exitZone.warned > 3) { exitZone.warned = time; showMessage(currentMission === 0 ? 'Graduation LOCKED — finish (or skip) every station first.' : currentMission === 2 ? 'LZ not ready — finish the objectives first.' : 'Elevator LOCKED — retrieve all intel first.', 2.5); }
-    }
+    const exD = Math.hypot(exitZone.x - px, exitZone.z - pz);
+    if (exD < exitZone.radius && exitZone.unlocked) endGame(true);
+    else if (!exitZone.unlocked && exD < (currentMission === 2 ? 30 : CELL * 2) && time - exitZone.warned > 4) { exitZone.warned = time; showMessage(exitLockedText(), 3.5); }   // v0.6.22: says why, from a few steps away
+    if (exitZone.statusSign && exitZone.statusOpen !== exitZone.unlocked) setExitStatusSign(exitZone.unlocked);
   }
 }
 
@@ -4037,6 +4051,51 @@ const hud = {
   reticle: $('reticle'), scopeInfo: $('scopeInfo'), windBox: $('windBox'), windArrow: $('windArrow'), windText: $('windText'), killFeed: $('killFeed'),
   damageAlpha: 0, dirAlpha: 0, hitAlpha: 0, messageTimer: 0, quipTimer: 0,
 };
+// v0.6.22: HUD layout. The top-centre column (compass, alert, CHIEF/GRAVEL box, big message, quip) sits
+// between the objectives list (left) and the right-hand tags/buttons, stacked so nothing overlaps.
+// If that gap is too narrow (small or portrait screens) the column moves below the objectives list.
+// Bottom: the danger tag sits above the radio line.
+let hudLayoutAt = 0;
+function layoutHud() {
+  const now = performance.now(); if (now - hudLayoutAt < 120) return; hudLayoutAt = now;
+  const W = window.innerWidth, H = window.innerHeight, gap = 8;
+  const shown = el => !!el && el.getClientRects().length > 0 && getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden';
+  const obj = $('objectives'), objR = shown(obj) && obj.textContent.trim() ? obj.getBoundingClientRect() : null;
+  // right-hand column: stack the tags so none covers the next
+  let prevB = 0;
+  for (const id of ['modeTag', 'nvTag', 'windBox', 'killFeed']) {
+    const el = $(id); if (!el) continue;
+    if (el.dataset.top0 === undefined) el.dataset.top0 = parseFloat(getComputedStyle(el).top) || 0;
+    if (!shown(el) || !el.textContent.trim()) continue;
+    const top = Math.max(+el.dataset.top0, prevB ? prevB + 6 : 0); el.style.top = top + 'px'; prevB = el.getBoundingClientRect().bottom;
+  }
+  let left = objR ? objR.right + gap : gap, right = W - gap;
+  for (const id of ['modeTag', 'nvTag', 'windBox', 'killFeed', 'tMap', 'tRadio', 'tSkip']) {
+    const el = $(id); if (!shown(el) || (id === 'killFeed' && !el.textContent.trim())) continue;
+    const r = el.getBoundingClientRect(); if (r.width < 2 || r.top > H * 0.5) continue;
+    right = Math.min(right, r.left - gap);
+  }
+  const besideW = right - left, under = besideW < 420;
+  const cL = under ? gap : left, cR = under ? right : right, cW = Math.max(200, cR - cL), mid = (cL + cR) / 2;
+  const cmp = $('compass');
+  let y = 6;
+  if (besideW >= 220) { cmp.style.left = ((left + right) / 2) + 'px'; cmp.style.top = '6px'; cmp.style.width = Math.min(460, besideW) + 'px'; }
+  else { cmp.style.left = mid + 'px'; cmp.style.top = ((objR ? objR.bottom : 0) + gap) + 'px'; cmp.style.width = Math.min(460, cW) + 'px'; }
+  cmp.style.height = (parseFloat(cmp.style.width) / 460 * 40) + 'px';
+  const cmpB = cmp.getBoundingClientRect().bottom;
+  y = under ? Math.max(cmpB, objR ? objR.bottom : 0) + gap : cmpB + 6;
+  const alert = $('alertBox');
+  if (shown(alert)) { alert.style.left = mid + 'px'; alert.style.top = y + 'px'; y = alert.getBoundingClientRect().bottom + 6; }
+  const tb = $('trainBox');
+  if (shown(tb) && tb.innerHTML) { tb.style.left = mid + 'px'; tb.style.top = y + 'px'; tb.style.boxSizing = 'border-box'; tb.style.width = Math.min(660, cW) + 'px'; y = tb.getBoundingClientRect().bottom + gap; }
+  for (const [id, frac] of [['message', 0.22], ['quip', 0.30]]) {
+    const el = $(id); el.style.left = cL + 'px'; el.style.width = cW + 'px';
+    const top = Math.max(y, H * frac); el.style.top = top + 'px';
+    if (+el.style.opacity > 0 && el.textContent) y = top + el.getBoundingClientRect().height + gap;
+  }
+  const sp = $('spotter'), dg = $('dangerTag');
+  if (shown(dg)) dg.style.bottom = (+sp.style.opacity > 0 && sp.textContent ? Math.max(150, H - sp.getBoundingClientRect().top + gap) : 150) + 'px';
+}
 function showMessage(text, seconds) { hud.message.textContent = text; hud.message.style.opacity = 1; hud.messageTimer = seconds; }
 function showQuip(text) { hud.quip.textContent = '"' + text + '"'; hud.quip.style.opacity = 1; hud.quipTimer = 2.5; }
 function flashHitmarker(kill) { hud.hitAlpha = 1; hud.hitmarker.classList.toggle('kill', kill); }
@@ -5625,7 +5684,7 @@ const CONTROLS = [
     ['Move finger', 'look around'],
     ['Push pointer into the left / right edge', 'keeps turning while you keep pushing · stops when the pointer rests · off in a sniper scope · Edge turn on/off in settings'],
     ['2-finger swipe', 'look / turn — unlimited 360° (when the trackpad isn\'t captured) · in a sniper scope up/down zooms instead'],
-    ['Click (1 finger)', 'fire (pistols & rifles: one shot per click · MP5 / M4 / AKM / SCAR: hold for auto)'],
+    ['Click (1 finger)', 'fire · MP5 / M4 / AKM / SCAR-H: hold for full auto at the real rate · pistols and Barrett: one shot per click · CheyTac: works the bolt between shots · 870: pumps between shots'],
     ['2-finger click', 'aim / scope (snipers: again = 2nd zoom, again = off) · dual pistols: fire LEFT gun'],
     ['Click with dual pistols', 'fire — the two guns take turns (no aiming, wider spread, 14-round shared ammo)'],
     ['2-finger scroll', 'captured trackpad / mouse wheel: switch weapon · in a sniper scope: up = zoom in, down = zoom out (one swipe = one step)'],
@@ -6271,6 +6330,8 @@ function gameLoop() {
     safe('hud', () => updateHUD(dt));
     safe('nav', () => updateNavigation(dt));
     safe('compass', () => drawCompass());
+    safe('hudLayout', () => layoutHud());   // v0.6.22: no HUD box covers another
+    safe('breachHint', () => breachDoorHint());
   }
   if (killcam.active) { safe('render', () => { updateFigureLOD(); renderer.clear(); renderer.render(scene, camera); }); return; }
   safe('materiel', () => updateMateriel(dt));
@@ -6358,8 +6419,9 @@ function underCrosshair() {
 // ##  like the Mission 1 MAP; digits 1-8 are the station doors.      ##
 // ##    #  wall   .  floor   P  start   X  graduation pad           ##
 // ##    1-8  station doors (open when that station is done/skipped) ##
-// ##    a  maze exit door (station 9)  r  demolition exit (station 10)##
-// ##    b  shoot-house door (station 10)   e  shoot-house exit (11)    ##
+// ##    a  maze exit door + r garrote room -> demolition (both open  ##
+// ##       when station 9 is done)  b  demolition -> shoot house (10) ##
+// ##    e  shoot house -> maze (opens when 11 is done)                ##
 // ##    d s h w  breach door: charge / shotgun / ram / marked wall    ##
 // #####################################################################
 const TRAIN_MAP = [
@@ -6511,15 +6573,31 @@ function createGate(ch, c, r) {
   const g = new THREE.Group(); g.position.set(x, 0, z); if (!along) g.rotation.y = Math.PI / 2;
   const door = new THREE.Mesh(new THREE.BoxGeometry(CELL, H, 0.25), trainMats.door); door.position.y = H / 2; g.add(door);
   for (const y of [0.25, H - 0.25]) { const s = new THREE.Mesh(new THREE.BoxGeometry(CELL, 0.3, 0.27), trainMats.stripe); s.position.y = y; door.add(s); s.position.y = y - H / 2; }
-  // Doors are named for where they lead, not the station you are in — otherwise the locker
-  // door at the sniper mat says "STATION 5 ▸ LOCKED" and people try to range the target through it.
-  const GATE_DEST = { '1': '2 · LOOK', '2': '3 · COMMS', '3': '4 · RANGE', '4': '5 · SNIPER LANE', '5': '6 · WEAPONS LOCKER', '6': '7 · KNIFE', '7': '8 · GARROTE', '8': 'GRADUATION HALL', a: '10 · DEMOLITION', r: '10 · DEMOLITION', b: '10 · DEMOLITION', e: '11 · BREACHING', f: '12 · SIGNALS', g: '13 · FINAL RUN' };
-  const lbl = ch === 'k' ? 'MAGLOCK' : ch === 'q' ? 'ROOM EXIT' : ch === 'a' ? 'MAZE EXIT ▸ 10 · DEMOLITION' : ch === 'e' ? 'SHOOT HOUSE · NOT THE MAZE EXIT' : 'NEXT: ' + (GATE_DEST[ch] || ch);   // v0.6.21
-  const sign = makeSign(lbl + ' ▸ LOCKED', 2.2, 0.4, '#200808', '#ff6060'); sign.position.set(0, 1.7 - H / 2, 0.14); door.add(sign);
-  const back = makeSign(lbl, 2.2, 0.4, '#200808', '#ff6060'); back.position.set(0, 1.7 - H / 2, -0.14); back.rotation.y = Math.PI; door.add(back);
+  // v0.6.22: each side of a door names the area on the OTHER side (where it leads from where you stand),
+  // worked out from the map, plus a second line saying what opens it. (Before, one hand-typed label was
+  // used for both sides and two doors were wrong.)
+  const [frontTxt, backTxt, frontWhy, backWhy] = gateSideText(ch, c, r, along);
+  const sign = makeSign(frontTxt, 3.0, 0.42, '#200808', '#ff6060'); sign.position.set(0, 1.95 - H / 2, 0.14); door.add(sign);
+  const back = makeSign(backTxt, 3.0, 0.42, '#200808', '#ff6060'); back.position.set(0, 1.95 - H / 2, -0.14); back.rotation.y = Math.PI; door.add(back);
+  const why = makeSign(frontWhy, 3.0, 0.3, '#200808', '#ffb0a0'); why.position.set(0, 1.5 - H / 2, 0.14); door.add(why);
+  const whyB = makeSign(backWhy, 3.0, 0.3, '#200808', '#ffb0a0'); whyB.position.set(0, 1.5 - H / 2, -0.14); whyB.rotation.y = Math.PI; door.add(whyB);
+  const lbl = frontTxt;
   levelGroup.add(g); wallMeshes.push(door);
   solid[r * worldCols + c] = 1;
   trainGates[ch] = { c, r, group: g, door, open: false, t: 0, label: lbl };
+}
+function gateOwner(ch) { return STATIONS.find(st => st.gate && st.gate.includes(ch)) || null; }
+function gateSideText(ch, c, r, along) {
+  // front sign faces +z (east-west wall) or +x (north-south wall): it's read by someone standing on that side.
+  const fz = zoneAt(...(along ? [c, r + 1] : [c + 1, r])), bz = zoneAt(...(along ? [c, r - 1] : [c - 1, r]));
+  const name = z => z.id === 't_grad' ? 'GRADUATION HALL' : z.name;
+  if (ch === 'k') return ['MAGLOCK · SOUTH DOOR', 'MAGLOCK · SOUTH DOOR', 'LOCKED · cut the junction box', 'LOCKED · cut the junction box'];
+  if (ch === 'q') return ['ROOM EXIT', 'ROOM EXIT', 'LOCKED · clear the room first', 'LOCKED · clear the room first'];
+  const own = gateOwner(ch);
+  const label = (here, there) => (here.id === 't_nav' && ch === 'a' ? 'MAZE EXIT ▸ ' : here.id === 't_nav' ? 'NOT THE MAZE EXIT · ' : '') + 'TO ' + name(there);
+  const why = here => ch === 'a' && here.id === 't_nav' ? 'LOCKED · opens by itself on the timed run'
+    : !own ? 'LOCKED' : own.zone === here.id ? 'LOCKED · opens when you finish this station' : 'LOCKED · opens after ' + own.name.replace(/^/, 'STATION ' + (STATIONS.indexOf(own) + 1) + ' · ');
+  return [label(fz, bz), label(bz, fz), why(fz), why(bz)];
 }
 function openGate(ch) {
   const gt = trainGates[ch]; if (!gt || gt.open) return;
@@ -6668,15 +6746,15 @@ function trainingLamps() {
 // ---- CHIEF's stations. Each step: text (what to do), optional 'at' (marker / compass target),
 //      start / tick helpers, and check() = true when it's done. 'say' = CHIEF's reaction. ----
 const LOCKER_NOTES = [
-  'Colt M1911 .45 — big slow round, 7 shots, semi-auto, suppressed. Quiet and honest.',
-  'Glock 17 — 9 mm, 17 shots, semi-auto, rectangular suppressor. Quiet and light.',
-  'HK MP5 — 9 mm, 30-round magazine, full auto. Compact and controllable.',
-  'M4 Carbine — 5.56, full auto, red dot. The all-rounder.',
-  'AKM — 7.62×39, full auto, hits harder and kicks more. Rugged as a tractor.',
-  'FN SCAR-H — 7.62 NATO battle rifle. Real flying bullets; one hit usually does it.',
-  'Barrett M107 — .50 BMG. Kills anything, punches through walls, wrecks vehicles. 2-step scope.',
-  'CheyTac M200 — .408 bolt-action, 2-step scope. Two kilometres in the right hands.',
-  'Remington 870 — 12-gauge pump, 8 pellets a shot. Brutal close, useless far. Also opens doors.',
+  'Colt M1911 .45 — big slow round, 7 shots, semi-auto (one shot per click, about 6 a second at most), suppressed. Quiet and honest.',
+  'Glock 17 — 9 mm, 17 shots, semi-auto (one shot per click, about 9 a second at most), rectangular suppressor. Quiet and light.',
+  'HK MP5 — 9 mm, 30-round magazine, full auto at the real 800 rounds a minute. Compact and controllable.',
+  'M4 Carbine — 5.56, full auto at the real ~800 rounds a minute, red dot. The all-rounder.',
+  'AKM — 7.62×39, full auto at the real 600 rounds a minute, hits harder and kicks more. Rugged as a tractor.',
+  'FN SCAR-H — 7.62 NATO battle rifle, full auto at the real 600 rounds a minute. Real flying bullets; one hit usually does it.',
+  'Barrett M107 — .50 BMG, semi-auto: one shot per click, about one every 0.6 s for the recoil. Kills anything, punches through walls, wrecks vehicles. 2-step scope.',
+  'CheyTac M200 — .408 bolt-action: about 1.3 s to work the bolt between shots. 2-step scope. Two kilometres in the right hands.',
+  'Remington 870 — 12-gauge pump: about 0.6 s to pump between shots, 8 pellets a shot. Brutal close, useless far. Also opens doors.',
 ];
 const CHIEF_SPOTTED = ['He saw you. Back off; he\'ll reset. Pretend that never happened.', 'Spotted. In real life that\'s a closed casket. Yours.', 'Congratulations, you\'re a target. Back off and go again.'];
 const tapWord = () => devKind() === 'touch' ? 'tap' : 'click';
@@ -6752,7 +6830,7 @@ const STATIONS = [
         start: () => raiseTargets(['r36'], 0.7), check: () => ev('pop:r36:aim') >= 2 },
       { text: () => 'HEADSHOT — the FAR steel (66 m) has a head plate. Aim small and hit the head. In this game one head hit drops anyone.',
         start: () => raiseTargets(['r66'], 0.7), check: () => ev('pop:r66:head') >= 1, say: 'Head plate. Lovely. Do that for real and Gravel might stop talking for once.' },
-      { text: () => `FULL AUTO — switch to the M4 (${KW(3)}) and ${K('hold')}: rifles keep firing while you hold. Put 8 rounds on any steel. (${ev('popW:3')}/8)`,
+      { text: () => `FULL AUTO — switch to the M4 (${KW(3)}) and ${K('hold')}: full-auto guns (MP5, M4, AKM, SCAR-H) keep firing while you hold — the M4 at a real ~800 rounds a minute. Put 8 rounds on any steel. (${ev('popW:3')}/8)`,
         start: () => raiseTargets(['r16', 'r36', 'r66'], 0.12), check: () => ev('popW:3') >= 8, say: 'Short bursts. Ammo is heavy and Doc won\'t carry yours.' },
       { text: () => `RELOAD — ${K('reload')}. Reload in a lull, not when the magazine is empty in a gunfight.`,
         start: () => { const s = weaponState[currentWeapon]; s.ammo = Math.max(1, Math.floor(magSizeOf(currentWeapon) / 2)); }, check: () => ev('reload') > 0 },
@@ -6805,7 +6883,7 @@ const STATIONS = [
         start: () => resetRolePlayer(trainRP.g2), check: () => !!(trainRP.g2 && trainRP.g2.garroteKill) },
     ] },
   // ---- v0.6.2: Station 9 NAVIGATION (the maze) and Station 10 DEMOLITION (SECTION 21 has the kit) ----
-  { id: 'nav', zone: 't_nav', gate: 'a', entry: [3, 22], name: 'NAVIGATION',
+  { id: 'nav', zone: 't_nav', gate: 'ar', entry: [3, 22], name: 'NAVIGATION',   // v0.6.22: 'r' (garrote room -> demolition) opens here too
     intro: 'The maze. Six short steps. The yellow ◆ on your compass stays on the whole time, and the green floor arrows always point to the EXIT. The exit door opens by itself on the last step.',
     outro: 'Out. The demolition range is through that door. Mind your eyebrows.',
     steps: [
@@ -6825,7 +6903,7 @@ const STATIONS = [
         tick: (S, dt) => { S.left -= dt; if (S.left <= 0) { S.tries++; S.left = SETTINGS.navTime; teleportTo(...NAV.entry); radioSay('CHIEF', 'Time. Back to the start. Again. Follow the ◆ and the green arrows.', 5); } },
         check: () => nearP(NAV.exit, 2.6), after: () => { showMessage('EXIT DOOR OPEN — walk through to DEMOLITION', 3); radioSay('CHIEF', `Out in ${Math.round(SETTINGS.navTime - TRAIN.S.left)} seconds${waypoint.on ? ', with the waypoint on. Cheeky' : ''}. Door\'s open.`, 5); } },
     ] },
-  { id: 'demo', zone: 't_demo', gate: 'rb', entry: [28, 30], name: 'DEMOLITION',
+  { id: 'demo', zone: 't_demo', gate: 'b', entry: [28, 30], name: 'DEMOLITION',
     intro: 'Demolition. You carry plastic explosive — C4 — a remote clacker and timed fuses. C4 is very stable until it very much isn\'t. Count your fingers now, for comparison.',
     get outro() { return `Demolition: done. Score ${demoScore.pts}${demoScore.close ? ', and ' + demoScore.close + ' danger-close. I\'ve seen tidier funerals' : ', and nobody danger-close. Lovely'}. You carry the kit into Black File: three charges. Next: the shoot house, through the west door.`; },
     steps: [
@@ -7098,7 +7176,7 @@ function updateTraining(dt) {
 // v0.6.21: bump into a locked station door -> say why it's shut and what opens it.
 let lockedDoorAt = -1e9;
 function lockedDoorHint() {
-  if (currentMission !== 0 || elapsed - lockedDoorAt < 4) return;
+  if (currentMission !== 0 || elapsed - lockedDoorAt < 4 || hud.messageTimer > 0.6) return;
   const s = curStation();
   for (const [ch, g] of Object.entries(trainGates)) {
     if (g.open) continue;
@@ -7107,9 +7185,10 @@ function lockedDoorHint() {
     if (s && s.id === 'nav' && ch === 'a') {
       const n = s.steps.length;
       showMessage(TRAIN.begun && TRAIN.step === n - 1 ? 'EXIT — keep coming, it opens when you reach it.' : `MAZE EXIT — locked until the last step (step ${n}, the timed run). It opens by itself then. You're on step ${TRAIN.begun ? TRAIN.step + 1 : 1} of ${n} — read the box at the top.`, 4);
-    } else if (ch === 'k' || ch === 'q') showMessage('LOCKED — it opens when you finish the step in the box at the top.', 3);
+    } else if (ch === 'k') showMessage('MAGLOCK — cut the junction box on the east wall (' + plain(K('use')) + ') and it rolls up.', 3.5);
+    else if (ch === 'q') showMessage('LOCKED — clear the room (shoot the hostiles, not the hostage) and it opens.', 3.5);
     else if (s && s.gate && s.gate.includes(ch)) showMessage(`LOCKED — opens by itself when you finish ${s.name}. Read the box at the top for the next step.`, 3.5);
-    else showMessage('LOCKED — not this door yet. Follow the yellow ◆ on the compass.', 3);
+    else { const o = gateOwner(ch); showMessage('LOCKED — not this way yet' + (o ? ` (opens after STATION ${STATIONS.indexOf(o) + 1} · ${o.name})` : '') + '. Follow the yellow ◆ on the compass.', 3.5); }
     return;
   }
 }
@@ -7792,6 +7871,15 @@ function breachAhead(range = 2.4) {
   const hit = breachRay.intersectObjects(doors.flatMap(t => [t.door, ...t.hinges, ...t.jambs]), false)[0];
   return hit ? hit.object.userData.demoTarget : null;
 }
+// v0.6.22: walk up to a shut breach door on any level -> how to open it.
+let breachHintAt = -1e9;
+function breachDoorHint() {
+  if (state !== 'playing' || elapsed - breachHintAt < 7 || hud.messageTimer > 0.6) return;
+  const d = demoTargets.find(t => t.kind === 'bdoor' && !t.open && dist2D(camera.position.x, camera.position.z, t.x, t.z) < 3.2);
+  if (!d) return;
+  breachHintAt = elapsed;
+  showMessage(`${d.name} — shut. Open it: door charge ${plain(K('c4'))} then stand beside it and ${plain(K('clacker'))} · or the 870 on both hinges · or ram it (${plain(K('ram'))} ×3).`, 4);
+}
 function ramHit(t) {
   t.ramHits++; playNoise(0.25, 0.55, 600); playTone(80, 45, 0.3, 0.45, 'square'); addShake(0.01); flashHitmarker(false);
   spawnParticles(new THREE.Vector3(t.x, 1.1, t.z), 0xb09070, 8, 3, 0.05);
@@ -8336,10 +8424,10 @@ const LESSON = [
       { text: () => { const l = lead('MOVER'); return `The MOVER (500 m, right of the line) walks back and forth at 1.5 m/s. Flight time is ${l.tof.toFixed(2)} s, so it moves about ${l.m.toFixed(1)} m — aim ${l.mils.toFixed(1)} mils IN FRONT of it, the way it's walking. Dial 500 m. Dial: ${fmtDist(zeroRange)}.`; },
         at: atT('MOVER'), label: 'MOVER', start: () => { const t = lessonTarget('MOVER'); if (t) { t.up = true; t.autoReset = 3; } setLessonWind(0); }, check: () => lev('hit:MOVER') > 0 },
     ] },
-  { id: 'rifles', name: 'CHEYTAC vs BARRETT', intro: 'Two big rifles. The CheyTac (.408) is the scalpel: flat, accurate, bolt-action — one shot, work the bolt. The Barrett (.50) is the sledgehammer: semi-auto, kills vehicles, but drops more and kicks hard.',
+  { id: 'rifles', name: 'CHEYTAC vs BARRETT', intro: 'Two big rifles. The CheyTac (.408) is the scalpel: flat, accurate, bolt-action — one shot, work the bolt. The Barrett (.50) is the sledgehammer: semi-auto (a shot every 0.6 s at best), kills vehicles, but drops more and kicks hard.',
     outro: 'People: CheyTac. Trucks, dishes and helicopters: Barrett. Pick the right tool.',
     steps: [
-      { text: () => `Switch to the Barrett M107 (${KW(6)}). Same scope, same dial. Hit any plate at 800 m or further. It fires as fast as you click — the CheyTac makes you work the bolt.`, at: atT('T800'), label: '800 M',
+      { text: () => `Switch to the Barrett M107 (${KW(6)}). Same scope, same dial. Hit any plate at 800 m or further. It's semi-auto: one shot per click, but the .50 kicks so hard you get about one shot every 0.6 s. The CheyTac makes you work the bolt (about 1.3 s).`, at: atT('T800'), label: '800 M',
         check: () => ['T800', 'T1000', 'T1200'].some(id => lev('hitW6:' + id) > 0),
         after: () => { const a = CALIBERS['.408 CheyTac'], b = CALIBERS['.50 BMG']; const fa = flightAt(a, 0, 1000), fb = flightAt(b, 0, 1000); radioSay('GRAVEL', `Numbers at 1,000 m: CheyTac drops ${(-fa.y).toFixed(1)} m in ${fa.t.toFixed(2)} s; Barrett drops ${(-fb.y).toFixed(1)} m in ${fb.t.toFixed(2)} s. Barrett hits harder and wrecks engines; CheyTac is flatter and quieter on the shoulder.`, 9); } },
       { text: () => `Back to the CheyTac (${KW(7)}) for the qualifier.`, check: () => currentWeapon === 7 },
@@ -8402,6 +8490,7 @@ window.__game = {
   training: () => TRAIN, STATIONS, LESSON, lessonTargets: () => lessonTargets, lessonCall: () => TRAIN && TRAIN.lastCall, setLessonWind, windHold, lessonClear, lessonLead: id => lead(id), skipStation, skipPressed, beginStation, popTargets: () => popTargets, trainRP: () => trainRP, garrote, garrotePress, updateGarrote, tryJump,
   demo: () => ({ charges, demoTargets, equip, demoScore, waypoint, shake, demoFires, demoTimers }), plantCharge, fireClacker, toggleWaypoint, detonate, demoBlast, NAV, DEMO_AT, findPath, isWall, cellOf,
   breach: () => ({ flashes, breachScore, cage, torch, doors: demoTargets.filter(t => t.kind === 'bdoor' || t.kind === 'bwall') }), throwFlash, openBreach, breachAhead, SH, stackTeam,
+  gateSideText, layoutHud: () => { hudLayoutAt = 0; layoutHud(); }, exitLockedText, exitZone: () => exitZone, showMessage, showQuip, radioSay,
   radioPressed, trainingOverview, teleportTo, curStep, trainGates: () => trainGates, obstacles: () => obstacles, chooseMission, currentWeapon: () => currentWeapon, aiming: () => aiming,
   aimAt: (x, y, z) => { const d = new THREE.Vector3(x, y, z).sub(camera.position); camera.rotation.set(Math.asin(THREE.MathUtils.clamp(d.y / d.length(), -1, 1)), Math.atan2(-d.x, -d.z), 0, 'YXZ'); },
   onPlayerShotNoise, nvMode: () => nvMode, lastShot: () => ({ lastShotSpot, repeatShots }), setZoom, weapon: () => WEAPONS[currentWeapon], zoomStep: () => zoomStep,
