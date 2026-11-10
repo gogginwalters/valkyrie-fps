@@ -1,0 +1,10 @@
+Valkyrie v0.6.26 sky / room lighting (HDRI). All CC0 from Poly Haven (polyhaven.com), no attribution
+required, credited anyway. Each was shrunk to 256x128, very bright sun spots capped and the overall
+brightness normalised so it works as soft image-based light + reflections (~130 KB each).
+
+indoor.hdr    "Empty Warehouse 01" by Sergej Majboroda — CC0   https://polyhaven.com/a/empty_warehouse_01
+              (Black File facility)
+overcast.hdr  "Kloofendal Overcast" by Greg Zaal — CC0 https://polyhaven.com/a/kloofendal_overcast
+              (Camp Halyard training + Sniper Lesson)
+snow.hdr      "Snowy Field" by Andreas Mischok — CC0 https://polyhaven.com/a/snowy_field
+              (Cold Horizon)
