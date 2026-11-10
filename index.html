@@ -8,7 +8,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <!--
   =====================================================================
-  OPERATION: BLACK FILE  (v0.6.24 — audio pass: real-gun loudness ladder (Barrett/CheyTac loudest … pistols; suppressed far quieter), real suppressed 9mm for the Glock + suppressed .45 for the M1911s, real AR-15 reload for the M4 (mag out, mag seat, charging handle), AK reload + real AK charging handle, real Glock 17 mag change, 870 loads shell by shell, garrote wire/choke/body-fall sounds, recorded explosion, enemy rifle shots use real recordings; v0.6.23 — trackpad look rebuilt: follows the on-screen pointer 1:1 like a finger drag, iPad trackpad inertia (coasting after you lift) is filtered out, pointer pinned at an edge still turns only while pushed, new TRACKPAD SPEED slider + DRIFT GUARD switch + iPad settings tip; v0.6.22 — every door sign names where that side really leads + what opens it, garrote-room door to Demolition opens after the maze, locked doors/exits/breach doors explain themselves on every level, elevator LOCKED/OPEN sign, HUD boxes never overlap (iPad sizes), fire-rate texts match the real rates; v0.6.21 — navigation: the compass ◆ is always on in every mission (no more no-compass maze steps), maze exit door marked + explained (opens by itself on the timed run), more green floor arrows; real fire rates for every gun (MP5 800, M4 800, AKM 600, SCAR-H 600 rpm; realistic pistol, Barrett, CheyTac and 870 pace); v0.6.20 — two-finger swipe never turns the view (stops leftover inertial drift); v0.6.19 — no extra two-finger look once trackpad look works (stops coasting), try fullscreen to hide the pointer; v0.6.18 — hide iPad cursor with a transparent pointer + kill leftover swipe drift; v0.6.17 — cursor/aim: OS cursor hidden over everything in play, relative trackpad look never stalls at screen edge, no edge-turn overshoot, steadier scoped aim; v0.5.3 — trackpad aim follows 1:1 (relative movement, coalesced events, hidden cursor), scope zoom on 2-finger up/down, look sens 1.6; v0.5.2 — trackpad no longer spins the view (edge turn only while moving, on/off switch, swipe momentum limit); v0.5.1 — semi-auto pistols, lean (Tab / E), fixed freeze at the elevator on iPad; v0.5 — real 3D soldiers, zone looks + signs, compass, map (M), radio hints, dual M1911s; v0.4.6 mission select fix for iPad, free 360° turning on iPad, retuned damage, friendly markers on your squad, sniper mission, knife, Magic Keyboard controls, iPad aim/layout fix + DEBUG readout)
+  OPERATION: BLACK FILE  (v0.6.25 — visual pass: realistic explosions everywhere (white flash, fireball that rolls into black smoke, dust skirt, shockwave ring, debris, soft scorch), real Humvee + M939 truck models instead of boxes, real-looking M112 C4 blocks (label, tape, blasting cap, wires, radio receiver, blinking LED) + linear door charge, KA-BAR-style combat knife in a gloved fist with a real slash and a stab takedown, per-gun reload animations (mag out/in + charging handle, pistol slide rack, shotgun shell-by-shell + pump, bolt cycle); v0.6.24 — audio pass: real-gun loudness ladder (Barrett/CheyTac loudest … pistols; suppressed far quieter), real suppressed 9mm for the Glock + suppressed .45 for the M1911s, real AR-15 reload for the M4 (mag out, mag seat, charging handle), AK reload + real AK charging handle, real Glock 17 mag change, 870 loads shell by shell, garrote wire/choke/body-fall sounds, recorded explosion, enemy rifle shots use real recordings; v0.6.23 — trackpad look rebuilt: follows the on-screen pointer 1:1 like a finger drag, iPad trackpad inertia (coasting after you lift) is filtered out, pointer pinned at an edge still turns only while pushed, new TRACKPAD SPEED slider + DRIFT GUARD switch + iPad settings tip; v0.6.22 — every door sign names where that side really leads + what opens it, garrote-room door to Demolition opens after the maze, locked doors/exits/breach doors explain themselves on every level, elevator LOCKED/OPEN sign, HUD boxes never overlap (iPad sizes), fire-rate texts match the real rates; v0.6.21 — navigation: the compass ◆ is always on in every mission (no more no-compass maze steps), maze exit door marked + explained (opens by itself on the timed run), more green floor arrows; real fire rates for every gun (MP5 800, M4 800, AKM 600, SCAR-H 600 rpm; realistic pistol, Barrett, CheyTac and 870 pace); v0.6.20 — two-finger swipe never turns the view (stops leftover inertial drift); v0.6.19 — no extra two-finger look once trackpad look works (stops coasting), try fullscreen to hide the pointer; v0.6.18 — hide iPad cursor with a transparent pointer + kill leftover swipe drift; v0.6.17 — cursor/aim: OS cursor hidden over everything in play, relative trackpad look never stalls at screen edge, no edge-turn overshoot, steadier scoped aim; v0.5.3 — trackpad aim follows 1:1 (relative movement, coalesced events, hidden cursor), scope zoom on 2-finger up/down, look sens 1.6; v0.5.2 — trackpad no longer spins the view (edge turn only while moving, on/off switch, swipe momentum limit); v0.5.1 — semi-auto pistols, lean (Tab / E), fixed freeze at the elevator on iPad; v0.5 — real 3D soldiers, zone looks + signs, compass, map (M), radio hints, dual M1911s; v0.4.6 mission select fix for iPad, free 360° turning on iPad, retuned damage, friendly markers on your squad, sniper mission, knife, Magic Keyboard controls, iPad aim/layout fix + DEBUG readout)
   A tiny browser first-person shooter.
   - Mission structure & spy flavour inspired by GoldenEye 007 (N64)
   - Fast, aggressive maze shooting inspired by Wolfenstein 3D
@@ -402,7 +402,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 // ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
 // ##  part failed and why.                                           ##
 // #####################################################################
-const VERSION = 'v0.6.24';
+const VERSION = 'v0.6.25';
 // v0.6.6 MISSION UNLOCKS. Order: TRAINING (0) -> BLACK FILE (1) -> SNIPER LESSON (3) -> COLD HORIZON (2).
 // A new player has only TRAINING; winning a mission unlocks the next one (saved as valkyrieUnlocked =
 // how far along that list you've got, 0-3). Developer mode (?dev=1, remembered; ?dev=0 clears it)
@@ -1909,6 +1909,7 @@ function damagePlayer(amount, fromX, fromZ) {
 // ##  SECTION 8: WEAPON (gun models, shooting, reloading, damage)    ##
 // #####################################################################
 let weaponState = [];   // ammo counters, one entry per weapon
+let reloadTotal = 1;   // v0.6.25: how long this reload lasts (for the reload animation)
 let currentWeapon = 0, fireCooldown = 0, reloadTimer = 0, recoil = 0, flashTimer = 0, switchTimer = 0, boltTimer = 0, boltDur = 0.9;
 let mouseDown = false, aiming = false, zoomStep = 0, triggerReleased = true;
 // A quick click/tap (button down AND up between two frames — common with an iPad trackpad
@@ -2332,7 +2333,7 @@ function switchWeapon(n) {
 function startReload() {
   const w = WEAPONS[currentWeapon], s = weaponState[currentWeapon];
   if (reloadTimer > 0 || s.ammo >= magSizeOf(currentWeapon) || s.reserve === 0) return;
-  reloadTimer = w.reloadTime * (dualActive() ? SETTINGS.dualReloadMult : 1);
+  reloadTimer = reloadTotal = w.reloadTime * (dualActive() ? SETTINGS.dualReloadMult : 1);
   SOUNDS.weaponReload(w, reloadTimer); trainEvent('reload');
 }
 
@@ -2614,20 +2615,42 @@ function shootEnemy(e, weapon, zone, distance, point, power = 1) {
 // ##  but he (and anyone close) knows you're there.                  ##
 // #####################################################################
 const knifeModel = new THREE.Group();
+// v0.6.25 ("the knife looks like a spear for spearfishing"): a KA-BAR-style combat knife (licensed model,
+// see models/CREDITS.txt) held in a gloved fist (fingers wrapped round the grip, thumb on the guard).
+// Blade ~18 cm, edge down. A simple fallback blade is used until the model loads.
+const knifePivot = new THREE.Group(); knifeModel.add(knifePivot);
 {
-  const steel = new THREE.MeshStandardMaterial({ color: 0xc8ccd0, roughness: 0.25, metalness: 0.9 });
-  const black = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.8 });
-  const glove = new THREE.MeshStandardMaterial({ color: 0x20221e, roughness: 0.95 });
-  const blade = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.008, 0.2), steel); blade.position.z = -0.16;
-  const tip = new THREE.Mesh(new THREE.ConeGeometry(0.014, 0.05, 4), steel); tip.rotation.x = -Math.PI / 2; tip.position.z = -0.285;
-  const guard = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.016, 0.014), black); guard.position.z = -0.055;
-  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.018, 0.11, 10), black); handle.rotation.x = Math.PI / 2;
-  const hand = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.06, 0.09), glove);
-  knifeModel.add(blade, tip, guard, handle, hand);
-  knifeModel.visible = false; knifeModel.scale.setScalar(1.7);
+  const glove = new THREE.MeshStandardMaterial({ color: 0x24261f, roughness: 0.92 }), knuckle = new THREE.MeshStandardMaterial({ color: 0x1a1b17, roughness: 0.85 });
+  const hand = new THREE.Group(); knifeModel.add(hand); knifeModel.userData.hand = hand;
+  const palm = new THREE.Mesh(new THREE.CapsuleGeometry(0.03, 0.045, 4, 8), glove); palm.rotation.x = Math.PI / 2; palm.position.set(0.018, -0.012, 0.0); palm.scale.set(1.1, 1, 0.8); hand.add(palm);
+  for (let i = 0; i < 4; i++) { const f = new THREE.Mesh(new THREE.CapsuleGeometry(0.0105, 0.03, 3, 6), i % 2 ? glove : knuckle); f.rotation.z = Math.PI / 2; f.position.set(-0.004, 0.0, 0.03 - i * 0.021); hand.add(f);
+    const tip = new THREE.Mesh(new THREE.CapsuleGeometry(0.0095, 0.012, 3, 6), glove); tip.position.set(-0.022, -0.016, 0.03 - i * 0.021); hand.add(tip); }
+  const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.011, 0.035, 3, 6), glove); thumb.rotation.set(0.9, 0, 0.5); thumb.position.set(0.006, 0.014, -0.036); hand.add(thumb);
+  const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.04, 0.07, 10), glove); cuff.rotation.x = Math.PI / 2; cuff.position.set(0.02, -0.01, 0.075); hand.add(cuff);
+  // fallback blade (replaced by the model)
+  const steel = new THREE.MeshStandardMaterial({ color: 0x3a3c3e, roughness: 0.35, metalness: 0.8 });
+  const fb = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.032, 0.18), steel); fb.position.set(0, 0.0, -0.13); knifePivot.add(fb); knifeModel.userData.fallback = fb;
+  getGunGltf('models/props/knife.glb').then(gltf => {
+    const m = gltf.scene.clone(true), holder = new THREE.Group(); holder.add(m);
+    let b = measureMeshBox(m, holder), sz = b.getSize(new THREE.Vector3());
+    // long axis -> -Z (blade forward)
+    if (sz.y >= sz.x && sz.y >= sz.z) m.rotation.x = -Math.PI / 2; else if (sz.x >= sz.z) m.rotation.y = Math.PI / 2;
+    b = measureMeshBox(m, holder); sz = b.getSize(new THREE.Vector3());
+    const k = 0.31 / sz.z; holder.scale.setScalar(k);                       // KA-BAR overall ≈ 31 cm
+    // blade end = the thinner, lighter end: put the pommel (handle) at the fist
+    const pts = collectGunPoints(m, holder); let wF = 0, wB = 0, nF = 0, nB = 0; const zc = (b.min.z + b.max.z) / 2;
+    for (let i = 0; i < pts.length; i += 3) { const w = Math.abs(pts[i] - (b.min.x + b.max.x) / 2); if (pts[i + 2] < zc) { wF += w; nF++; } else { wB += w; nB++; } }
+    if (nF && nB && wF / nF > wB / nB) m.rotation.y += Math.PI;   // thicker (handle) half goes to the back                                    // fat handle toward the back
+    b = measureMeshBox(m, holder); const c = b.getCenter(new THREE.Vector3());
+    m.position.set(-c.x, -c.y, -b.max.z + 0.065 / k);                       // handle end sits in the fist
+    { const s2 = b.getSize(new THREE.Vector3()); if (s2.x > s2.y) holder.rotation.z = Math.PI / 2; }   // blade stands on its edge
+    holder.traverse(o => { if (o.isMesh) o.frustumCulled = false; });
+    knifePivot.add(holder); fb.visible = false;
+  }).catch(() => {});
+  knifeModel.visible = false; knifeModel.scale.setScalar(1.25);
   weaponScene.add(knifeModel);
 }
-let knifeTimer = 0, knifeAnim = 0;
+let knifeTimer = 0, knifeAnim = 0, knifeAnimMax = 0.36, knifeKind = 'slash';
 // Find the guard the knife can reach: close, roughly in front of you, nothing in between.
 function knifeTarget() {
   const fwd = camera.getWorldDirection(new THREE.Vector3()); fwd.y = 0; fwd.normalize();
@@ -2655,7 +2678,7 @@ function isBehindUnaware(e) {
 }
 function knifeAttack() {
   if (state !== 'playing' || knifeTimer > 0 || killcam.active) return;
-  knifeTimer = SETTINGS.knifeCooldown; knifeAnim = 0.3;
+  knifeTimer = SETTINGS.knifeCooldown; knifeAnim = knifeAnimMax = 0.36; knifeKind = 'slash';
   setZoom(0);
   { const bd = breachAhead(); if (bd) { knifeTimer = 0.45; ramHit(bd); return; } }   // v0.6.3: facing a door = the ram
   SOUNDS.knifeSwish();
@@ -2680,6 +2703,7 @@ function knifeAttack() {
   if (isBehindUnaware(e)) {
     if (e.roleplayer) trainEvent('rpKnife');
     // SILENT TAKEDOWN: instant, no alarm, no gunshot noise.
+    knifeAnim = knifeAnimMax = 0.5; knifeKind = 'stab';   // v0.6.25: a hard downward stab, not a swipe
     e.health = 0; e.hitFlash = 0.12;
     if (SETTINGS.gore) spawnParticles(chest, 0x8a0000, 10, 1.5, 0.04);
     lastHit = { zone: 'knife', distance: t.d };
@@ -2709,12 +2733,85 @@ function updateKnife(dt) {
   const on = knifeAnim > 0;
   knifeModel.visible = on;
   if (!on) return;
-  const p = 1 - knifeAnim / 0.3;                                       // 0 -> 1 during the slash
-  knifeModel.position.set(0.42 - p * 0.8, -0.2 - Math.sin(p * Math.PI) * 0.07, -0.45);
-  knifeModel.rotation.set(-0.2, 0.9 - p * 1.6, -0.5 + p * 0.9);
+  // v0.6.25: real knife-fighting motion. SLASH: cock back to the right shoulder, a fast diagonal cut
+  // down-left with the wrist turning the edge through, follow-through, recover. STAB (takedown):
+  // raise, drive the blade forward and down hard, a short twist, pull out.
+  const p = 1 - knifeAnim / knifeAnimMax, ez = t => t * t * (3 - 2 * t), seg = (a, b) => THREE.MathUtils.clamp((p - a) / (b - a), 0, 1);
+  if (knifeKind === 'stab') {
+    const up = ez(seg(0, 0.3)), drive = ez(seg(0.3, 0.5)), out = ez(seg(0.72, 1));
+    knifeModel.position.set(0.16 - drive * 0.12, -0.2 + up * 0.14 - drive * 0.2 + out * 0.06, -0.38 - drive * 0.28 + out * 0.2);
+    knifeModel.rotation.set(-0.3 + up * 0.9 - drive * 1.25 + out * 0.5, 0.15, -0.2 + drive * 0.15 + Math.sin(seg(0.5, 0.72) * Math.PI) * 0.25);
+  } else {
+    const wind = ez(seg(0, 0.28)), cut = ez(seg(0.28, 0.6)), back = ez(seg(0.6, 1));
+    const x = 0.3 + wind * 0.08 - cut * 0.55 + back * 0.17, y = -0.2 + wind * 0.1 - cut * 0.2 + back * 0.1, z = -0.42 - cut * 0.12 + back * 0.12;
+    knifeModel.position.set(x, y, z);
+    knifeModel.rotation.set(-0.25 + wind * 0.35 - cut * 0.5 + back * 0.4, 0.55 + wind * 0.35 - cut * 1.3 + back * 0.4, -0.5 - wind * 0.4 + cut * 1.5 - back * 0.6);
+  }
   weaponRoot.visible = false;
 }
 
+// v0.6.25 RELOAD ANIMATIONS (replaces the old dip-and-rise). The whole gun is moved through the real
+// steps for its type, timed to the reload sounds; a magazine drops out of the well and a fresh one
+// comes up and is seated (the gun models are one piece, so the mag is a matching stand-in shape).
+//  rifle / SMG: tilt to show the mag well, mag out, new mag in + slap, roll left, charging handle pull.
+//  pistol: tip up, mag out, new mag in + seat, slide rack.  shotgun: roll the loading port up, shell by
+//  shell, then rack the pump.  bolt-action sniper: mag change then the bolt cycle.
+const RP0 = { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0, out: -1, inn: -1 };
+function reloadPose(w, p) {
+  if (p < 0 || p > 1) return RP0;
+  const ez = t => t * t * (3 - 2 * t), seg = (a, b) => THREE.MathUtils.clamp((p - a) / (b - a), 0, 1), bump = (a, b) => Math.sin(seg(a, b) * Math.PI);
+  const r = { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0, out: -1, inn: -1 };
+  const present = ez(seg(0, 0.12)) * (1 - ez(seg(0.88, 1)));
+  if (w.pump) {                                        // Remington 870
+    const roll = ez(seg(0, 0.1)) * (1 - ez(seg(0.78, 0.86)));
+    r.rz = -0.75 * roll; r.rx = 0.25 * roll; r.x = -0.06 * roll; r.y = 0.03 * roll;
+    for (let i = 0; i < 4; i++) { const a = 0.12 + i * 0.16; r.y += 0.012 * bump(a, a + 0.08); r.rx += 0.05 * bump(a, a + 0.08); }   // thumbing a shell in
+    const pump = bump(0.84, 0.97); r.z += 0.07 * pump; r.rx += 0.05 * pump;
+    return r;
+  }
+  const pistol = w.model === 'pistol';
+  if (pistol) {
+    r.rx = 0.45 * present; r.rz = 0.25 * present; r.x = -0.08 * present; r.y = 0.04 * present;
+    r.out = seg(0.08, 0.3); r.inn = p < 0.32 ? -1 : 1 - ez(seg(0.32, 0.58));
+    r.y += 0.025 * bump(0.58, 0.66);                                   // palm seats the mag
+    const rack = seg(0.68, 0.9); r.rz -= 0.5 * Math.sin(rack * Math.PI); r.z += 0.06 * bump(0.74, 0.84);   // slide rack
+    return r;
+  }
+  // rifles, SMG, snipers
+  r.rz = 0.55 * present; r.rx = 0.18 * present; r.x = -0.06 * present; r.y = 0.05 * present;
+  r.out = seg(0.08, 0.3); r.inn = p < 0.33 ? -1 : 1 - ez(seg(0.33, 0.56));
+  r.y += 0.03 * bump(0.56, 0.64); r.rx -= 0.06 * bump(0.56, 0.64);   // slap the mag home
+  if (w.boltAction) {                                                    // CheyTac: bolt up, back, forward, down
+    const b = seg(0.68, 0.92); r.rz += -0.5 * Math.sin(b * Math.PI); r.z += 0.05 * bump(0.72, 0.88); r.ry += 0.08 * bump(0.68, 0.92);
+  } else {                                                                 // charging handle / HK cocking lever
+    const c = seg(0.68, 0.9); r.rz += -0.85 * Math.sin(c * Math.PI); r.ry += 0.12 * Math.sin(c * Math.PI); r.z += 0.045 * bump(0.74, 0.8);
+  }
+  return r;
+}
+// The magazine that drops out / goes in during a reload (one per gun type, made once).
+const reloadMag = { mesh: null, kind: '', box: new Map() };
+function updateReloadMag(w, rp) {
+  const kind = w.pump ? '' : w.model === 'pistol' ? 'pistol' : w.name.includes('AKM') ? 'ak' : w.model === 'sniper' ? 'sniper' : 'rifle';
+  if (!reloadMag.mesh) {
+    const mat = new THREE.MeshStandardMaterial({ color: 0x1c1d1f, roughness: 0.6, metalness: 0.4 });
+    reloadMag.mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), mat); reloadMag.mesh.visible = false; weaponRoot.add(reloadMag.mesh);
+  }
+  const m = reloadMag.mesh;
+  if (!kind || (rp.out < 0 && rp.inn < 0) || (rp.out >= 1 && rp.inn < 0)) { m.visible = false; return; }
+  // where the mag well is on this gun model (measured once from the model, in weaponRoot space)
+  const gm = weaponModels[currentWeapon]; let wb = reloadMag.box.get(currentWeapon);
+  if (!wb && gm) { const b = measureMeshBox(gm, weaponRoot); if (isFinite(b.min.y)) { wb = b; reloadMag.box.set(currentWeapon, b); } }
+  if (!wb) { m.visible = false; return; }
+  const len = wb.max.z - wb.min.z, h = kind === 'pistol' ? 0.075 : kind === 'sniper' ? 0.07 : 0.11, wd = kind === 'pistol' ? 0.022 : 0.026, dp = kind === 'pistol' ? 0.03 : kind === 'sniper' ? 0.05 : 0.05;
+  const zc = kind === 'pistol' ? wb.max.z - len * 0.22 : wb.min.z + len * (kind === 'sniper' ? 0.6 : 0.52);
+  const y0 = wb.min.y + h * 0.35 + (kind === 'pistol' ? 0.01 : 0.02);
+  m.scale.set(wd, h, dp); m.rotation.set(kind === 'ak' ? -0.35 : kind === 'rifle' ? -0.12 : 0, 0, 0);
+  let drop = 0;
+  if (rp.inn >= 0) drop = rp.inn * 0.35;                 // new mag coming up into the well
+  else drop = rp.out * rp.out * 0.6;                     // old mag falling away
+  m.position.set((wb.min.x + wb.max.x) / 2, y0 - drop, zc + (rp.inn >= 0 ? rp.inn * 0.05 : 0));
+  m.visible = drop < 0.5;
+}
 function updateWeapon(dt) {
   const w = WEAPONS[currentWeapon], s = weaponState[currentWeapon];
   fireCooldown -= dt; switchTimer = Math.max(0, switchTimer - dt);
@@ -2743,13 +2840,17 @@ function updateWeapon(dt) {
   const moving = Math.hypot(player.velocity.x, player.velocity.z);
   const bob = Math.sin(player.bobTime) * 0.012 * Math.min(moving / 5, 1);
   const reloadDip = reloadTimer > 0 ? Math.sin((1 - reloadTimer / w.reloadTime) * Math.PI) : 0;
-  const aimX = aiming ? 0 : 0.28, aimY = (aiming ? -0.2 : -0.28) + bob - reloadDip * 0.15 - switchTimer * 0.8;
+  const rp = reloadPose(w, reloadTimer > 0 && !dualActive() ? 1 - reloadTimer / reloadTotal : -1);   // v0.6.25 real reload moves
+  const dipY = dualActive() ? reloadDip * 0.15 : 0;
+  const aimX = (aiming ? 0 : 0.28) + rp.x, aimY = (aiming ? -0.2 : -0.28) + bob - dipY - switchTimer * 0.8 + rp.y;
   const follow = Math.min(1, dt * 14);
   weaponRoot.position.x += (aimX - weaponRoot.position.x) * follow;
   weaponRoot.position.y += (aimY - weaponRoot.position.y) * follow;
-  weaponRoot.position.z = -0.5 + recoil * 0.06 * w.sound;
-  weaponRoot.rotation.x = recoil * 0.12 * w.sound + reloadDip * 0.6;
-  weaponRoot.rotation.z = bolt * 0.35;
+  weaponRoot.position.z = -0.5 + recoil * 0.06 * w.sound + rp.z;
+  weaponRoot.rotation.x = recoil * 0.12 * w.sound + (dualActive() ? reloadDip * 0.6 : rp.rx);
+  weaponRoot.rotation.y = rp.ry;
+  weaponRoot.rotation.z = bolt * 0.35 + rp.rz;
+  updateReloadMag(w, rp);
   weaponRoot.visible = !(aiming && w.scope);
   updateKnife(dt);             // knife slash (hides the gun while it plays)
   updateDualModels(dt, aimY);  // v0.5: two pistols
@@ -4073,7 +4174,7 @@ function updateEffects(dt) {
     const fx = effects[i];
     fx.life -= dt;
     if (fx.update) fx.update(dt, fx);
-    if (fx.life <= 0) { levelGroup.remove(fx.obj); effects.splice(i, 1); }
+    if (fx.life <= 0) { levelGroup.remove(fx.obj); effects.splice(i, 1); if (fx.own) { fx.obj.material.dispose(); if (!fx.obj.isSprite && fx.obj.geometry) fx.obj.geometry.dispose(); } }
   }
 }
 
@@ -4859,6 +4960,8 @@ function addMateriel(def) {
     for (const z of zs) for (const x of [-1.2, 1.2]) {
       const w = part(wheel, mat(0x181818, 0.9), big ? x : x * 0.8, 0.5, z); w.rotation.z = Math.PI / 2;
     }
+    // v0.6.25: real M939 truck / Humvee look; the boxes stay as invisible hit zones (engine = hood)
+    dressVehicle(def.type, g, big ? 7.9 : 4.6, 'z', (ms, holder) => { m.parts.push(holder); if (m.destroyed) holder.visible = false; });
   } else if (def.type === 'fuel') {
     const t = part(new THREE.CylinderGeometry(1.6, 1.6, 8, 20), mat(0xc8c8c0, 0.4, 0.6), 0, 2.2, 0, 'tank', true); t.rotation.z = Math.PI / 2;
     for (const x of [-2.6, 2.6]) part(new THREE.BoxGeometry(0.4, 1.0, 2.6), mat(0x333333), x, 0.5, 0);
@@ -4932,6 +5035,70 @@ function cutCompoundLights() {
   masking.generator = null;                          // no more backfires to hide your shots behind
   sniperState.lightsOut = true;
 }
+// v0.6.25 REALISTIC EXPLOSIONS (James: "explosions look corny"). Same look on every level:
+// a white-hot flash, a fireball of soft puffs that quickly cools to orange then black smoke,
+// a dark smoke column that rolls up and spreads, a low dust skirt pushed outwards, a ground
+// shockwave ring, flying debris + sparks and a soft-edged scorch. Sprites only (cheap on iPad).
+const FX_TEX = (() => {
+  const mk = draw => { const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d'); draw(x); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; };
+  const blobs = (x, inner, outer, n, seed, spread = 46) => { const r = makeRandom(seed); for (let i = 0; i < n; i++) { const px = 64 + (r() - 0.5) * spread, py = 64 + (r() - 0.5) * spread, rad = 16 + r() * 30; const g = x.createRadialGradient(px, py, 0, px, py, rad); g.addColorStop(0, inner); g.addColorStop(1, outer); x.fillStyle = g; x.beginPath(); x.arc(px, py, rad, 0, 7); x.fill(); } };
+  const rad = (x, stops) => { const g = x.createRadialGradient(64, 64, 0, 64, 64, 64); for (const [o, c] of stops) g.addColorStop(o, c); x.fillStyle = g; x.fillRect(0, 0, 128, 128); };
+  return {
+    fire: mk(x => blobs(x, 'rgba(255,245,215,0.6)', 'rgba(255,110,20,0)', 16, 11)),
+    smoke: mk(x => blobs(x, 'rgba(255,255,255,0.26)', 'rgba(255,255,255,0)', 20, 12)),
+    flash: mk(x => rad(x, [[0, 'rgba(255,255,255,1)'], [0.2, 'rgba(255,240,200,0.9)'], [0.5, 'rgba(255,170,70,0.35)'], [1, 'rgba(255,120,40,0)']])),
+    scorch: mk(x => { rad(x, [[0, 'rgba(0,0,0,0.92)'], [0.45, 'rgba(12,9,6,0.7)'], [0.8, 'rgba(20,16,12,0.25)'], [1, 'rgba(0,0,0,0)']]); blobs(x, 'rgba(0,0,0,0.35)', 'rgba(0,0,0,0)', 10, 13, 80); }),
+    ring: mk(x => rad(x, [[0, 'rgba(220,205,180,0)'], [0.72, 'rgba(220,205,180,0)'], [0.86, 'rgba(225,210,185,0.55)'], [1, 'rgba(220,205,180,0)']])),
+  };
+})();
+function fxSprite(tex, color, opacity, additive) {
+  const m = new THREE.SpriteMaterial({ map: tex, color, transparent: true, opacity, depthWrite: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending });
+  m.rotation = Math.random() * Math.PI * 2; return new THREE.Sprite(m);
+}
+function fxPush(obj, life, update) { levelGroup.add(obj); effects.push({ obj, life, max: life, own: true, update }); }
+const fxDirt = new THREE.MeshStandardMaterial({ color: 0x4a3d2e, roughness: 1 });
+function blastFX(center, radius, small, groundY = 0) {
+  const R = THREE.MathUtils.clamp(radius * (small ? 0.5 : 0.75), 1.2, 9), low = SETTINGS.quality === 'low' || (window.innerWidth < 1400 && navigator.maxTouchPoints > 0);
+  const n = k => Math.max(2, Math.round(k * (small ? 0.6 : 1) * (low ? 0.7 : 1)));
+  const rnd = () => Math.random() - 0.5;
+  // 1. flash: blinding for a split second
+  const fl = fxSprite(FX_TEX.flash, 0xffffff, 1, true); fl.position.copy(center); fl.userData.hot = true;
+  fxPush(fl, 0.14, (dt, fx) => { const t = 1 - fx.life / fx.max; fl.material.opacity = (1 - t) * (1 - t); fl.scale.setScalar(R * (2.6 + t * 2)); });
+  // 2. fireball: hot puffs burst out, slow down, cool to orange/red and go dark
+  for (let i = 0; i < n(11); i++) {
+    const s = fxSprite(FX_TEX.fire, 0xffffff, 1, true), dir = new THREE.Vector3(rnd(), Math.random() * 0.8 + 0.05, rnd()).normalize();
+    const sp = R * (2.2 + Math.random() * 2), s0 = R * (0.5 + Math.random() * 0.45), life = 0.38 + Math.random() * 0.32;
+    s.position.copy(center); s.userData.hot = true;
+    fxPush(s, life, (dt, fx) => { const t = 1 - fx.life / fx.max; s.position.addScaledVector(dir, sp * dt * (1 - t) * (1 - t)); s.position.y += dt * R * 0.6;
+      s.scale.setScalar(s0 * (0.6 + t * 1.9)); s.material.color.setRGB(1, Math.max(0.22, 0.95 - t * 1.1), Math.max(0.04, 0.75 - t * 1.6)); s.material.opacity = Math.min(1, (1 - t) * 1.6); s.material.rotation += dt * 0.6; });
+  }
+  // 3. smoke column: black-brown, starts as the fire dies, rolls up and spreads, drifts
+  for (let i = 0; i < n(14); i++) {
+    const g = 0.12 + Math.random() * 0.12, s = fxSprite(FX_TEX.smoke, new THREE.Color(g * 1.1, g, g * 0.92), 0, false);
+    s.position.set(center.x + rnd() * R * 0.7, center.y + Math.random() * R * 0.5, center.z + rnd() * R * 0.7);
+    const delay = 0.06 + Math.random() * 0.3, s0 = R * (0.7 + Math.random() * 0.6), v = new THREE.Vector3(rnd() * 0.8, 0.9 + Math.random() * 1.2, rnd() * 0.8).multiplyScalar(R * 0.45), spin = rnd() * 0.5;
+    fxPush(s, 4.5 + Math.random() * 3.5, (dt, fx) => { const age = fx.max - fx.life; if (age < delay) return; const t = (age - delay) / (fx.max - delay);
+      s.position.addScaledVector(v, dt * (1 - t * 0.8)); s.position.x += dt * 0.5; s.scale.setScalar(s0 * (1 + t * 2.8)); s.material.opacity = 0.9 * Math.min(1, (age - delay) * 5) * (1 - t) * (1 - t * 0.3); s.material.rotation += dt * spin; });
+  }
+  // 4. dust skirt: thrown out low along the ground
+  for (let i = 0; i < n(9); i++) {
+    const a = Math.random() * Math.PI * 2, s = fxSprite(FX_TEX.smoke, 0x8a7860, 0, false), sp = R * (3 + Math.random() * 2.5), s0 = R * (0.5 + Math.random() * 0.4);
+    s.position.set(center.x, groundY + 0.4 + Math.random() * 0.5, center.z);
+    fxPush(s, 2.2 + Math.random() * 1.5, (dt, fx) => { const t = 1 - fx.life / fx.max; const k = sp * dt * Math.max(0, 1 - t * 2.2); s.position.x += Math.cos(a) * k; s.position.z += Math.sin(a) * k; s.position.y += dt * 0.35;
+      s.scale.setScalar(s0 * (1 + t * 2.2)); s.material.opacity = 0.55 * Math.min(1, t * 12) * (1 - t); });
+  }
+  // 5. shockwave ring racing across the ground
+  const ring = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: FX_TEX.ring, transparent: true, opacity: 0.85, depthWrite: false }));
+  ring.rotation.x = -Math.PI / 2; ring.position.set(center.x, groundY + 0.08, center.z);
+  fxPush(ring, 0.5, (dt, fx) => { const t = 1 - fx.life / fx.max; ring.scale.setScalar(R * (1 + Math.sqrt(t) * 7)); ring.material.opacity = 0.85 * (1 - t); });
+  // 6. debris: charred chunks + dirt clods, and fast sparks
+  spawnDebris(center, n(10), demoMats.char, 0.16, R * 2.2);
+  spawnDebris(new THREE.Vector3(center.x, groundY + 0.2, center.z), n(8), fxDirt, 0.12, R * 1.8);
+  spawnParticles(center, 0xffd27a, n(26), R * 2.6, 0.05);
+  // 7. scorch mark (soft edges, not a black disc)
+  const sc = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: FX_TEX.scorch, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3 }));
+  sc.rotation.x = -Math.PI / 2; sc.rotation.z = Math.random() * 6.3; sc.scale.setScalar(R * 1.6); sc.position.set(center.x, groundY + 0.025, center.z); levelGroup.add(sc); decals.push(sc);
+}
 // Explosions: fireball, smoke, kills guards nearby and sets off other explosives.
 const smokers = [];
 const explosionLight = new THREE.PointLight(0xffaa55, 0, 120, 1.4);
@@ -4946,14 +5113,8 @@ function explodeMateriel(m) {
 }
 function explosionAt(center, radius, label) {
   SOUNDS.boom(volumeFar(center.x, center.z));
-  const fire = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), new THREE.MeshBasicMaterial({ color: 0xffa040, transparent: true, opacity: 0.95, depthWrite: false }));
-  fire.position.copy(center); fire.userData.hot = true; levelGroup.add(fire);
-  effects.push({ obj: fire, life: 0.8, max: 0.8, update(dt, fx) { const t = 1 - fx.life / fx.max; fire.scale.setScalar(1 + t * radius * 0.7); fire.material.opacity = 0.95 * (1 - t); fire.material.color.setRGB(1, 0.65 - t * 0.4, 0.25 - t * 0.2); } });
-  const smoke = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), new THREE.MeshBasicMaterial({ color: 0x2a2a2a, transparent: true, opacity: 0.6, depthWrite: false }));
-  smoke.position.copy(center); levelGroup.add(smoke);
-  effects.push({ obj: smoke, life: 4, max: 4, update(dt, fx) { const t = 1 - fx.life / fx.max; smoke.scale.setScalar(2 + t * radius); smoke.position.y += dt * 3; smoke.material.opacity = 0.6 * (1 - t); } });
-  spawnParticles(center, 0xffc060, 30, radius * 0.8, 0.2);
-  spawnParticles(center, 0x333333, 20, radius * 0.5, 0.35);
+  blastFX(center, radius, false, center.y - 1.5);   // v0.6.25 realistic blast
+  addShake(THREE.MathUtils.clamp(radius * 0.01 / Math.max(1, dist2D(camera.position.x, camera.position.z, center.x, center.z) / 8), 0.002, 0.06));
   explosionLight.position.copy(center); explosionLight.intensity = 400;
   smokers.push({ pos: center.clone(), until: masking.time + 60 });
   const me = shooterPos(), shooterDist = dist2D(me.x, me.z, center.x, center.z);
@@ -7516,16 +7677,15 @@ function spawnDebris(center, n, mat, size, speed, push = null) {
     } });
   }
 }
-function flameAt(p, size) {
-  const m = new THREE.Mesh(particleGeometry, demoMats.flame[Math.floor(Math.random() * 3)]);
-  m.position.set(p.x + (Math.random() - 0.5) * size, p.y, p.z + (Math.random() - 0.5) * size); const s0 = size * (0.25 + Math.random() * 0.3); m.scale.setScalar(s0);
-  levelGroup.add(m);
-  effects.push({ obj: m, life: 0.7, max: 0.7, update(dt, fx) { m.position.y += dt * 2.2; m.scale.setScalar(s0 * fx.life / fx.max); m.rotation.y += dt * 3; if (fx.life < 0.25) m.material = demoMats.flame[3]; } });
+function flameAt(p, size) {   // v0.6.25: soft licking flames (sprites), not boxes
+  const m = fxSprite(FX_TEX.fire, 0xffffff, 0.9, true); m.userData.hot = true;
+  m.position.set(p.x + (Math.random() - 0.5) * size, p.y, p.z + (Math.random() - 0.5) * size); const s0 = size * (0.45 + Math.random() * 0.4);
+  fxPush(m, 0.7, (dt, fx) => { const t = 1 - fx.life / fx.max; m.position.y += dt * 1.8; m.scale.set(s0 * (1 - t * 0.5), s0 * (1.3 - t * 0.4), 1); m.material.color.setRGB(1, 0.75 - t * 0.5, 0.35 - t * 0.3); m.material.opacity = 0.9 * (1 - t); });
 }
 function smokeAt(p, size) {
-  const m = new THREE.Mesh(particleGeometry, demoMats.smoke); m.position.set(p.x + (Math.random() - 0.5) * size, p.y + 0.4, p.z + (Math.random() - 0.5) * size);
-  const s0 = size * (0.3 + Math.random() * 0.3); levelGroup.add(m);
-  effects.push({ obj: m, life: 2.5, max: 2.5, update(dt, fx) { m.position.y += dt * 1.6; m.position.x += dt * 0.4; m.scale.setScalar(s0 * (1 + 1.5 * (1 - fx.life / fx.max))); } });
+  const g = 0.1 + Math.random() * 0.08, m = fxSprite(FX_TEX.smoke, new THREE.Color(g, g, g), 0, false);
+  m.position.set(p.x + (Math.random() - 0.5) * size, p.y + 0.6, p.z + (Math.random() - 0.5) * size); const s0 = size * (0.7 + Math.random() * 0.5);
+  fxPush(m, 3, (dt, fx) => { const t = 1 - fx.life / fx.max; m.position.y += dt * 1.5; m.position.x += dt * 0.45; m.scale.setScalar(s0 * (1 + 2.2 * t)); m.material.opacity = 0.75 * Math.min(1, t * 6) * (1 - t); });
 }
 function addFire(p, seconds, size) { demoFires.push({ p: p.clone ? p.clone() : new THREE.Vector3(p.x, p.y, p.z), until: elapsed + seconds, size, sparks: false }); }
 function addSparks(p, seconds) { demoFires.push({ p: p.clone(), until: elapsed + seconds, size: 0.3, sparks: true }); }
@@ -7548,15 +7708,7 @@ function demoBlast(center, radius, o = {}) {
   // sound arrives a moment later when far; very close = louder
   const vol = Math.min(1.3, volumeFar(center.x, center.z) * (o.small ? 0.6 : 1.1));
   SOUNDS.boom(vol); if (!o.small) playTone(40, 18, 2.2, 0.5 * vol);
-  const fire = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), new THREE.MeshBasicMaterial({ color: 0xffc060, transparent: true, opacity: 1, depthWrite: false }));
-  fire.position.copy(center); levelGroup.add(fire);
-  effects.push({ obj: fire, life: 0.55, max: 0.55, update(dt, fx) { const t = 1 - fx.life / fx.max; fire.scale.setScalar(0.5 + Math.sqrt(t) * radius * 0.8); fire.material.opacity = 1 - t; fire.material.color.setRGB(1, 0.8 - t * 0.5, 0.4 - t * 0.35); } });
-  const smoke = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), new THREE.MeshBasicMaterial({ color: 0x2c2a28, transparent: true, opacity: 0.7, depthWrite: false }));
-  smoke.position.copy(center); levelGroup.add(smoke);
-  effects.push({ obj: smoke, life: 5, max: 5, update(dt, fx) { const t = 1 - fx.life / fx.max; smoke.scale.set(1.5 + t * radius * 0.9, 1 + t * radius * 0.6, 1.5 + t * radius * 0.9); smoke.position.y += dt * 1.2; smoke.material.opacity = 0.7 * (1 - t); } });
-  spawnParticles(center, 0xffd070, o.small ? 14 : 34, radius * 1.1, 0.16);
-  spawnDebris(center, o.small ? 6 : 14, demoMats.char, 0.18, radius * 1.5);
-  const sc = new THREE.Mesh(new THREE.CircleGeometry(radius * 0.4, 20), demoMats.scorch); sc.rotation.x = -Math.PI / 2; sc.position.set(center.x, 0.025, center.z); levelGroup.add(sc); decals.push(sc);
+  blastFX(center, radius, !!o.small, 0);   // v0.6.25 realistic blast (flash, fireball → smoke, dust, shockwave, debris, scorch)
   explosionLight.position.copy(center); explosionLight.intensity = o.small ? 200 : 500;
   addShake(THREE.MathUtils.clamp((o.small ? 0.5 : 1) * radius * 0.012 / Math.max(1, d / 6), 0.004, 0.09));
   // You: DANGER CLOSE inside 1.5x the blast radius of your own charge
@@ -7596,6 +7748,50 @@ function detonate(c) {
 }
 // ---- Planting ----
 const plantRay = new THREE.Raycaster();
+// v0.6.25 ("make the charge more realistic"): an M112 demolition block (olive-drab wrapper with the
+// printed label, black tape), a blasting cap pushed into the end, twin firing wires to a small radio
+// receiver with an antenna (or a timer with a red readout) and a blinking LED. A door charge is a long
+// flat linear charge (det-cord strip) taped down the frame with the same block + receiver on it.
+const C4_MATS = (() => {
+  const lab = makeCanvasTexture(128, (x, s) => { x.fillStyle = '#4f5534'; x.fillRect(0, 0, s, s); x.fillStyle = 'rgba(0,0,0,0.12)'; for (let i = 0; i < 40; i++) x.fillRect(Math.random() * s, Math.random() * s, 8, 1);
+    x.fillStyle = '#d8c66a'; x.font = 'bold 13px monospace'; x.textAlign = 'center';
+    x.fillText('CHARGE DEMOLITION', s / 2, 40); x.fillText('M112  1.25 LB', s / 2, 60); x.fillText('COMP C-4', s / 2, 80); x.font = '9px monospace'; x.fillText('LOT 21-0447', s / 2, 98); }, 1, 1);
+  const tim = makeCanvasTexture(64, (x, s) => { x.fillStyle = '#111'; x.fillRect(0, 0, s, s); x.fillStyle = '#ff3020'; x.font = 'bold 22px monospace'; x.textAlign = 'center'; x.fillText('0:10', s / 2, 40); }, 1, 1);
+  return {
+    block: new THREE.MeshStandardMaterial({ map: lab, roughness: 0.75, metalness: 0.05 }),
+    side: new THREE.MeshStandardMaterial({ color: 0x4f5534, roughness: 0.75 }),
+    tape: new THREE.MeshStandardMaterial({ color: 0x141414, roughness: 0.55 }),
+    cap: new THREE.MeshStandardMaterial({ color: 0xb8b8b0, roughness: 0.3, metalness: 0.85 }),
+    red: new THREE.MeshStandardMaterial({ color: 0xa01010, roughness: 0.5 }), grn: new THREE.MeshStandardMaterial({ color: 0x1d6a26, roughness: 0.5 }),
+    box: new THREE.MeshStandardMaterial({ color: 0x23262a, roughness: 0.6, metalness: 0.3 }),
+    timer: new THREE.MeshBasicMaterial({ map: tim }),
+    strip: new THREE.MeshStandardMaterial({ color: 0x2b2e30, roughness: 0.7 }), cord: new THREE.MeshStandardMaterial({ color: 0xc9a227, roughness: 0.6 }),
+  };
+})();
+function buildChargeModel(g, isDoor, timed) {
+  const M = C4_MATS, add = (geo, mat, x, y, z, parent = g) => { const o = new THREE.Mesh(geo, mat); o.position.set(x, y, z); parent.add(o); return o; };
+  // the group's +Z points out of the surface. Block lies flat on it.
+  if (isDoor) {   // linear charge strip down the frame + det cord
+    add(new THREE.BoxGeometry(0.07, 0.95, 0.025), M.strip, 0, 0, 0.0125);
+    for (const y of [-0.38, 0, 0.38]) add(new THREE.BoxGeometry(0.09, 0.05, 0.03), M.tape, 0, y, 0.015);
+    const cord = add(new THREE.CylinderGeometry(0.006, 0.006, 0.95, 6), M.cord, 0.04, 0, 0.03);
+  }
+  const blk = add(new THREE.BoxGeometry(0.28, 0.05, 0.038), [M.side, M.side, M.side, M.side, M.block, M.side], 0, isDoor ? 0.12 : 0, 0.022);
+  blk.geometry = new THREE.BoxGeometry(0.28, 0.05, 0.038);   // M112 = 11 x 2 x 1.5 in
+  blk.material = [M.side, M.side, M.side, M.side, M.block, M.side];
+  const by = isDoor ? 0.12 : 0;
+  for (const x of [-0.09, 0.09]) add(new THREE.BoxGeometry(0.03, 0.054, 0.042), M.tape, x, by, 0.022);
+  const cap = add(new THREE.CylinderGeometry(0.0045, 0.0045, 0.06, 8), M.cap, 0.16, by, 0.022); cap.rotation.z = Math.PI / 2;
+  // receiver / timer box sitting just above the block, wires looping between
+  const rx = add(new THREE.BoxGeometry(0.075, 0.05, 0.028), M.box, 0.11, by + 0.07, 0.03);
+  if (timed) add(new THREE.PlaneGeometry(0.05, 0.03), M.timer, 0.11, by + 0.07, 0.0445);
+  else { const ant = add(new THREE.CylinderGeometry(0.0025, 0.0025, 0.09, 5), M.tape, 0.135, by + 0.135, 0.03); }
+  for (const [mat, dz] of [[M.red, 0.036], [M.grn, 0.042]]) {
+    const curve = new THREE.CatmullRomCurve3([new THREE.Vector3(0.19, by, 0.022), new THREE.Vector3(0.215, by + 0.03, dz), new THREE.Vector3(0.18, by + 0.065, dz), new THREE.Vector3(0.145, by + 0.07, 0.03)]);
+    add(new THREE.TubeGeometry(curve, 10, 0.0025, 5), mat, 0, 0, 0);
+  }
+  return add(new THREE.BoxGeometry(0.012, 0.012, 0.01), demoMats.led, 0.09, by + 0.088, 0.045);
+}
 function plantCharge(timed) {
   if (state !== 'playing') return;
   if (!equip.max && !equip.doorsMax) { showMessage('No demolition kit on this op.', 2); return; }
@@ -7616,9 +7812,7 @@ function plantCharge(timed) {
   const doorJob = !!target && (target.kind === 'bdoor' || target.kind === 'bwall'), isDoor = doorJob && equip.doors > 0;
   if (!isDoor && equip.c4 <= 0) { showMessage(equip.doors > 0 ? 'Out of C4. Door charges only go on doors and marked walls.' : 'Out of C4' + (equip.doorsMax ? ' and door charges.' : '.'), 2.5); return; }
   const g = new THREE.Group(); g.position.copy(pos).addScaledVector(normal, 0.035); g.lookAt(g.position.clone().add(normal));
-  if (isDoor) box(0.5, 0.08, 0.05, demoMats.barrel, 0, 0, 0, g);   // a red strip: the breaching (frame) charge
-  box(0.28, 0.16, 0.06, demoMats.c4, 0, 0, 0, g); box(0.29, 0.03, 0.065, demoMats.tape, 0, 0.04, 0, g); box(0.29, 0.03, 0.065, demoMats.tape, 0, -0.04, 0, g);
-  const det = box(0.07, 0.05, 0.04, timed ? demoMats.gen : demoMats.tape, 0.06, 0, 0.045, g); const led = box(0.025, 0.025, 0.02, demoMats.led, -0.06, 0.02, 0.04, g);
+  const led = buildChargeModel(g, isDoor, timed);   // v0.6.25: real-looking M112 C4 / linear door charge
   levelGroup.add(g);
   const R = isDoor ? SETTINGS.doorChargeRadius : SETTINGS.c4Radius, ring = new THREE.Group(); ring.position.set(pos.x, 0.04, pos.z);
   const r1 = new THREE.Mesh(new THREE.RingGeometry(R - 0.18, R, 56), demoMats.ring); r1.rotation.x = -Math.PI / 2; ring.add(r1);
@@ -7681,11 +7875,36 @@ function updateDemo(dt) {
   if (warn !== dangerLast) { dangerLast = warn; el.textContent = warn; el.style.display = warn ? 'block' : 'none'; el.className = /DANGER/.test(warn) ? 'hot' : ''; }
 }
 // ---- Demolition targets (the range, mission 0) ----
+// v0.6.25: real vehicle models instead of boxes (licensed, see models/CREDITS.txt). The old boxes stay
+// as invisible hit / plant shapes, so gameplay is identical; only the look changes.
+const VEHICLE_GLB = { jeep: 'models/vehicles/humvee.glb', truck: 'models/vehicles/m939.glb' };
+function dressVehicle(kind, group, length, axis, onMeshes) {
+  const path = VEHICLE_GLB[kind]; if (!path) return;
+  getGunGltf(path).then(gltf => {
+    if (!group.parent) return;                                  // level was rebuilt meanwhile
+    const m = SkeletonUtils.clone(gltf.scene), holder = new THREE.Group(); holder.add(m);
+    let b = measureMeshBox(m), sz = b.getSize(new THREE.Vector3());
+    if ((axis === 'x') !== (sz.x >= sz.z)) { m.rotation.y = Math.PI / 2; b = measureMeshBox(m, holder); sz = b.getSize(new THREE.Vector3()); }
+    // which end is the front? the cab / roof / canvas sits toward the back, the low hood toward the front
+    const pts = collectGunPoints(m, holder), hiY = b.min.y + sz.y * 0.8, ai = axis === 'x' ? 0 : 2; let sum = 0, cnt = 0;
+    for (let i = 0; i < pts.length; i += 3) if (pts[i + 1] > hiY) { sum += pts[i + ai]; cnt++; }
+    const mid = axis === 'x' ? (b.min.x + b.max.x) / 2 : (b.min.z + b.max.z) / 2;
+    if (cnt && sum / cnt > mid) m.rotation.y += Math.PI;         // roof toward + → turn it round so the hood faces +
+    b = measureMeshBox(m, holder); sz = b.getSize(new THREE.Vector3());
+    const k = length / Math.max(sz.x, sz.z); holder.scale.setScalar(k);
+    const c = b.getCenter(new THREE.Vector3()); m.position.x -= c.x; m.position.z -= c.z; m.position.y -= b.min.y;
+    const meshes = [];
+    holder.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.frustumCulled = true; meshes.push(o); } });
+    for (const ch of group.children) if (ch.isMesh) ch.visible = false;   // the boxes become invisible hit shapes
+    group.add(holder); if (onMeshes) onMeshes(meshes, holder);
+  }).catch(() => {});                                            // no model = keep the boxes
+}
 function addDemoTarget(kind, id, name, x, z, r, build) {
   const g = new THREE.Group(); g.position.set(x, 0, z); levelGroup.add(g);
   const t = { kind, id, name, x, z, r, group: g, meshes: [], destroyed: false, pending: false, hard: ['door', 'wall', 'tower', 'bdoor', 'bwall'].includes(kind), props: [] };
   build(t, g, (w, h, d, mat, px, py, pz, parent = g) => box(w, h, d, mat, px, py, pz, parent));
   g.traverse(o => { if (o.isMesh) { o.userData.demoTarget = t; t.meshes.push(o); } });
+  if (kind === 'jeep') dressVehicle('jeep', g, 4.6, 'x', ms => { for (const o of ms) { o.userData.demoTarget = t; t.meshes.push(o); if (t.destroyed) o.material = demoMats.char; } });
   demoTargets.push(t); return t;
 }
 function addTargetProp(t, x, z, r) { const p = { x, z, r }; props.push(p); t.props.push(p); }
@@ -8560,7 +8779,7 @@ window.__gameLoaded = true;
 if (!debugInfo.on) document.getElementById('debugHud').style.display = 'none';
 // Handy for testing in the browser console (F12), e.g.  __game.SETTINGS.enemyDamage = 0
 window.__game = {
-  THREE, SOUNDS, sfxBuf: () => sfxBuf,
+  THREE, SOUNDS, sfxBuf: () => sfxBuf, blastFX, demoBlast, explosionAt, DEMO_AT, demoTargets: () => demoTargets, materiel: () => materiel, reloadPose, knifeModel, reloadMag, fx: () => effects.length, startReload, weaponState: () => weaponState,
   endMission: won => endGame(won),
   progress: () => ({ dev: DEV, unlockedIdx, unlocked: [0, 1, 2, 3].filter(isUnlocked) }),
   sig: () => SIG, fr: () => FR, orderCover, hjobAhead, coverOn, hawk, SIGAT, FRAT, cutJammer,

@@ -3,3 +3,19 @@ https://poly.pizza/m/Btfn3G5Xv4
 Licence: CC0 1.0 Universal (public domain) — free for commercial use, no attribution required
 (credited anyway on the game's start screen).
 In-game changes: colours re-tinted (guards green/black, SEALs tan/coyote), procedural rifle attached.
+
+==== v0.6.25 visual pass (downloaded from Poly Pizza as GLB) ====
+vehicles/humvee.glb  "Humvee" by madtrollstudio — CC-BY 3.0
+                     https://poly.pizza/m/Ebryot9iKM
+                     Used for every jeep (Camp Halyard demolition yard, final run, Sniper Lesson /
+                     Cold Horizon). Honest note: the story calls them "jeeps"; the model is an
+                     M998 Humvee-style military light vehicle. Low-poly game model, not a scan.
+vehicles/m939.glb    "M939 Truck" by J-Toastie — CC-BY 3.0
+                     https://poly.pizza/m/y8lBpvMlim
+                     Used for the cargo trucks in Sniper Lesson / Cold Horizon.
+props/knife.glb      "Knife" by Quaternius — CC0
+                     https://poly.pizza/m/N9bfPFP1hr
+                     Honest stand-in: a generic clip-point combat knife with a brown grip and
+                     serrated spine, close to a KA-BAR in shape; not a branded KA-BAR model.
+The gloved hand, the M112 C4 block, the linear door charge, the reload magazine and all explosion
+effects are drawn by the game itself (no outside assets).
