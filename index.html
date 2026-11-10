@@ -8,7 +8,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <!--
   =====================================================================
-  OPERATION: BLACK FILE  (v0.6.20 — two-finger swipe never turns the view (stops leftover inertial drift); v0.6.19 — no extra two-finger look once trackpad look works (stops coasting), try fullscreen to hide the pointer; v0.6.18 — hide iPad cursor with a transparent pointer + kill leftover swipe drift; v0.6.17 — cursor/aim: OS cursor hidden over everything in play, relative trackpad look never stalls at screen edge, no edge-turn overshoot, steadier scoped aim; v0.5.3 — trackpad aim follows 1:1 (relative movement, coalesced events, hidden cursor), scope zoom on 2-finger up/down, look sens 1.6; v0.5.2 — trackpad no longer spins the view (edge turn only while moving, on/off switch, swipe momentum limit); v0.5.1 — semi-auto pistols, lean (Tab / E), fixed freeze at the elevator on iPad; v0.5 — real 3D soldiers, zone looks + signs, compass, map (M), radio hints, dual M1911s; v0.4.6 mission select fix for iPad, free 360° turning on iPad, retuned damage, friendly markers on your squad, sniper mission, knife, Magic Keyboard controls, iPad aim/layout fix + DEBUG readout)
+  OPERATION: BLACK FILE  (v0.6.21 — navigation: the compass ◆ is always on in every mission (no more no-compass maze steps), maze exit door marked + explained (opens by itself on the timed run), more green floor arrows; real fire rates for every gun (MP5 800, M4 800, AKM 600, SCAR-H 600 rpm; realistic pistol, Barrett, CheyTac and 870 pace); v0.6.20 — two-finger swipe never turns the view (stops leftover inertial drift); v0.6.19 — no extra two-finger look once trackpad look works (stops coasting), try fullscreen to hide the pointer; v0.6.18 — hide iPad cursor with a transparent pointer + kill leftover swipe drift; v0.6.17 — cursor/aim: OS cursor hidden over everything in play, relative trackpad look never stalls at screen edge, no edge-turn overshoot, steadier scoped aim; v0.5.3 — trackpad aim follows 1:1 (relative movement, coalesced events, hidden cursor), scope zoom on 2-finger up/down, look sens 1.6; v0.5.2 — trackpad no longer spins the view (edge turn only while moving, on/off switch, swipe momentum limit); v0.5.1 — semi-auto pistols, lean (Tab / E), fixed freeze at the elevator on iPad; v0.5 — real 3D soldiers, zone looks + signs, compass, map (M), radio hints, dual M1911s; v0.4.6 mission select fix for iPad, free 360° turning on iPad, retuned damage, friendly markers on your squad, sniper mission, knife, Magic Keyboard controls, iPad aim/layout fix + DEBUG readout)
   A tiny browser first-person shooter.
   - Mission structure & spy flavour inspired by GoldenEye 007 (N64)
   - Fast, aggressive maze shooting inspired by Wolfenstein 3D
@@ -392,7 +392,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 // ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
 // ##  part failed and why.                                           ##
 // #####################################################################
-const VERSION = 'v0.6.20';
+const VERSION = 'v0.6.21';
 // v0.6.6 MISSION UNLOCKS. Order: TRAINING (0) -> BLACK FILE (1) -> SNIPER LESSON (3) -> COLD HORIZON (2).
 // A new player has only TRAINING; winning a mission unlocks the next one (saved as valkyrieUnlocked =
 // how far along that list you've got, 0-3). Developer mode (?dev=1, remembered; ?dev=0 clears it)
@@ -690,33 +690,37 @@ const HIT_ZONES = {
 //   projectile   = fires a real flying bullet with drop, wind and flight time (SECTION 16).
 //   kick = camera recoil.  length = gun model length.  sound = loudness/punch.
 //   color = metal colour, grip = grip/stock colour (hex numbers).
+// v0.6.21 REAL FIRE RATES (fireDelay = 60 / rounds-per-minute):
+//   full auto = the real gun's published cyclic rate: MP5 800 rpm (H&K) · M4 800 (published 700-950) · AKM 600 · SCAR-H 600 (published 550-650).
+//   semi-auto / manual = the fastest a trained shooter can really fire it: M1911 0.15 s · Glock 17 0.11 s · Barrett M107 0.6 s (recoil recovery)
+//   · CheyTac M200 1.3 s (work the bolt) · Remington 870 0.6 s (pump). Dual M1911s alternate, never faster than one shot per 0.1 s.
 const WEAPONS = [
-  { name: 'Colt M1911 .45', caliber: '.45 ACP', model: 'pistol', gltf: 'models/guns/m1911.glb', gltfRot: [0, Math.PI / 2, 0], magSize: 7, reserve: 35, fireDelay: 0.2, reloadTime: 1.2,
+  { name: 'Colt M1911 .45', caliber: '.45 ACP', model: 'pistol', gltf: 'models/guns/m1911.glb', gltfRot: [0, Math.PI / 2, 0], magSize: 7, reserve: 35, fireDelay: 0.15, reloadTime: 1.2,
     arcadeDamage: 55, automatic: false, spread: 0.005, zoomLevels: [55], kick: 0.018, length: 0.3, sound: 1.1,
     color: 0x8a8d90, grip: 0x5a3820, suppressed: true, canSuppress: true },
-  { name: 'Glock 17', caliber: '9mm', model: 'pistol', gltf: 'models/guns/glock.glb', gltfRot: [0, Math.PI / 2, 0], magSize: 17, reserve: 68, fireDelay: 0.14, reloadTime: 1.1,
+  { name: 'Glock 17', caliber: '9mm', model: 'pistol', gltf: 'models/guns/glock.glb', gltfRot: [0, Math.PI / 2, 0], magSize: 17, reserve: 68, fireDelay: 0.11, reloadTime: 1.1,
     arcadeDamage: 52, automatic: false, spread: 0.004, zoomLevels: [55], kick: 0.012, length: 0.3, sound: 1.0,
     color: 0x242528, grip: 0x1b1b1d, suppressed: true, canSuppress: true },
   { name: 'HK MP5', caliber: '9mm', model: 'rifle', gltf: 'models/guns/mp5.glb', gltfRot: [0, Math.PI / 2, 0], magSize: 30, reserve: 90, fireDelay: 0.075, reloadTime: 2.0,
     arcadeDamage: 51, automatic: true, spread: 0.011, zoomLevels: [50], kick: 0.007, length: 0.55, sound: 0.9,
     color: 0x2a2c2a, grip: 0x1c1d1c, suppressed: false, canSuppress: true },
-  { name: 'M4 Carbine', caliber: '5.56x45', model: 'rifle', gltf: 'models/guns/m4.glb', gltfRot: [0, -Math.PI / 2, 0], magSize: 30, reserve: 90, fireDelay: 0.085, reloadTime: 1.9,
+  { name: 'M4 Carbine', caliber: '5.56x45', model: 'rifle', gltf: 'models/guns/m4.glb', gltfRot: [0, -Math.PI / 2, 0], magSize: 30, reserve: 90, fireDelay: 0.075, reloadTime: 1.9,
     arcadeDamage: 55, automatic: true, spread: 0.007, zoomLevels: [45], kick: 0.009, length: 0.75, sound: 1.2,
     color: 0x2b2c2e, grip: 0x2b2c2e, suppressed: false, canSuppress: true },
   { name: 'AKM', caliber: '7.62x39', model: 'rifle', gltf: 'models/guns/akm.glb', gltfRot: [0, -Math.PI / 2, 0], magSize: 30, reserve: 90, fireDelay: 0.1, reloadTime: 2.1,
     arcadeDamage: 60, automatic: true, spread: 0.009, zoomLevels: [48], kick: 0.011, length: 0.8, sound: 1.3,
     color: 0x3a3a3c, grip: 0x7a4520, curvedMag: true, suppressed: false, canSuppress: true },
-  { name: 'FN SCAR-H', caliber: '7.62x51', model: 'rifle', gltf: 'models/guns/scar.glb', gltfRot: [0, Math.PI / 2, 0], magSize: 20, reserve: 60, fireDelay: 0.16, reloadTime: 2.2,
+  { name: 'FN SCAR-H', caliber: '7.62x51', model: 'rifle', gltf: 'models/guns/scar.glb', gltfRot: [0, Math.PI / 2, 0], magSize: 20, reserve: 60, fireDelay: 0.1, reloadTime: 2.2,
     arcadeDamage: 100, automatic: true, spread: 0.006, zoomLevels: [35], kick: 0.022, length: 0.85, sound: 1.6,
     color: 0xa58c60, grip: 0x2a2a2a, suppressed: false, canSuppress: true, projectile: true },
-  { name: 'Barrett M107', caliber: '.50 BMG', model: 'sniper', gltf: 'models/guns/barrett.glb', gltfRot: [0, 0, 0], magSize: 10, reserve: 30, fireDelay: 0.45, reloadTime: 2.8,
+  { name: 'Barrett M107', caliber: '.50 BMG', model: 'sniper', gltf: 'models/guns/barrett.glb', gltfRot: [0, 0, 0], magSize: 10, reserve: 30, fireDelay: 0.6, reloadTime: 2.8,
     arcadeDamage: 150, alwaysKills: true, automatic: false, spread: 0.0, zoomLevels: [8, 2.4], kick: 0.05, length: 1.15, sound: 2.0,
     color: 0x3a3d36, grip: 0x222222, scope: true, muzzleBrake: true, penetration: 1, suppressed: false, canSuppress: false, projectile: true },
   { name: 'CheyTac M200 Intervention', caliber: '.408 CheyTac', model: 'sniper', gltf: 'models/guns/cheytac.glb', gltfRot: [0, 0, 0], magSize: 7, reserve: 21, fireDelay: 1.3, reloadTime: 3.0,
     arcadeDamage: 140, alwaysKills: true, automatic: false, spread: 0.0, zoomLevels: [6, 1.6], kick: 0.045, length: 1.2, sound: 1.9,
     color: 0x4a4d40, grip: 0x30322a, scope: true, boltAction: true, suppressed: false, canSuppress: false, projectile: true },
   // v0.6: pump shotgun. 8 pellets per shot, brutal close up, weak past ~25 m. Also blows door hinges (breaching, v0.6b).
-  { name: 'Remington 870', caliber: '12 gauge', model: 'shotgun', gltf: 'models/guns/shotgun.glb', gltfRot: [0, 0, -Math.PI / 2], magSize: 6, reserve: 30, fireDelay: 0.85, reloadTime: 2.6,
+  { name: 'Remington 870', caliber: '12 gauge', model: 'shotgun', gltf: 'models/guns/shotgun.glb', gltfRot: [0, 0, -Math.PI / 2], magSize: 6, reserve: 30, fireDelay: 0.6, reloadTime: 2.6,
     arcadeDamage: 18, pellets: 8, automatic: false, spread: 0.045, zoomLevels: [55], kick: 0.06, length: 0.9, sound: 1.8,
     color: 0x2a2a2c, grip: 0x6a4424, pump: true, suppressed: false, canSuppress: false },
 ];
@@ -1072,6 +1076,23 @@ function playSample(name, vol = 1, delay = 0, rate = 1) {
     src.start(t); return true;
   } catch (err) { noteSoundError(err); return false; }
 }
+// v0.6.21: gunshots get their own voices. At full-auto rates the oldest shot's tail fades out fast
+// so the newest shot always plays (before, shots past 10 sounds were silently dropped).
+const gunVoices = [];
+function playGunSample(name, rate = 1) {
+  try {
+    const buf = sfxBuf[name];
+    if (!audioCtx || !buf) return false;
+    const now = audioCtx.currentTime;
+    while (gunVoices.length >= 6) { const o = gunVoices.shift(); try { o.g.gain.setTargetAtTime(0, now, 0.02); o.src.stop(now + 0.12); } catch (err) {} }
+    const src = audioCtx.createBufferSource(); src.buffer = buf; src.playbackRate.value = rate;
+    const g = audioCtx.createGain(); g.gain.value = 0.8;
+    src.connect(g).connect(masterGain);
+    const v = { src, g }; gunVoices.push(v);
+    src.onended = () => { const i = gunVoices.indexOf(v); if (i >= 0) gunVoices.splice(i, 1); };
+    src.start(now); return true;
+  } catch (err) { noteSoundError(err); return false; }
+}
 function gunSample(w) {
   const n = w.name;
   if (w.suppressed) return w.model === 'pistol' ? ['pistol_supp', 1] : ['smg_supp', 1];
@@ -1151,7 +1172,7 @@ const SOUNDS = {
   radio()            { playNoise(0.06, 0.12, 3000); playTone(1200, 1200, 0.05, 0.05, 'square'); },
   nvToggle(on)       { playTone(on ? 6000 : 9000, on ? 11000 : 4000, 0.35, 0.03); },
   suppressedShot()   { playTone(95, 40, 0.14, 0.55); playNoise(0.1, 0.3, 450); playTone(2400, 1900, 0.02, 0.05, 'square'); },
-  weaponShot(w)      { const g = gunSample(w); if (!g || !playSample(g[0], 1, 0, g[1])) { if (w.suppressed) SOUNDS.suppressedShot(); else SOUNDS.gunshot(w.sound); } },
+  weaponShot(w)      { const g = gunSample(w); if (!g || !playGunSample(g[0], g[1])) { if (w.suppressed) SOUNDS.suppressedShot(); else SOUNDS.gunshot(w.sound); } },
   weaponCycle(w)     { if (!playSample(w.pump ? 'pump' : 'bolt', 0.9, w.pump ? 0.25 : 0.35)) SOUNDS.bolt(); },
   weaponReload(w, time) {
     let ok;
@@ -1846,7 +1867,7 @@ function damagePlayer(amount, fromX, fromZ) {
 // ##  SECTION 8: WEAPON (gun models, shooting, reloading, damage)    ##
 // #####################################################################
 let weaponState = [];   // ammo counters, one entry per weapon
-let currentWeapon = 0, fireCooldown = 0, reloadTimer = 0, recoil = 0, flashTimer = 0, switchTimer = 0, boltTimer = 0;
+let currentWeapon = 0, fireCooldown = 0, reloadTimer = 0, recoil = 0, flashTimer = 0, switchTimer = 0, boltTimer = 0, boltDur = 0.9;
 let mouseDown = false, aiming = false, zoomStep = 0, triggerReleased = true;
 // A quick click/tap (button down AND up between two frames — common with an iPad trackpad
 // "tap to click") must still fire, so every press is remembered for a moment (see queueShot).
@@ -2379,15 +2400,15 @@ function tryShoot() {
     if (s.reserve > 0) startReload();
     return;
   }
-  s.ammo--; fireCooldown = w.fireDelay; player.shotsFired++;
+  s.ammo--; fireCooldown = w.fireDelay + (w.automatic ? Math.max(fireCooldown, -0.034) : 0); player.shotsFired++;   // v0.6.21: full auto keeps the true cyclic rate (no frame rounding)
   recoil = w.suppressed ? 0.7 : 1; flashTimer = 0.05;
   const akimbo = dualActive();
   if (akimbo) {                                    // two guns take turns: twice the rate, each gun kicks on its own
     const side = dual.force || dual.side; dual.force = 0; dual.side = -side;
-    fireCooldown = w.fireDelay * 0.5; dual.recoil[String(side)] = recoil; dual.flash[String(side)] = 0.05; recoil *= 0.3; flashTimer = 0;
+    fireCooldown = Math.max(0.1, w.fireDelay * 0.5); dual.recoil[String(side)] = recoil; dual.flash[String(side)] = 0.05; recoil *= 0.3; flashTimer = 0;
   }
   SOUNDS.weaponShot(w);
-  if (w.boltAction || w.pump) { boltTimer = 0.9; SOUNDS.weaponCycle(w); }
+  if (w.boltAction || w.pump) { boltDur = Math.min(0.9, w.fireDelay); boltTimer = boltDur; SOUNDS.weaponCycle(w); }   // v0.6.21: the pump finishes before the next shot
   trainEvent('shot', currentWeapon); if (akimbo) trainEvent('dualShot');
 
   // NOISE: who hears this shot, and how well they can tell where it came from
@@ -2676,7 +2697,7 @@ function updateWeapon(dt) {
   // Gun animation: recoil kick, walking bob, reload dip, switch raise, aim to centre.
   recoil = Math.max(0, recoil - dt * 8);
   boltTimer = Math.max(0, boltTimer - dt);
-  const bolt = boltTimer > 0 ? Math.sin((1 - boltTimer / 0.9) * Math.PI) : 0;   // bolt-action twist
+  const bolt = boltTimer > 0 ? Math.sin((1 - boltTimer / boltDur) * Math.PI) : 0;   // bolt-action twist
   const moving = Math.hypot(player.velocity.x, player.velocity.z);
   const bob = Math.sin(player.bobTime) * 0.012 * Math.min(moving / 5, 1);
   const reloadDip = reloadTimer > 0 ? Math.sin((1 - reloadTimer / w.reloadTime) * Math.PI) : 0;
@@ -6492,8 +6513,8 @@ function createGate(ch, c, r) {
   for (const y of [0.25, H - 0.25]) { const s = new THREE.Mesh(new THREE.BoxGeometry(CELL, 0.3, 0.27), trainMats.stripe); s.position.y = y; door.add(s); s.position.y = y - H / 2; }
   // Doors are named for where they lead, not the station you are in — otherwise the locker
   // door at the sniper mat says "STATION 5 ▸ LOCKED" and people try to range the target through it.
-  const GATE_DEST = { '1': '2 · LOOK', '2': '3 · COMMS', '3': '4 · RANGE', '4': '5 · SNIPER LANE', '5': '6 · WEAPONS LOCKER', '6': '7 · KNIFE', '7': '8 · GARROTE', '8': 'GRADUATION HALL', a: '9 · NAVIGATION', r: '10 · DEMOLITION', b: '10 · DEMOLITION', e: '11 · BREACHING', f: '12 · SIGNALS', g: '13 · FINAL RUN' };
-  const lbl = ch === 'k' ? 'MAGLOCK' : ch === 'q' ? 'ROOM EXIT' : 'NEXT: ' + (GATE_DEST[ch] || ch);
+  const GATE_DEST = { '1': '2 · LOOK', '2': '3 · COMMS', '3': '4 · RANGE', '4': '5 · SNIPER LANE', '5': '6 · WEAPONS LOCKER', '6': '7 · KNIFE', '7': '8 · GARROTE', '8': 'GRADUATION HALL', a: '10 · DEMOLITION', r: '10 · DEMOLITION', b: '10 · DEMOLITION', e: '11 · BREACHING', f: '12 · SIGNALS', g: '13 · FINAL RUN' };
+  const lbl = ch === 'k' ? 'MAGLOCK' : ch === 'q' ? 'ROOM EXIT' : ch === 'a' ? 'MAZE EXIT ▸ 10 · DEMOLITION' : ch === 'e' ? 'SHOOT HOUSE · NOT THE MAZE EXIT' : 'NEXT: ' + (GATE_DEST[ch] || ch);   // v0.6.21
   const sign = makeSign(lbl + ' ▸ LOCKED', 2.2, 0.4, '#200808', '#ff6060'); sign.position.set(0, 1.7 - H / 2, 0.14); door.add(sign);
   const back = makeSign(lbl, 2.2, 0.4, '#200808', '#ff6060'); back.position.set(0, 1.7 - H / 2, -0.14); back.rotation.y = Math.PI; door.add(back);
   levelGroup.add(g); wallMeshes.push(door);
@@ -6785,24 +6806,24 @@ const STATIONS = [
     ] },
   // ---- v0.6.2: Station 9 NAVIGATION (the maze) and Station 10 DEMOLITION (SECTION 21 has the kit) ----
   { id: 'nav', zone: 't_nav', gate: 'a', entry: [3, 22], name: 'NAVIGATION',
-    intro: 'The maze. Real buildings don\'t come with a yellow line on the floor. Today you learn to find your own way out.',
+    intro: 'The maze. Six short steps. The yellow ◆ on your compass stays on the whole time, and the green floor arrows always point to the EXIT. The exit door opens by itself on the last step.',
     outro: 'Out. The demolition range is through that door. Mind your eyebrows.',
     steps: [
-      { text: () => 'COMPASS — the yellow <b>◆</b> at the top of the screen points at your objective and shows how far. Walls get in the way, so pick the corridor that heads the right way. Follow it to <b>CHECKPOINT A</b> (the red barrels).',
+      { text: () => 'COMPASS — look at the top of the screen. The yellow <b>◆</b> points to <b>CHECKPOINT A</b> (the red barrels) and shows how far. Turn until the ◆ is in the middle, then walk. If a wall is in the way, take the corridor that heads toward the ◆. The yellow ring on the floor marks the spot.',
         at: NAV.A, label: 'CHECKPOINT A', check: () => nearP(NAV.A, 2.4), say: 'Checkpoint A. The compass gives you the direction; the corridors get a vote too.' },
-      { text: () => `MAP — ${K('map')} shows everywhere you've been (the game pauses), so you never try the same dead end twice. ${K('map')} again or ${tapWord()} to close it.`,
+      { text: () => `MAP — press ${K('map')} to open the map. It shows everywhere you've been (the game pauses), so you never try the same dead end twice. Press ${K('map')} again or ${tapWord()} to close it.`,
         check: () => ev('mapOpen') > 0 && state === 'playing' },
-      { text: () => 'SIGNS & LANDMARKS — no ◆ this time. Find the <b>GREEN LAMP</b> (a post with a glowing green globe). At every junction a <b>green arrow</b> on the floor points toward the exit — the lamp is on that route.',
-        at: NAV.lamp, label: 'GREEN LAMP', noCompass: true, noRing: true, check: () => nearP(NAV.lamp, 2.6), say: 'Green lamp. Landmarks: notice them on the way in, use them on the way out.' },
-      { text: () => `TEAMMATE HINT — lost? Ask HAWK: ${K('radio')}. He'll tell you which way to head and how far it is.`, radio: true, check: () => ev('radio') > 0, after: () => navHint(NAV.exit) },
-      { text: S => `WAYPOINT — ${K('waypoint')} puts a tall <b>BLUE</b> light over your objective that you can see through walls. Turn it on, find it, then turn it off. ${S.on ? '✔ on ' : ''}${S.on && !waypoint.on ? '✔ off' : ''}`,
-        at: NAV.exit, label: 'EXIT', noCompass: true, noRing: true, start: S => { S.on = 0; }, tick: S => { if (waypoint.on) S.on = 1; }, check: S => S.on && !waypoint.on,
+      { text: () => 'LANDMARKS — follow the <b>◆</b> to the <b>GREEN LAMP</b> (a tall post with a glowing green ball on top). Remember things like that on the way in; they help you find your way back.',
+        at: NAV.lamp, label: 'GREEN LAMP', check: () => nearP(NAV.lamp, 2.6), say: 'Green lamp. Landmarks: notice them on the way in, use them on the way out.' },
+      { text: () => `TEAMMATE HINT — lost? Ask HAWK: press ${K('radio')}. He'll tell you which way to head and how far it is.`, radio: true, check: () => ev('radio') > 0, after: () => navHint(NAV.exit) },
+      { text: S => `WAYPOINT — press ${K('waypoint')}: a tall <b>BLUE</b> light appears over the <b>EXIT</b> door (you can see it through walls). Look for it, then press ${K('waypoint')} again to turn it off. ${S.on ? '✔ on ' : ''}${S.on && !waypoint.on ? '✔ off' : ''}`,
+        at: NAV.exit, label: 'EXIT', start: S => { S.on = 0; }, tick: S => { if (waypoint.on) S.on = 1; }, check: S => S.on && !waypoint.on,
         say: 'Handy. Also handy for anyone watching for a big blue light. Use it when you\'re properly lost.' },
-      { text: S => `TIMED RUN — back to the start. Find the <b>EXIT</b> door on the east side in <b>${Math.max(0, Math.ceil(S.left))} s</b>. No ◆ (the waypoint still works if you're desperate): green arrows, landmarks, map.${S.tries ? ' · attempt ' + (S.tries + 1) : ''}`,
-        at: NAV.exit, label: 'EXIT', noCompass: true, noRing: true,
+      { text: S => `TIMED RUN (last step) — you're back at the maze start. Get to the green <b>EXIT</b> door on the east side in <b>${Math.max(0, Math.ceil(S.left))} s</b>. Follow the yellow <b>◆</b> and the green floor arrows. The door opens by itself the moment you reach it — no key needed.${S.tries ? ' · attempt ' + (S.tries + 1) : ''}`,
+        at: NAV.exit, label: 'EXIT',
         start: S => { S.left = SETTINGS.navTime; S.tries = 0; waypoint.on = false; teleportTo(...NAV.entry); },
-        tick: (S, dt) => { S.left -= dt; if (S.left <= 0) { S.tries++; S.left = SETTINGS.navTime; teleportTo(...NAV.entry); radioSay('CHIEF', 'Time. Back to the start. Again. The arrows are green for a reason.', 5); } },
-        check: () => nearP(NAV.exit, 2.6), after: () => radioSay('CHIEF', `Out in ${Math.round(SETTINGS.navTime - TRAIN.S.left)} seconds${waypoint.on ? ', with the waypoint on. Cheeky' : ''}.`, 5) },
+        tick: (S, dt) => { S.left -= dt; if (S.left <= 0) { S.tries++; S.left = SETTINGS.navTime; teleportTo(...NAV.entry); radioSay('CHIEF', 'Time. Back to the start. Again. Follow the ◆ and the green arrows.', 5); } },
+        check: () => nearP(NAV.exit, 2.6), after: () => { showMessage('EXIT DOOR OPEN — walk through to DEMOLITION', 3); radioSay('CHIEF', `Out in ${Math.round(SETTINGS.navTime - TRAIN.S.left)} seconds${waypoint.on ? ', with the waypoint on. Cheeky' : ''}. Door\'s open.`, 5); } },
     ] },
   { id: 'demo', zone: 't_demo', gate: 'rb', entry: [28, 30], name: 'DEMOLITION',
     intro: 'Demolition. You carry plastic explosive — C4 — a remote clacker and timed fuses. C4 is very stable until it very much isn\'t. Count your fingers now, for comparison.',
@@ -7004,10 +7025,28 @@ function trainingObjective() {
   const s = curStation();
   if (!s) return exitZone ? { x: exitZone.x, z: exitZone.z, label: 'GRADUATION' } : null;
   if (!TRAIN.begun) { const p = TP(...s.entry); return { x: p.x, z: p.z, label: 'STATION ' + (TRAIN.i + 1) }; }
-  const st = curStep(); if (!st || !st.at) return null;
-  if (st.noCompass && !waypoint.on) return null;                 // v0.6.2 maze: find it yourself (unless the waypoint is on)
-  const p = typeof st.at === 'function' ? st.at(TRAIN.S) : st.at;
-  return p ? { x: p.x, z: p.z, label: st.label || 'MARKER' } : null;
+  return guideObjective('MARKER');                               // v0.6.21: the ◆ is always on (no more no-compass steps)
+}
+// v0.6.21: where the compass ◆ points. The current step's spot; if this step has none (map, radio, pause...),
+// the next step's spot; then this station's exit door; then the next station. Never hidden.
+function stepSpot(st, S) {
+  if (!st || !st.at) return null;
+  try { const p = typeof st.at === 'function' ? st.at(S) : st.at; return p && isFinite(p.x) && isFinite(p.z) ? p : null; } catch (err) { return null; }
+}
+function guideObjective(defLabel) {
+  if (!TRAIN) return null;
+  const list = ST();
+  for (let i = TRAIN.i; i < list.length; i++) {
+    const s = list[i];
+    if (i > TRAIN.i && currentMission === 0) { const p = TP(...s.entry); return { x: p.x, z: p.z, label: 'STATION ' + (i + 1) }; }
+    const from = i === TRAIN.i && TRAIN.begun ? TRAIN.step : 0;
+    for (let k = from; k < s.steps.length; k++) {
+      const st = s.steps[k], p = stepSpot(st, i === TRAIN.i && k === TRAIN.step ? TRAIN.S : {});
+      if (p) return { x: p.x, z: p.z, label: (k === from ? '' : 'NEXT: ') + (st.label || defLabel) };
+    }
+    if (currentMission === 0 && s.gate && trainGates[s.gate[0]]) { const g = trainGates[s.gate[0]], p = TP(g.c, g.r); return { x: p.x, z: p.z, label: 'NEXT DOOR' }; }
+  }
+  return null;
 }
 function radioPressed() {
   noteInput('radio');
@@ -7053,7 +7092,26 @@ function updateTraining(dt) {
     showMessage({ jump: 'Hurdle — jump over it: ', crouch: 'Too low to walk under — crouch: ', prone: 'Crawl net — go prone: ' }[obstacleBlocked.need] + plain(K(obstacleBlocked.need)), 2);
   }
   obstacleBlocked = null;
+  lockedDoorHint();
   updateTrainBox();
+}
+// v0.6.21: bump into a locked station door -> say why it's shut and what opens it.
+let lockedDoorAt = -1e9;
+function lockedDoorHint() {
+  if (currentMission !== 0 || elapsed - lockedDoorAt < 4) return;
+  const s = curStation();
+  for (const [ch, g] of Object.entries(trainGates)) {
+    if (g.open) continue;
+    const p = TP(g.c, g.r); if (dist2D(camera.position.x, camera.position.z, p.x, p.z) > 4.3) continue;
+    lockedDoorAt = elapsed;
+    if (s && s.id === 'nav' && ch === 'a') {
+      const n = s.steps.length;
+      showMessage(TRAIN.begun && TRAIN.step === n - 1 ? 'EXIT — keep coming, it opens when you reach it.' : `MAZE EXIT — locked until the last step (step ${n}, the timed run). It opens by itself then. You're on step ${TRAIN.begun ? TRAIN.step + 1 : 1} of ${n} — read the box at the top.`, 4);
+    } else if (ch === 'k' || ch === 'q') showMessage('LOCKED — it opens when you finish the step in the box at the top.', 3);
+    else if (s && s.gate && s.gate.includes(ch)) showMessage(`LOCKED — opens by itself when you finish ${s.name}. Read the box at the top for the next step.`, 3.5);
+    else showMessage('LOCKED — not this door yet. Follow the yellow ◆ on the compass.', 3);
+    return;
+  }
 }
 function updateTrainBox() {
   const el = $('trainBox'), now = performance.now();
@@ -7069,7 +7127,8 @@ function updateTrainBox() {
   }
   if (!s) html = '<b>GRADUATION</b><br>All stations done. Walk onto the green pad (follow the ◆).';
   else if (!st) html = `<b>NEXT: STATION ${TRAIN.i + 1} · ${s.name}</b><br>Follow the ◆ on the compass and the yellow floor arrows.`;
-  else html = `<b>STATION ${TRAIN.i + 1}/${STATIONS.length} · ${s.name}</b> &nbsp; <span class="tstep">step ${TRAIN.step + 1}/${s.steps.length}</span><br>${st.text(TRAIN.S)}`;
+  else html = `<b>STATION ${TRAIN.i + 1}/${STATIONS.length} · ${s.name}</b> &nbsp; <span class="tstep">step ${TRAIN.step + 1}/${s.steps.length}</span><br>${st.text(TRAIN.S)}`
+    + (s.id === 'nav' && TRAIN.step < s.steps.length - 1 ? '<div class="tsmall">The EXIT door stays shut until the last step (the timed run); then it opens by itself.</div>' : '');
   html += `<div class="tsmall">${K('radio')} = CHIEF repeats${DEV ? ' · ' + K('skip') + ' = skip this station (dev)' : ''}</div>`;
   if (html !== TRAIN.boxHTML) { el.innerHTML = html; TRAIN.boxHTML = html; }
 }
@@ -7565,11 +7624,15 @@ function buildDemoRange() {
 // ---- The maze (mission 0): floor arrows at junctions, two landmarks, an entry board ----
 function buildMaze() {
   const toExit = gridDistances(26, 30), geo = new THREE.PlaneGeometry(1.4, 1.4); geo.rotateX(-Math.PI / 2);
+  const mainRoute = new Set();                                    // v0.6.21: every square on the shortest way from the start to the exit
+  { let [c, r] = NAV.entry, k = toExit[r * worldCols + c], guard = 0;
+    while (k > 0 && guard++ < 400) { mainRoute.add(r * worldCols + c); const nx = [[1, 0], [-1, 0], [0, 1], [0, -1]].find(([dc, dr]) => toExit[(r + dr) * worldCols + c + dc] === k - 1); if (!nx) break; c += nx[0]; r += nx[1]; k--; } }
   const mat = new THREE.MeshStandardMaterial({ map: arrowTextureGo, transparent: true, depthWrite: false, roughness: 0.8, emissive: 0x003311, color: 0x60ff90, polygonOffset: true, polygonOffsetFactor: -2 });
   for (let r = 22; r <= 32; r++) for (let c = 1; c <= 26; c++) {
     const k = toExit[r * worldCols + c]; if (k <= 0) continue;
     const open = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dc, dr]) => !isWall(c + dc, r + dr) && zoneAt(c + dc, r + dr).id === 't_nav');
-    if (open.length < 3 && !(c === NAV.entry[0] && r === NAV.entry[1])) continue;
+    const corner = open.length === 2 && open[0][0] !== -open[1][0] && open[0][1] !== -open[1][1];
+    if (open.length < 3 && !corner && !mainRoute.has(r * worldCols + c) && !(c === NAV.entry[0] && r === NAV.entry[1])) continue;   // v0.6.21: junctions, corners and the whole main route
     const next = open.find(([dc, dr]) => toExit[(r + dr) * worldCols + c + dc] === k - 1); if (!next) continue;
     const a = new THREE.Mesh(geo, mat); a.position.set(c * CELL + CELL / 2, 0.013, r * CELL + CELL / 2); a.rotation.y = Math.atan2(-next[0], -next[1]); levelGroup.add(a);
   }
@@ -7582,6 +7645,12 @@ function buildMaze() {
   addTrainSign('◀ CHECKPOINT A', 8, 28, 8, 27, 2.3, 2.0, 0.4, '#2a0808', '#ff8080');
   addTrainSign('EXIT ▶ DEMOLITION', 26, 30, 26, 29, 2.4, 2.4, 0.4, '#04200a', '#60ff80');
   addTrainSign('DEMOLITION RANGE · CHARGES LIVE · EARS ON', 28, 30, 27, 30, 2.5, 3.6, 0.5, '#2a0e06', '#ffa040');
+  // v0.6.21: a glowing green frame round the maze EXIT door, and floor signs that say how it opens
+  { const glow = new THREE.MeshBasicMaterial({ color: 0x40ff70 }), x = 27 * CELL - 0.06, zc = 30 * CELL + CELL / 2, H = SETTINGS.wallHeight;
+    for (const sz of [-1, 1]) box(0.1, H, 0.18, glow, x, H / 2, zc + sz * (CELL / 2 - 0.09), levelGroup);
+    box(0.1, 0.18, CELL, glow, x, H - 0.09, zc, levelGroup); }
+  for (const [txt, c, r] of [['EXIT ▶  opens by itself on the timed run', 26, 30], ['START · follow the ◆ and the green arrows', NAV.entry[0], NAV.entry[1]]]) {
+    const fs = makeSign(txt, 3.4, 0.5, '#04200a', '#60ff80'); fs.position.set(c * CELL + CELL / 2, 0.03, r * CELL + CELL / 2); fs.rotation.set(-Math.PI / 2, 0, c === 26 ? -Math.PI / 2 : Math.PI); /* reads the right way up as you walk in */ levelGroup.add(fs); }
 }
 function navHint(target) {
   const [sc, sr] = cellOf(camera.position.x, camera.position.z), [tc, tr] = cellOf(target.x, target.z);
@@ -8289,11 +8358,7 @@ const LESSON = [
         }, check: S => S.h300 && S.h800 && S.h1200 },
     ] },
 ];
-function lessonObjective() {
-  const st = curStep(); if (!st || !st.at) return null;
-  const p = typeof st.at === 'function' ? st.at(TRAIN.S) : st.at;
-  return p ? { x: p.x, z: p.z, label: st.label || 'TARGET' } : null;
-}
+function lessonObjective() { return guideObjective('TARGET'); }   // v0.6.21: always points somewhere
 
 loadFigures();
 // Build the level once so it shows behind the briefing screen, then start the loop.
