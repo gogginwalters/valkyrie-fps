@@ -41,3 +41,25 @@ pistol_slide.mp3 "Glock 19 Handgun Pistol Slide Cocking Sounds" by jackthemurray
 pump.mp3       "Pump Action Shotgun Cycle" by Zott820 https://freesound.org/s/370344/
 bolt.mp3       "Mosin Nagant Bolt Action Cycle" by Zott820 https://freesound.org/s/370345/
 dry.mp3        "Dry Fire" by brianhanson2nd https://freesound.org/s/171211/
+
+==== v0.6.24 audio pass (all CC0 1.0 from Freesound; trimmed, combined, loudness-set) ====
+Loudness: every gunshot file is now level-matched to a real-gun ladder (Barrett/CheyTac loudest,
+then 870, SCAR-H, AKM, M4, M1911, MP5, Glock; suppressed shots about 14 dB below the open guns).
+glock_supp.mp3  "SIG Sauer P226 (Suppressed)" by areniporgen — a real suppressed 9x19mm pistol
+                (honest stand-in: a P226, same 9mm round as the Glock 17). https://freesound.org/s/828790/
+pistol_supp.mp3 (M1911 suppressed) unchanged source, re-levelled: Clutvh https://freesound.org/s/627087/
+rl_m4.mp3       M4 reload, built from real AR-15 recordings:
+                mag out + mag seated: "AR15 Various Sounds" by wadaltmon https://freesound.org/s/263513/
+                charging handle: "AR15 chambering 2.aif" by ceremonialchapstick https://freesound.org/s/142893/
+                (also used for the SCAR-H as an honest stand-in: same AR-style mag + charging pull)
+rl_akm.mp3      AKM reload: mag out/in "AK-47 Assault Rifle being unloaded and reloaded" by serøutōnin--deprivəd
+                (made from airsoft replicas, honest stand-in) https://freesound.org/s/674742/
+                charging handle: "AK47 chambering.aif" by ceremonialchapstick (real Romanian AK) https://freesound.org/s/142892/
+rl_glock.mp3    "Glock17_Magazine" by Stoniac (real Glock 17 mag out/in) https://freesound.org/s/842729/
+                + slide: "Glock 19 Handgun Pistol Slide Cocking Sounds" by jackthemurray https://freesound.org/s/393734/
+shell_in.mp3    "Loading Shotgun.wav" by Dentrabert (one shell) https://freesound.org/s/673317/
+garrote_wire.mp3  "String tightens and whips.wav" by romeoplank https://freesound.org/s/337668/
+garrote_choke.mp3 "Being Strangled" by Mutcholoko (acted, for a short film) https://freesound.org/s/501148/
+body_fall.mp3     "Body fall.wav" by DylanTheFish https://freesound.org/s/417994/
+explosion.mp3     "Explosion, Medium Blast" by Kinoton https://freesound.org/s/516914/
+Enemy rifle fire now reuses the akm / m4 recordings above.
