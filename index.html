@@ -230,6 +230,7 @@
       <label id="m4Card"><input type="radio" name="mission" value="4"><b>MISSION 03 — HALO INSERTION</b><br>Night HALO jump from 25,000 ft with HAWK and DOC, then a quiet raid.</label>
       <label id="m5Card"><input type="radio" name="mission" value="5"><b>MISSION 04 — THE DAM</b><br>Alpine arch dam. Checkpoint, crest, control room, powerhouse. Leave by bungee.</label>
       <label id="m6Card"><input type="radio" name="mission" value="6"><b>MISSION 05 — THE CONDUCTOR'S TRAIN</b><br>Drop onto an armoured train in the Alps. Car by car to the vault and the cab.</label>
+      <label id="m7Card"><input type="radio" name="mission" value="7"><b>MISSION 06 — PORT RAID</b><br>Night raid on a cargo ship in Rotterdam with HAWK and DOC at your side.</label>
     </div>
     <button class="startBtn" id="startBtn">▶ CLICK OR TAP TO BEGIN MISSION</button>
     <div id="briefText"></div>
@@ -408,12 +409,12 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 // ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
 // ##  part failed and why.                                           ##
 // #####################################################################
-const VERSION = 'v0.6.30';
+const VERSION = 'v0.6.31';
 // v0.6.6 MISSION UNLOCKS. Order: TRAINING (0) -> BLACK FILE (1) -> SNIPER LESSON (3) -> COLD HORIZON (2).
 // A new player has only TRAINING; winning a mission unlocks the next one (saved as valkyrieUnlocked =
 // how far along that list you've got, 0-3). Developer mode (?dev=1, remembered; ?dev=0 clears it)
 // unlocks everything and turns the skips back on.
-const MISSION_ORDER = [0, 1, 3, 2, 4, 5, 6];   // v0.6.30: 6 = THE CONDUCTOR'S TRAIN   // v0.6.29: 5 = THE DAM (after HALO)   // v0.6.27: 4 = HALO INSERTION (after Cold Horizon)
+const MISSION_ORDER = [0, 1, 3, 2, 4, 5, 6, 7];   // v0.6.31: 7 = PORT RAID   // v0.6.30: 6 = THE CONDUCTOR'S TRAIN   // v0.6.29: 5 = THE DAM (after HALO)   // v0.6.27: 4 = HALO INSERTION (after Cold Horizon)
 let DEV = false, unlockedIdx = 0;
 try {
   const dv = [...location.search.matchAll(/[?&]dev=([01])/gi)].pop();
@@ -665,6 +666,8 @@ const MISSION_OVERRIDES = {
   // v0.6.27 HALO: night raid on the airfield from Cold Horizon. Guards see less in the dark; HAWK and DOC join you on landing.
   // v0.6.29 THE DAM: daylight, fast close fights inside; HAWK and DOC on the radio only
   // v0.6.30 THE TRAIN: close quarters, car by car
+  // v0.6.31 PORT RAID: night, short sight lines in the stacks; HAWK + DOC are on screen (made by the mission itself)
+  7: { enemySightRange: 45, enemyHearingRange: 80, enemyAttackRange: 40, enemyAccuracy: 0.28, silencedAlertRadius: 12, alertShoutRadius: 30, searchDuration: 30, killWitnessRange: 35, bodySightRange: 25, teammates: 0 },
   6: { enemySightRange: 70, enemyHearingRange: 110, enemyAttackRange: 55, enemyAccuracy: 0.3, silencedAlertRadius: 14, alertShoutRadius: 30, searchDuration: 25, killWitnessRange: 40, bodySightRange: 30, teammates: 0 },
   5: { enemySightRange: 230, enemyHearingRange: 320, enemyAttackRange: 200, enemyAccuracy: 0.32, silencedAlertRadius: 22, alertShoutRadius: 35, searchDuration: 30, killWitnessRange: 70, bodySightRange: 55, teammates: 0 },
   4: { enemySightRange: 150, enemyHearingRange: 260, enemyAttackRange: 220, enemyAccuracy: 0.3, silencedAlertRadius: 25,
@@ -811,6 +814,13 @@ const KNIFE_QUIPS = [
 //   8. Depot demolition — plant charges on a fuel/ammo depot, exfil before the blast.
 //   9. Final showdown  — corner The Conductor (and maybe unmask The Patron).
 const BRIEFINGS = {
+  7: `<p><b>Wraith,</b> the Conductor's ledger names a ship: the <b>MV Nordstern</b>, berthed tonight at a container terminal on the Maasvlakte, Rotterdam. She's carrying THE PATRON's shipment — and her <b>manifest</b> says where it's going.</p>
+    <ul><li><b>Container yard:</b> the stacks are a maze. Get through to the quay. A <b>sniper on crane 2</b> covers it — take him out.</li>
+    <li><b>Board</b> by the gangway. <b>Hatch ▼</b> on deck = the holds: <b>photograph the shipment</b> (hold 2), then <b>C4</b> on the 2 charge points in the engine room (<b>B</b> plant, <b>Y</b> fire — stand back).</li>
+    <li><b>Bridge ▲</b> (door in the white superstructure): take the <b>manifest</b>.</li>
+    <li><b>Exfil:</b> back down the gangway to the <b>RHIB</b> past the stern.</li>
+    <li><b>Bonus:</b> reach the ship without raising the alarm; free the informant tied up in hold 1.</li></ul>
+    <p style="color:#9a9"><b>HAWK and DOC are with you</b> — they follow, stack on the bridge door, and shoot anyone who's shooting. It's night: <b>N</b> = night vision, <b>L</b> = IR laser. Follow the yellow ◆; <b>O</b> = hint.</p>`,
   6: `<p><b>Wraith,</b> the Dam gave us his timetable. Today THE CONDUCTOR rides his own armoured train over the Arlberg line — tunnels, snow, and the Trisanna viaduct, 85 m above the river. Somewhere aboard is his <b>ledger</b>: who pays him, and who he pays. We think it's <b>THE PATRON</b>.</p>
     <ul><li><b>Board:</b> drop from a road bridge onto the flatcar (automatic).</li>
     <li><b>Sleeper car:</b> find the <b>vault combination</b>. <b>Cargo car:</b> open the vault, take the <b>ledger</b>.</li>
@@ -1451,6 +1461,7 @@ function buildLevel() { buildLevel_(); safe('graphics', () => applyGraphics()); 
 function buildLevel_() {
   DAM.on = false; DAM.jump = null;   // v0.6.29
   RAIL.on = false; RAIL.seq = null; RAIL.roof = false;   // v0.6.30
+  PORT.on = false; PORT.boat = null;   // v0.6.31
   if (levelGroup) { scene.remove(levelGroup); levelGroup.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
   worldSun = null;
   levelGroup = new THREE.Group(); scene.add(levelGroup);
@@ -4392,6 +4403,7 @@ function createPickup(x, z, type) {
 // v0.6.22: why the exit is still shut, and what to do (all levels).
 function exitLockedText() {
   if (currentMission === 0 || currentMission === 3) { const n = TRAIN ? TRAIN.done.filter(d => !d).length : 0; return `GRADUATION LOCKED — ${n} station${n === 1 ? '' : 's'} still to do. Follow the yellow ◆ to the next one.`; }
+  if (currentMission === 7) { const left = portObjectives().filter(o => !o.done && !o.bonus).length; return `RHIB LOCKED — ${left} objective${left === 1 ? '' : 's'} left (top left). Follow the yellow ◆.`; }
   if (currentMission === 6) { const left = railObjectives().filter(o => !o.done && !o.bonus).length; return `EXFIL LOCKED — ${left} objective${left === 1 ? '' : 's'} left (top left). Follow the yellow ◆.`; }
   if (currentMission === 5) { const left = damObjectives().filter(o => !o.done && !o.bonus).length; return `BUNGEE LOCKED — ${left} objective${left === 1 ? '' : 's'} left (top left). Follow the yellow ◆.`; }
   if (currentMission === 4) { const left = haloObjectives().filter(o => !o.done && !o.bonus).length; return `EXFIL NOT READY — ${left} objective${left === 1 ? '' : 's'} left (top left). Follow the yellow ◆.`; }
@@ -4448,7 +4460,7 @@ function updateObjectives(dt, time) {
     }
     exitZone.beamMat.opacity = 0.12 + Math.sin(time * 4) * 0.05;
     const exD = Math.hypot(exitZone.x - px, exitZone.z - pz);
-    if (exD < exitZone.radius && exitZone.unlocked) { if (currentMission === 6) railTryJump(); else if (currentMission === 5) damStartJump(); else endGame(true); }
+    if (exD < exitZone.radius && exitZone.unlocked) { if (currentMission === 7) portStartBoat(); else if (currentMission === 6) railTryJump(); else if (currentMission === 5) damStartJump(); else endGame(true); }
     else if (!exitZone.unlocked && exD < (heightField ? 30 : CELL * 2) && time - exitZone.warned > 4) { exitZone.warned = time; showMessage(exitLockedText(), 3.5); }   // v0.6.22: says why, from a few steps away
     if (exitZone.statusSign && exitZone.statusOpen !== exitZone.unlocked) setExitStatusSign(exitZone.unlocked);
   }
@@ -4576,6 +4588,9 @@ function updateHUD(dt) {
   else if (currentMission === 2) {
     for (const o of sniperObjectives()) html += `<div class="${o.done ? 'done' : ''}">${o.done ? '☑' : '☐'} ${o.text}</div>`;
     html += `<div class="${ready ? '' : 'locked'}">${ready ? '☐ Exfil to the LZ behind the ridge' : '🔒 Exfil LZ (finish the list first)'}</div>`;
+  } else if (currentMission === 7) {
+    for (const o of portObjectives()) html += `<div class="${o.done ? 'done' : ''}">${o.done ? '☑' : '☐'} ${o.text}</div>`;
+    html += `<div class="${ready ? '' : 'locked'}">${ready ? '☐ Exfil: the RHIB at the quay, past the stern' : '🔒 Exfil (finish the list first)'}</div>`;
   } else if (currentMission === 6) {
     for (const o of railObjectives()) html += `<div class="${o.done ? 'done' : ''}">${o.done ? '☑' : '☐'} ${o.text}</div>`;
     html += `<div class="${ready ? '' : 'locked'}">${ready ? '☐ Exfil: front platform — JUMP over a viaduct' : '🔒 Exfil (finish the list first)'}</div>`;
@@ -4901,6 +4916,9 @@ function updateTouchLayer() {
 // #####################################################################
 let currentMission = 1;                 // 1 = Black File (indoor), 2 = Cold Horizon (sniper)
 const M2_WORLD = { size: 4000, center: { x: 2000, z: 2000 }, waterLevel: -3 };
+// v0.6.31 PORT RAID state (SECTION 29): yard + quay + ship (deck 10 m, bridge 22 m, holds 1.2 m)
+const PORT = { on: false, level: 'A', boat: null, deckY: 10, bridgeY: 22, belowY: 1.2, sc0: 470, sr0: 502, gc: 480, qr: 500,
+  land: { c0: 440, c1: 520, r0: 452, r1: 499 }, yard: { c0: 446, c1: 506, r0: 456, r1: 491 }, cranes: [478, 498], start: { c: 442, r: 474 }, exit: { c: 513, r: 499 }, grids: {}, lift: { armed: true }, said: {} };
 // v0.6.30 THE CONDUCTOR'S TRAIN state (SECTION 28). The train stands still; the Alps roll past.
 const RAIL = { on: false, seq: null, roof: false, deck: 1.3, roofH: 3.66, speed: 22, r0: 500, c0: 470, cars: [], tiles: [], said: {} };
 // v0.6.29 THE DAM state (the mission itself is SECTION 27)
@@ -4973,7 +4991,7 @@ function smooth(a, b, x) { const t = Math.min(1, Math.max(0, (x - a) / (b - a)))
 // v0.6.27: on the HALO mission a meadow north-west of the compound is levelled out as the LZ.
 function terrainHeight(x, z) {
   if (currentMission === 5) return damTerrain(x, z);
-  if (currentMission === 6) return 0;
+  if (currentMission === 6 || currentMission === 7) return 0;
   let h = terrainHeight0(x, z);
   if (currentMission === 4) { const L = haloLZ(), hl = terrainHeight0(L.x, L.z), f = smooth(150, 80, Math.hypot(x - L.x, z - L.z)); h += (hl - h) * f; }
   return h;
@@ -5001,7 +5019,8 @@ function terrainHeight0(x, z) {
 let heightField = null;
 function groundAt(x, z) {
   if (DAM.on) { const o = damGround(x, z); if (o !== null) return o; }
-  if (RAIL.on) { const o = railGround(x, z); if (o !== null) return o; }   // v0.6.30: the train deck   // v0.6.29: crest walkway + powerhouse floor
+  if (RAIL.on) { const o = railGround(x, z); if (o !== null) return o; }
+  if (PORT.on) { const o = portGround(x, z); if (o !== null) return o; }   // v0.6.31: ship deck / bridge / holds   // v0.6.30: the train deck   // v0.6.29: crest walkway + powerhouse floor
   return groundAt0(x, z);
 }
 function groundAt0(x, z) {
@@ -5049,7 +5068,8 @@ const asphaltTexture = makeCanvasTexture(256, (ctx, s) => {
 // ---- Build the whole outdoor mission ----
 let sniperLights = [], sniperLamps = [], sniperWater = null, materiel = [], sniperState = null;
 function buildSniperMission() {
-  DAM.on = false; RAIL.on = false;
+  DAM.on = false; RAIL.on = false; PORT.on = false;
+  if (currentMission === 7) return buildPortMission();   // v0.6.31 (SECTION 29)
   if (currentMission === 6) return buildRailMission();   // v0.6.30 (SECTION 28)
   if (currentMission === 5) return buildDamMission();   // v0.6.29 (SECTION 27)
   const Q = SETTINGS.graphicsQuality === 'high';
@@ -5618,6 +5638,7 @@ function objectivesComplete() {
   if (currentMission === 4) return haloObjectives().every(o => o.done || o.bonus);
   if (currentMission === 5) return damObjectives().every(o => o.done || o.bonus);
   if (currentMission === 6) return railObjectives().every(o => o.done || o.bonus);
+  if (currentMission === 7) return portObjectives().every(o => o.done || o.bonus);
   return intelItems.every(i => i.collected);
 }
 // Distance written nicely: "1,243 m"
@@ -6404,6 +6425,7 @@ function currentObjective() {
   if (currentMission === 4) return haloObjective();
   if (currentMission === 5) return damObjective();
   if (currentMission === 6) return railObjective();
+  if (currentMission === 7) return portObjective();
   if (currentMission === 1) {
     const left = intelItems.filter(i => !i.collected);
     if (left.length) {
@@ -6667,7 +6689,7 @@ function applyMission(m) {
   SETTINGS.graphicsQuality = $('optQuality').value;
   if (m === 3) SETTINGS.nightOps = false;                              // the lesson is always in daylight
   if (m === 4) SETTINGS.nightOps = true;
-  if (m >= 5) SETTINGS.nightOps = false;                              // v0.6.29: the dam is a daylight job                               // v0.6.27: HALO is always a night jump
+  if (m >= 5) SETTINGS.nightOps = m === 7;   // v0.6.31: the port raid is at night                              // v0.6.29: the dam is a daylight job                               // v0.6.27: HALO is always a night jump
   if (m !== 4 && typeof haloOff === 'function') haloOff();
   const outdoors = m >= 2, high = SETTINGS.graphicsQuality === 'high';
   if (!GFX_LEVELS[SETTINGS.graphicsQuality]) SETTINGS.graphicsQuality = autoGfx();
@@ -6677,16 +6699,16 @@ function applyMission(m) {
   document.querySelectorAll('.equiponly').forEach(el => (el.style.display = m === 0 || m === 1 || m >= 4 ? 'flex' : 'none'));   // v0.6.2 demolition kit + waypoint
   document.querySelectorAll('.trainonly').forEach(el => (el.style.display = (m === 0 || (m === 3 && el.id === 'tSkip')) && (el.id !== 'tSkip' || DEV) ? 'flex' : 'none'));   // v0.6.6: SKIP button only in dev mode
   $('trainBox').style.display = m === 0 || m === 3 ? 'block' : 'none';
-  for (const k of [0, 1, 2, 3, 4, 5, 6]) $('m' + k + 'Card').classList.toggle('sel', missionPicked && m === k);
+  for (const k of [0, 1, 2, 3, 4, 5, 6, 7]) $('m' + k + 'Card').classList.toggle('sel', missionPicked && m === k);
   $('briefText').innerHTML = BRIEFINGS[m];
 }
 // v0.4.6 (iPad fix): the chosen mission lives in a variable, not only in the radio button,
 // because on some iPads tapping the mission card never ticked its radio (always Mission 1).
 let chosenMission = 1, missionPicked = true;   // v0.6.5: false = plain link for a returning player: pick a card first
-const MISSION_NAMES = { 0: 'CAMP HALYARD', 1: 'BLACK FILE', 2: 'COLD HORIZON', 3: 'SNIPER LESSON', 4: 'HALO INSERTION', 5: 'THE DAM', 6: 'THE CONDUCTOR\'S TRAIN' };
+const MISSION_NAMES = { 0: 'CAMP HALYARD', 1: 'BLACK FILE', 2: 'COLD HORIZON', 3: 'SNIPER LESSON', 4: 'HALO INSERTION', 5: 'THE DAM', 6: 'THE CONDUCTOR\'S TRAIN', 7: 'PORT RAID' };
 function selectedMission() { return chosenMission; }
 function chooseMission(m, rebuild = true) {
-  m = m === 2 || m === 0 || m === 3 || m === 4 || m === 5 || m === 6 ? m : 1;
+  m = m === 2 || m === 0 || m === 3 || m === 4 || m === 5 || m === 6 || m === 7 ? m : 1;
   if (!isUnlocked(m)) { showLockNote(lockReason(m)); noteInput('locked mission ' + m); showPicked(); return; }   // v0.6.6
   const changed = m !== chosenMission;
   chosenMission = m; missionPicked = true;
@@ -6695,10 +6717,10 @@ function chooseMission(m, rebuild = true) {
     applyMission(m); buildLevel(); resetPlayer(); resetWeapons(); resetMasking(); missionStartPose();
   }
 }
-const MISSION_TITLES = { 0: 'Training', 1: 'Black File', 2: 'Cold Horizon', 3: 'the Sniper Lesson', 4: 'HALO Insertion', 5: 'The Dam', 6: 'The Conductor\'s Train' };
+const MISSION_TITLES = { 0: 'Training', 1: 'Black File', 2: 'Cold Horizon', 3: 'the Sniper Lesson', 4: 'HALO Insertion', 5: 'The Dam', 6: 'The Conductor\'s Train', 7: 'the Port Raid' };
 const lockReason = m => 'Locked — beat ' + MISSION_TITLES[MISSION_ORDER[MISSION_ORDER.indexOf(m) - 1]] + ' first';
 function showLocks() {
-  for (const k of [0, 1, 2, 3, 4, 5, 6]) {
+  for (const k of [0, 1, 2, 3, 4, 5, 6, 7]) {
     const card = $('m' + k + 'Card'), locked = !isUnlocked(k);
     card.classList.toggle('locked', locked); card.setAttribute('aria-disabled', locked ? 'true' : 'false');
     const r = card.querySelector('input'); if (r) r.disabled = locked;
@@ -6714,9 +6736,9 @@ function showLockNote(txt) { $('lockNote').textContent = txt; clearTimeout(lockN
 function showPicked() {
   const m = chosenMission, p = missionPicked;
   document.querySelectorAll('input[name="mission"]').forEach(r => (r.checked = p && +r.value === m));
-  for (const k of [0, 1, 2, 3, 4, 5, 6]) $('m' + k + 'Card').classList.toggle('sel', p && m === k);
+  for (const k of [0, 1, 2, 3, 4, 5, 6, 7]) $('m' + k + 'Card').classList.toggle('sel', p && m === k);
   $('startBtn').textContent = p ? '▶ START: ' + MISSION_NAMES[m] : '▲ PICK A MISSION ABOVE, THEN START';
-  const headlines = { 0: 'CAMP HALYARD TRAINING', 1: 'OPERATION: BLACK FILE', 2: 'OPERATION: COLD HORIZON', 3: 'SNIPER LESSON', 4: 'OPERATION: HALO INSERTION', 5: 'OPERATION: THE DAM', 6: 'OPERATION: THE CONDUCTOR\'S TRAIN' };
+  const headlines = { 0: 'CAMP HALYARD TRAINING', 1: 'OPERATION: BLACK FILE', 2: 'OPERATION: COLD HORIZON', 3: 'SNIPER LESSON', 4: 'OPERATION: HALO INSERTION', 5: 'OPERATION: THE DAM', 6: 'OPERATION: THE CONDUCTOR\'S TRAIN', 7: 'OPERATION: PORT RAID' };
   const h1 = document.querySelector('#startScreen h1');
   if (h1 && p) h1.textContent = headlines[m] || headlines[1];
   document.title = (p ? (headlines[m] || 'VALKYRIE') : 'VALKYRIE') + ' — ' + VERSION;
@@ -6791,6 +6813,7 @@ function startMission() {
   safe('start:training', () => { garrote.active = false; garrote.anim = 0; if (currentMission === 0 || currentMission === 3) resetTraining(); });
   showMessage(currentMission === 0 ? 'Welcome to CAMP HALYARD. Read CHIEF\'s box at the top. Follow the yellow ◆ and the floor rings.'
     : currentMission === 3 ? 'SNIPER LESSON. Read GRAVEL\'s box at the top — he\'ll walk you through every shot.'
+    : currentMission === 7 ? 'PORT RAID. HAWK and DOC are with you. Follow the yellow ◆ through the stacks. N = night vision, O = hint.'
     : currentMission === 6 ? 'THE CONDUCTOR\'S TRAIN. Wait for the drop… then follow the yellow ◆. O = radio for a hint.'
     : currentMission === 5 ? 'THE DAM. Follow the yellow ◆: checkpoint first. O = radio for a hint.'
     : currentMission === 4 ? 'HALO INSERTION. Listen to the JUMPMASTER (red box at the top). Keys for each step are listed on the right.'
@@ -6815,14 +6838,16 @@ function endGame(won) {
   safeUnlock();
   const secs = Math.round((performance.now() - player.startTime) / 1000);
   const acc = player.shotsFired ? Math.round(player.shotsHit / player.shotsFired * 100) : 0;
-  $('endTitle').textContent = won && currentMission === 6 ? 'MISSION COMPLETE — THE CONDUCTOR\'S TRAIN' : won && currentMission === 5 ? 'MISSION COMPLETE — THE DAM' : won && currentMission === 4 ? 'MISSION COMPLETE — HALO INSERTION' : won ? (currentMission === 0 ? 'TRAINING COMPLETE' : currentMission === 3 ? 'QUALIFIED — SNIPER LESSON COMPLETE' : 'MISSION COMPLETE') : 'MISSION FAILED';
+  $('endTitle').textContent = won && currentMission === 7 ? 'MISSION COMPLETE — PORT RAID' : won && currentMission === 6 ? 'MISSION COMPLETE — THE CONDUCTOR\'S TRAIN' : won && currentMission === 5 ? 'MISSION COMPLETE — THE DAM' : won && currentMission === 4 ? 'MISSION COMPLETE — HALO INSERTION' : won ? (currentMission === 0 ? 'TRAINING COMPLETE' : currentMission === 3 ? 'QUALIFIED — SNIPER LESSON COMPLETE' : 'MISSION COMPLETE') : 'MISSION FAILED';
   $('endTitle').style.color = won ? '#7f7' : '#f66';
-  $('endSubtitle').textContent = currentMission === 6 ? (won ? (RAIL.conductor && RAIL.conductor.state === 'dead' ? 'HAWK: "The Conductor\'s dead and his ledger is ours. Every line points to one house: THE PATRON\'s estate."' : 'HAWK: "He ran. Good — he\'ll run home to THE PATRON, and we\'ll follow the ledger and the footprints."') : 'DOC: "Trains: 1. Wraith: 0. Mind the gap next time."') : currentMission === 5 ? (won ? 'HAWK: "220 metres on a rubber band. The Conductor\'s train is next — and you\'re buying the tickets."' : 'DOC: "The dam won. Dams usually do."') : currentMission === 4 ? (won ? 'HAWK: "In by parachute, out by helicopter. They never knew we were there."' : (H && H.phase !== 'ground' ? 'DOC: "That\'s why we practise in the wind tunnel, Wraith."' : 'Wraith down on the airfield. HAWK and DOC carry you out.')) : won ? (currentMission === 0 ? 'CHIEF: "Congratulations, Wraith. You are now marginally less likely to die. Black File is waiting."' : currentMission === 3 ? 'GRAVEL: "Measure, dial, breathe, squeeze, stay. Now do it when they shoot back."' : currentMission === 2 ? 'Exfil complete. The Conductor just lost an airfield.' : 'Extraction successful. Good work, Agent.')
+  $('endSubtitle').textContent = currentMission === 7 ? (won ? 'HAWK: "The Nordstern\'s on the bottom of the Maas and we have an address: Villa Aurora, Lake Como. Time to visit THE PATRON."' : 'DOC: "Rotterdam: the largest port in Europe. Also, apparently, your final resting place."') : currentMission === 6 ? (won ? (RAIL.conductor && RAIL.conductor.state === 'dead' ? 'HAWK: "The Conductor\'s dead and his ledger is ours. Every line points to one house: THE PATRON\'s estate."' : 'HAWK: "He ran. Good — he\'ll run home to THE PATRON, and we\'ll follow the ledger and the footprints."') : 'DOC: "Trains: 1. Wraith: 0. Mind the gap next time."') : currentMission === 5 ? (won ? 'HAWK: "220 metres on a rubber band. The Conductor\'s train is next — and you\'re buying the tickets."' : 'DOC: "The dam won. Dams usually do."') : currentMission === 4 ? (won ? 'HAWK: "In by parachute, out by helicopter. They never knew we were there."' : (H && H.phase !== 'ground' ? 'DOC: "That\'s why we practise in the wind tunnel, Wraith."' : 'Wraith down on the airfield. HAWK and DOC carry you out.')) : won ? (currentMission === 0 ? 'CHIEF: "Congratulations, Wraith. You are now marginally less likely to die. Black File is waiting."' : currentMission === 3 ? 'GRAVEL: "Measure, dial, breathe, squeeze, stay. Now do it when they shoot back."' : currentMission === 2 ? 'Exfil complete. The Conductor just lost an airfield.' : 'Extraction successful. Good work, Agent.')
     : (currentMission === 2 ? 'Wraith down. Gravel is going to be insufferable about this.' : 'Agent down. The intel is lost.');
   if (won) unlockAfterWin(currentMission);                            // v0.6.6: winning opens the next mission
   if (won && currentMission === 0) { try { localStorage.setItem('valkyrieTrainingDone', '1'); } catch (err) {} }
   if (won && currentMission === 3) { try { localStorage.setItem('valkyrieSniperLessonDone', '1'); } catch (err) {} }
-  const objLine = currentMission === 6
+  const objLine = currentMission === 7
+    ? portObjectives().map(o => (o.done ? '☑ ' : '☐ ') + o.text).join('<br>')
+    : currentMission === 6
     ? railObjectives().map(o => (o.done ? '☑ ' : '☐ ') + o.text).join('<br>') + (RAIL.decoupled ? `<br>Left behind with the troop car: ${RAIL.troopGuards.filter(e => e.leftBehind).length}` : '')
     : currentMission === 5
     ? damObjectives().map(o => (o.done ? '☑ ' : '☐ ') + o.text).join('<br>')
@@ -6840,7 +6865,7 @@ function endGame(won) {
     : `Intel recovered: ${intelItems.filter(i => i.collected).length} / ${intelItems.length}`;
   $('endStats').innerHTML = `Time: ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}<br>
     ${currentMission === 3 ? 'Plates hit: ' + player.shotsHit : 'Guards neutralised: ' + player.kills + ' / ' + enemies.length}<br>Accuracy: ${acc}% &nbsp; Headshots: ${player.headshots}<br>${objLine}`;
-  $('restartBtn').textContent = won && currentMission === 0 ? '▶ CONTINUE: MISSION 01 — BLACK FILE (Enter)' : won && currentMission === 3 ? '▶ CONTINUE: MISSION 02 — COLD HORIZON (Enter)' : won && currentMission === 2 ? '▶ CONTINUE: MISSION 03 — HALO INSERTION (Enter)' : won && currentMission === 4 ? '▶ CONTINUE: MISSION 04 — THE DAM (Enter)' : won && currentMission === 5 ? '▶ CONTINUE: MISSION 05 — THE CONDUCTOR\'S TRAIN (Enter)' : '↻ CLICK / TAP TO RESTART MISSION (Enter)';
+  $('restartBtn').textContent = won && currentMission === 0 ? '▶ CONTINUE: MISSION 01 — BLACK FILE (Enter)' : won && currentMission === 3 ? '▶ CONTINUE: MISSION 02 — COLD HORIZON (Enter)' : won && currentMission === 2 ? '▶ CONTINUE: MISSION 03 — HALO INSERTION (Enter)' : won && currentMission === 4 ? '▶ CONTINUE: MISSION 04 — THE DAM (Enter)' : won && currentMission === 5 ? '▶ CONTINUE: MISSION 05 — THE CONDUCTOR\'S TRAIN (Enter)' : won && currentMission === 6 ? '▶ CONTINUE: MISSION 06 — PORT RAID (Enter)' : '↻ CLICK / TAP TO RESTART MISSION (Enter)';
   $('endScreen').style.display = 'flex';
   safe('end:sound', () => (won ? SOUNDS.win() : SOUNDS.lose()));
 }
@@ -6856,7 +6881,7 @@ document.querySelectorAll('.gfxSel').forEach(el => el.addEventListener('change',
 document.querySelectorAll('input[name="mission"]').forEach(r => r.addEventListener('change', () => { if (r.checked && startOpen()) chooseMission(+r.value); }));
 // Tapping / clicking anywhere on a mission card picks it (pointer, touch AND click, whichever arrives).
 // v0.6.5: a genuine tap or click only, and only while the start screen is up (see onTap).
-for (const [id, m] of [['m0Card', 0], ['m1Card', 1], ['m3Card', 3], ['m2Card', 2], ['m4Card', 4], ['m5Card', 5], ['m6Card', 6]])
+for (const [id, m] of [['m0Card', 0], ['m1Card', 1], ['m3Card', 3], ['m2Card', 2], ['m4Card', 4], ['m5Card', 5], ['m6Card', 6], ['m7Card', 7]])
   onTap($(id), how => { noteInput('mission card ' + m + ' (' + how + ')'); chooseMission(m); }, { when: startOpen });
 // A link can pick the mission: ...?mission=2  or  ...#m2
 {
@@ -6866,9 +6891,9 @@ for (const [id, m] of [['m0Card', 0], ['m1Card', 1], ['m3Card', 3], ['m2Card', 2
   const params = new URLSearchParams(location.search);
   const q = (params.get('mission') || '').toLowerCase();
   const h = (location.hash || '').toLowerCase();
-  const fromName = { '0': 0, training: 0, train: 0, halyard: 0, camphalyard: 0, '1': 1, black: 1, blackfile: 1, mission1: 1, '2': 2, cold: 2, horizon: 2, mission2: 2, '3': 3, sniper: 3, lesson: 3, '4': 4, halo: 4, jump: 4, insertion: 4, mission3: 4, '5': 5, dam: 5, mission4: 5, '6': 6, train: 6, conductor: 6, mission5: 6 };
+  const fromName = { '0': 0, training: 0, train: 0, halyard: 0, camphalyard: 0, '1': 1, black: 1, blackfile: 1, mission1: 1, '2': 2, cold: 2, horizon: 2, mission2: 2, '3': 3, sniper: 3, lesson: 3, '4': 4, halo: 4, jump: 4, insertion: 4, mission3: 4, '5': 5, dam: 5, mission4: 5, '6': 6, train: 6, conductor: 6, mission5: 6, '7': 7, port: 7, ship: 7, mission6: 7 };
   const want = Object.prototype.hasOwnProperty.call(fromName, q) ? fromName[q]
-    : (h === '#train' || h === '#m6' ? 6 : h === '#dam' || h === '#m5' ? 5 : h === '#halo' || h === '#m4' ? 4 : h === '#m3' || h === '#sniper' || h === '#lesson' ? 3 : h === '#m2' || h === '#mission2' || h === '#horizon' ? 2 : h === '#m1' || h === '#mission1' || h === '#blackfile' ? 1
+    : (h === '#port' || h === '#m7' ? 7 : h === '#train' || h === '#m6' ? 6 : h === '#dam' || h === '#m5' ? 5 : h === '#halo' || h === '#m4' ? 4 : h === '#m3' || h === '#sniper' || h === '#lesson' ? 3 : h === '#m2' || h === '#mission2' || h === '#horizon' ? 2 : h === '#m1' || h === '#mission1' || h === '#blackfile' ? 1
     : h === '#m0' || h === '#training' || h === '#halyard' ? 0 : -1);
   // v0.6.6: no mission in the link = the furthest mission you've earned, ticked, on the picker.
   // A link to a LOCKED mission falls back to the furthest one you've earned, with a short note.
@@ -6886,7 +6911,8 @@ function continueOrRestart() {
   if (state === 'won' && currentMission === 3) { chooseMission(2, false); lastStartAt = -1e9; }
   else if (state === 'won' && currentMission === 2) { chooseMission(4, false); lastStartAt = -1e9; }
   else if (state === 'won' && currentMission === 4) { chooseMission(5, false); lastStartAt = -1e9; }   // v0.6.29
-  else if (state === 'won' && currentMission === 5) { chooseMission(6, false); lastStartAt = -1e9; }   // v0.6.30   // v0.6.27
+  else if (state === 'won' && currentMission === 5) { chooseMission(6, false); lastStartAt = -1e9; }   // v0.6.30
+  else if (state === 'won' && currentMission === 6) { chooseMission(7, false); lastStartAt = -1e9; }   // v0.6.31   // v0.6.27
   startMission();
 }
 // v0.6.5: Skip training needs a genuine tap AND a second tap to confirm (it sits below the briefing now).
@@ -8568,6 +8594,368 @@ function updateRailSeq(dt) {
 }
 
 // #####################################################################
+// ##  SECTION 29: PORT RAID (v0.6.31)                                ##
+// #####################################################################
+// Night raid on a cargo ship at a Rotterdam-style container terminal. Three floors share the same
+// map squares (quay + main deck / ship's bridge / below decks), so each floor has its OWN wall grid;
+// guards on the other floors wait (hidden, frozen) until you get there.
+const PORT_DECK = [            // main deck, 40 x 6 squares (bow = west). k = deck containers, B = superstructure, S = door, H = hatch
+  'xx......................................',
+  'x...kkk........H....kkk.......BBBBBBBB..',
+  '....kkk.............kkk.......BBBBBBBB..',
+  '.........kkk.............kkk..SBBBBBBB..',
+  'x........kkk.............kkk..BBBBBBBB..',
+  'xx......................................',
+];
+const PORT_BELOW = [           // below decks: hold 1 | hold 2 | engine room. c = cargo, P = THE PATRON's shipment, m = engine, G = charge point, I = informant
+  '########################################',
+  '#I...cc.....#..H.....PPP..#..G......G..#',
+  '#.cc....cc..d.....cc......d..mmmm..mm..#',
+  '#.cc.cc.cc..#..cc....PPP..#..mmmm..mm..#',
+  '#......cc...#..cc..cc.....d...........##',
+  '########################################',
+];
+const PORT_BRIDGE = ['########', '#..M...#', '#......#', 'S......#', '#..##..#', '########'];
+function portCell(c, r) { return { x: c * CELL + CELL / 2, z: r * CELL + CELL / 2 }; }
+function portFind(map, c0, r0, ch) { const out = []; map.forEach((row, r) => { for (let c = 0; c < row.length; c++) if (row[c] === ch) out.push(portCell(c0 + c, r0 + r)); }); return out; }
+function portInShip(x, z) { return x >= PORT.sc0 * CELL && x < (PORT.sc0 + 40) * CELL && z >= PORT.sr0 * CELL && z < (PORT.sr0 + 6) * CELL; }
+function portGround(x, z) {
+  const L = PORT.level;
+  if (L === 'B') return PORT.bridgeY;
+  if (L === 'C') return portInShip(x, z) ? PORT.belowY : null;
+  if (portInShip(x, z)) return PORT.deckY;
+  const g = PORT.gang; if (Math.abs(x - g.x) < 2.2 && z >= g.z0 && z < g.z1) return PORT.deckY * smooth(g.z0, g.z1, z) ;
+  return null;
+}
+// ---- the yard: rows of 40 ft containers with gaps (a seeded random maze that always connects) ----
+function portYard(seed) {
+  const Y = PORT.yard, rand = makeRandom(seed), W = Y.c1 - Y.c0, H = Y.r1 - Y.r0, g = [];
+  for (let r = 0; r < H; r++) { g.push(new Array(W).fill(0)); if (r % 2 === 1) for (let c = 0; c < W; c++) g[r][c] = (c % 4 === 3 && rand() < 0.7) ? 0 : 1; }
+  for (let r = 0; r < H; r += 2) for (let c = 0; c < W; c++) if (rand() < 0.07 && r > 0 && r < H - 1) g[r][c] = 2;    // 20 ft boxes across the aisle
+  for (let r = 1; r < H; r += 2) { let open = 0; for (let c = 3; c < W; c += 4) open += g[r][c] === 0; if (open < 3) for (let c = 3; c < W; c += 8) g[r][c] = 0; }
+  // connectivity check (west edge to east/south edge)
+  const seen = new Set(), q = []; for (let r = 0; r < H; r++) if (!g[r][0]) { q.push([0, r]); seen.add(r * W); }
+  while (q.length) { const [c, r] = q.pop(); for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nc = c + dc, nr = r + dr; if (nc < 0 || nr < 0 || nc >= W || nr >= H || g[nr][nc] || seen.has(nr * W + nc)) continue; seen.add(nr * W + nc); q.push([nc, nr]); } }
+  let ok = false; for (let c = 0; c < W; c++) if (seen.has((H - 1) * W + c)) ok = true;
+  return ok ? g : null;
+}
+function portSetLevel(L, arrive) {
+  PORT.level = L; solid = PORT.grids[L].s; opaque = PORT.grids[L].o;
+  for (const it of intelItems) if (it.portLevel) { const here = it.portLevel === L; it.group.position.x = it.home.x + (here ? 0 : 5000); }   // intel only on its own floor
+  for (const e of enemies) { if (!e.portLevel) continue; const here = e.portLevel === L; e.group.visible = here; if (e.state !== 'dead') e.dummy = !here || !!e.portFrozen; }
+  if (arrive) { camera.position.x = arrive.x; camera.position.z = arrive.z; player.velocity.set(0, 0, 0); clearLean(); if (arrive.yaw !== undefined) camera.rotation.set(0, arrive.yaw, 0, 'YXZ');
+    teammates.forEach((m, i) => { m.goal = null; m.path = []; const a = [[-1.6, 0], [0, 1.6], [1.6, 0]][i % 3]; const p = randomFloorNear(arrive.x + a[0], arrive.z + a[1], 1.2); m.group.position.set(p.x, groundAt(p.x, p.z), p.z); }); }
+}
+function buildPortMission() {
+  const Q = SETTINGS.graphicsQuality === 'high', low = SETTINGS.graphicsQuality === 'low', C = M2_WORLD.center, size = M2_WORLD.size;
+  sniperLights = []; sniperLamps = []; materiel = []; sniperWater = null; teammates = [];
+  sniperState = { leadersTotal: 0, objectivesAnnounced: false, lightsOut: false };
+  Object.assign(PORT, { on: true, level: 'A', boat: null, said: {}, yardDone: false, boarded: false, silentFail: false, freed: false, shipFound: false, stacked: false, lift: { armed: true }, msgT: 0 });
+  heightField = { seg: 4, step: size / 4, x0: C.x - size / 2, z0: C.z - size / 2, data: new Float32Array(25) };
+  // ---- night: moon, sodium lights, harbour glow ----
+  scene.background = new THREE.Color(0x070a12); scene.fog = new THREE.FogExp2(0x0b0f18, 0.0045);
+  const moon = new THREE.DirectionalLight(0x9fb4e0, 1.1); moon.position.set(C.x - 400, 600, C.z + 500); moon.target.position.set(C.x, 0, C.z);
+  moon.castShadow = !low; moon.shadow.mapSize.set(Q ? 2048 : 1024, Q ? 2048 : 1024); const sc = moon.shadow.camera; sc.left = -270; sc.right = 270; sc.top = 270; sc.bottom = -270; sc.near = 100; sc.far = 1500; moon.shadow.bias = -0.0005;
+  levelGroup.add(moon, moon.target); worldSun = moon; worldSun.userData.outdoor = true;
+  hemiLight.intensity = 0.42; hemiLight.color.set(0x6a7aa0); hemiLight.groundColor.set(0x2a2a30); ambientLight.intensity = 0.12;
+  disposeEnv(); scene.environment = null;
+  { const n = 900, P = new Float32Array(n * 3); for (let k = 0; k < n; k++) { const v = new THREE.Vector3().setFromSphericalCoords(6000, Math.random() * 1.35, Math.random() * 6.283); P.set([v.x + C.x, Math.abs(v.y) + 200, v.z + C.z], k * 3); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); const st = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 2.2, sizeAttenuation: false, fog: false })); levelGroup.add(st); }
+  // ---- land, quay wall, water ----
+  const land = new THREE.Mesh(new THREE.PlaneGeometry(700, 400), pbr(new THREE.MeshStandardMaterial({ color: 0x5c5c5a, roughness: 0.9 }), 'asphalt', { scale: 5 }));
+  land.rotation.x = -Math.PI / 2; land.position.set(C.x, 0, C.z - 200); land.receiveShadow = true; land.userData.isFloor = true; levelGroup.add(land);
+  const quayM = pbr(new THREE.MeshStandardMaterial({ color: 0x9a9890, roughness: 0.85 }), 'concrete', { mode: 'detail', scale: 3 });
+  const qw = new THREE.Mesh(new THREE.BoxGeometry(700, 5, 2), quayM); qw.position.set(C.x, -2.5, C.z - 1); levelGroup.add(qw);
+  const edge = new THREE.Mesh(new THREE.BoxGeometry(700, 0.25, 0.6), new THREE.MeshStandardMaterial({ color: 0xc8b030, roughness: 0.6 })); edge.position.set(C.x, 0.12, C.z - 0.5); levelGroup.add(edge);
+  const wGeo = new THREE.PlaneGeometry(3000, 1600);
+  if (Q) { sniperWater = new Water(wGeo, { textureWidth: 512, textureHeight: 512, waterNormals: makeWaterNormals(), sunDirection: new THREE.Vector3(-0.4, 0.6, 0.5).normalize(), sunColor: 0x8090b0, waterColor: 0x0a1a22, distortionScale: 2.5, fog: true }); sniperWater.material.uniforms.size.value = 3; }
+  else sniperWater = new THREE.Mesh(wGeo, new THREE.MeshStandardMaterial({ color: 0x0c1c24, metalness: 0.7, roughness: 0.2 }));
+  sniperWater.rotation.x = -Math.PI / 2; sniperWater.position.set(C.x, -2, C.z + 800); levelGroup.add(sniperWater);
+  // far shore: cranes and lights of the rest of the port
+  { const glow = new THREE.MeshBasicMaterial({ color: 0xffb060 }), red = new THREE.MeshBasicMaterial({ color: 0xff2a20 }), dark = new THREE.MeshStandardMaterial({ color: 0x15171c, roughness: 1 });
+    for (let i = 0; i < 14; i++) { const x = C.x - 900 + i * 140, z = C.z + 900 + (i % 3) * 40, cr = new THREE.Mesh(new THREE.BoxGeometry(6, 60, 6), dark); cr.position.set(x, 30, z); levelGroup.add(cr);
+      const bm = new THREE.Mesh(new THREE.BoxGeometry(4, 4, 90), dark); bm.position.set(x, 62, z - 30); levelGroup.add(bm); const l = new THREE.Mesh(new THREE.SphereGeometry(1.4, 6, 4), red); l.position.set(x, 66, z); levelGroup.add(l); }
+    const P = new Float32Array(600 * 3); for (let k = 0; k < 600; k++) P.set([C.x - 1300 + Math.random() * 2600, 2 + Math.random() * 25, C.z + 850 + Math.random() * 250], k * 3);
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); levelGroup.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffc070, size: 3, sizeAttenuation: false }))); }
+  // ---- three wall grids ----
+  worldCols = worldRows = Math.ceil(size / CELL); worldOffset = { x: C.x - size / 2, z: C.z - size / 2 };
+  const N = worldCols * worldRows, mk = () => ({ s: new Uint8Array(N).fill(1), o: new Uint8Array(N) });
+  PORT.grids = { A: mk(), B: mk(), C: mk() };
+  const A = PORT.grids.A, gi = (c, r) => r * worldCols + c;
+  for (let r = PORT.land.r0; r <= PORT.land.r1; r++) for (let c = PORT.land.c0; c <= PORT.land.c1; c++) A.s[gi(c, r)] = 0;
+  // yard maze
+  let yard = null; for (let s = 11; !yard && s < 60; s++) yard = portYard(s); PORT.yardMap = yard;
+  const Y = PORT.yard, box40 = [], box20 = [];
+  yard.forEach((row, r) => row.forEach((v, c) => { if (v) { A.s[gi(Y.c0 + c, Y.r0 + r)] = 1; A.o[gi(Y.c0 + c, Y.r0 + r)] = 1; } }));
+  const rand = makeRandom(7);
+  yard.forEach((row, r) => { let c = 0; while (c < row.length) { if (row[c] === 1) { let e = c; while (e < row.length && row[e] === 1 && e - c < 3) e++; box40.push({ c: Y.c0 + c, r: Y.r0 + r, n: e - c, h: 1 + Math.floor(rand() * 4) }); c = e; } else { if (row[c] === 2) box20.push({ c: Y.c0 + c, r: Y.r0 + r, h: 1 + Math.floor(rand() * 2) }); c++; } } });
+  // ship: deck squares are open; the hull and the water around it stay solid
+  PORT.gang = { x: portCell(PORT.gc, 0).x, z0: PORT.sr0 * CELL - 8, z1: PORT.sr0 * CELL };
+  A.s[gi(PORT.gc, PORT.sr0 - 1)] = 0; A.s[gi(PORT.gc, PORT.sr0 - 2)] = 0;
+  const applyMap = (G, map, c0, r0, walls) => map.forEach((row, r) => { for (let c = 0; c < row.length; c++) { const ch = row[c], k = gi(c0 + c, r0 + r); if (walls.includes(ch)) { G.s[k] = 1; G.o[k] = ch === 'x' ? 0 : 1; } else { G.s[k] = 0; G.o[k] = 0; } } });
+  applyMap(A, PORT_DECK, PORT.sc0, PORT.sr0, 'xkB');
+  applyMap(PORT.grids.C, PORT_BELOW, PORT.sc0, PORT.sr0, '#cPm');
+  applyMap(PORT.grids.B, PORT_BRIDGE, PORT.sc0 + 30, PORT.sr0, '#');
+  // crane legs block the quay a little
+  for (const cc of PORT.cranes) for (const dc of [-2, 2]) for (const r of [PORT.qr - 6, PORT.qr - 1]) A.s[gi(cc + dc, r)] = 1;
+  portSetLevel('A');
+  // ---- meshes ----
+  portContainers(box40, box20, Q);
+  portCranes(); portShip(Q); portLights(low);
+  // fence round the terminal
+  { const fm = new THREE.MeshStandardMaterial({ color: 0x6c7070, roughness: 0.6, metalness: 0.6, transparent: true, opacity: 0.55 }), L = PORT.land;
+    const x0 = L.c0 * CELL, x1 = (L.c1 + 1) * CELL, z0 = L.r0 * CELL;
+    for (const [x, z, w, d] of [[(x0 + x1) / 2, z0, x1 - x0, 0.1], [x0, (z0 + C.z) / 2, 0.1, C.z - z0], [x1, (z0 + C.z) / 2, 0.1, C.z - z0]]) { const f = new THREE.Mesh(new THREE.BoxGeometry(w, 3, d), fm); f.position.set(x, 1.5, z); levelGroup.add(f); } }
+  // signs
+  const sign = (t, x, y, z, rot, w = 3) => { const s = makeSign(t, w, w * 0.22, '#0d2a4a', '#f2f6ff', true); s.position.set(x, y, z); s.rotation.y = rot; levelGroup.add(s); return s; };
+  const st = portCell(PORT.start.c, PORT.start.r);
+  sign('MAASVLAKTE · TERMINAL 7', st.x + 6, 4, st.z - 6, -Math.PI / 2, 4.2);
+  sign('KADE · QUAY ▶', Y.c1 * CELL - 2, 4, (Y.r0 + Y.r1) / 2 * CELL, -Math.PI / 2, 3);
+  const gw = PORT.gang; sign('GANGWAY · MV NORDSTERN', gw.x + 3, 3.5, gw.z0 - 2, 0, 3.6);
+  const dS = portFind(PORT_DECK, PORT.sc0, PORT.sr0, 'S')[0], dH = portFind(PORT_DECK, PORT.sc0, PORT.sr0, 'H')[0];
+  sign('BRUG · BRIDGE ▲', dS.x - 2.1, PORT.deckY + 2.8, dS.z, -Math.PI / 2, 2.4);
+  sign('LUIK · HATCH ▼ HOLDS', dH.x, PORT.deckY + 2.2, dH.z - 1.9, 0, 2.6);
+  const X = portCell(PORT.exit.c, PORT.exit.r); sign('RHIB ▼ EXFIL', X.x, 2.6, X.z - 1.5, 0, 2.2);
+  // ---- intel, charges, people ----
+  const M = portFind(PORT_BRIDGE, PORT.sc0 + 30, PORT.sr0, 'M')[0];
+  PORT.level = 'B'; createIntel(M.x, M.z, "Cargo manifest — consignee: THE PATRON's estate"); PORT.level = 'A';
+  { const it = intelItems[intelItems.length - 1]; it.portLevel = 'B'; it.home = it.group.position.clone(); }
+  const shipP = portFind(PORT_BELOW, PORT.sc0, PORT.sr0, 'P'); PORT.shipSpot = { x: shipP[0].x + 4, z: shipP[0].z + CELL };
+  PORT.level = 'C';
+  createIntel(PORT.shipSpot.x, PORT.shipSpot.z, 'Photos of the shipment (crate stencils)');
+  { const it = intelItems[intelItems.length - 1]; it.portLevel = 'C'; it.home = it.group.position.clone(); }
+  for (const p of portFind(PORT_BELOW, PORT.sc0, PORT.sr0, 'G')) addMateriel({ type: 'generator', x: p.x - C.x, z: p.z - C.z });
+  PORT.level = 'A';
+  const guards = PORT_GUARDS();
+  for (const g of guards) { PORT.level = g.L; addSniperGuard(g); const e = enemies[enemies.length - 1]; e.portLevel = g.L; if (g.crane) { e.baseY = 48; e.label = 'Crane sniper'; e.static = true; PORT.sniper = e; } if (g.captain) { e.label = 'Captain Brandt'; } }
+  PORT.level = 'A'; portSetLevel('A');
+  sniperState.leadersTotal = enemies.filter(e => e.officer).length;
+  playerStart = { x: st.x, z: st.z, yaw: -Math.PI / 2 };
+  createTeammate(st.x - 2, st.z - 1.5, 'HAWK'); createTeammate(st.x - 2, st.z + 1.5, 'DOC');
+  const I = portFind(PORT_BELOW, PORT.sc0, PORT.sr0, 'I')[0]; PORT.informantSpot = I;
+  createPickup(st.x + 3, st.z + 2, 'ammo'); createPickup(dS.x - 4, dS.z, 'health'); createPickup(gw.x + 4, gw.z0 - 3, 'ammo');
+  createExit(X.x, X.z); if (exitZone) exitZone.radius = 2.6;
+  finalizeTargets();
+}
+function PORT_GUARDS() {
+  const C = M2_WORLD.center, Y = PORT.yard, rel = p => ({ x: p.x - C.x, z: p.z - C.z }), out = [], rand = makeRandom(23);
+  const aisle = []; PORT.yardMap.forEach((row, r) => row.forEach((v, c) => { if (!v && r % 2 === 0 && c > 4) aisle.push([c, r]); }));
+  for (let i = 0; i < 9; i++) { const [c, r] = aisle[Math.floor(rand() * aisle.length)]; const p = rel(portCell(Y.c0 + c, Y.r0 + r));
+    let c2 = c; while (c2 + 1 < PORT.yardMap[0].length && !PORT.yardMap[r][c2 + 1] && c2 - c < 6) c2++;
+    const q = rel(portCell(Y.c0 + c2, Y.r0 + r)); out.push({ ...p, L: 'A', ...(i % 3 === 2 ? { type: 'sentry' } : { route: [[p.x, p.z], [q.x, q.z]] }), ...(i === 4 ? { type: 'officer' } : {}) }); }
+  const q = c => rel(portCell(c, PORT.qr - 3));
+  out.push({ ...q(PORT.gc - 3), L: 'A', type: 'sentry' }, { ...q(PORT.gc + 4), L: 'A', route: [[q(PORT.gc + 4).x, q(PORT.gc + 4).z], [q(PORT.gc + 18).x, q(PORT.gc + 18).z]] }, { ...q(PORT.gc + 10), L: 'A' });
+  const crane = PORT.cranes[1]; out.push({ ...rel(portCell(crane, PORT.qr - 7)), L: 'A', crane: true, type: 'sentry' });
+  const d = (c, r, extra = {}) => ({ ...rel(portCell(PORT.sc0 + c, PORT.sr0 + r)), L: 'A', ...extra });
+  out.push(d(3, 3), d(8, 0, { route: [[d(8, 0).x, d(8, 0).z], [d(28, 0).x, d(28, 0).z]] }), d(17, 3, { type: 'sentry' }), d(24, 5, { route: [[d(24, 5).x, d(24, 5).z], [d(6, 5).x, d(6, 5).z]] }), d(29, 2, { type: 'officer' }), d(38, 3));
+  const b = (c, r, extra = {}) => ({ ...rel(portCell(PORT.sc0 + 30 + c, PORT.sr0 + r)), L: 'B', ...extra });
+  out.push(b(2, 2, { type: 'officer', captain: true }), b(5, 1), b(5, 3, { type: 'sentry' }));
+  const u = (c, r, extra = {}) => ({ ...rel(portCell(PORT.sc0 + c, PORT.sr0 + r)), L: 'C', ...extra });
+  out.push(u(3, 1), u(10, 4, { type: 'sentry' }), u(17, 4, { route: [[u(14, 4).x, u(14, 4).z], [u(24, 1).x, u(24, 1).z]] }), u(23, 2), u(30, 4, { type: 'officer' }), u(34, 1), u(37, 3, { type: 'sentry' }));
+  return out;
+}
+function portContainers(b40, b20, Q) {
+  const cols = [0x2a6fb0, 0xd8b030, 0xb03028, 0x2f7a46, 0x8a8f94, 0xd86a20, 0x6a2c80, 0xe0e0e0], rand = makeRandom(31);
+  const mat = pbr(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6, metalness: 0.3 }), 'corrugated', { mode: 'detail', scale: 0.9, strength: 0.9 });
+  const n40 = b40.reduce((a, b) => a + b.h, 0), n20 = b20.reduce((a, b) => a + b.h, 0);
+  const m40 = new THREE.InstancedMesh(new THREE.BoxGeometry(12.1, 2.55, 2.44), mat, Math.max(1, n40)), m20 = new THREE.InstancedMesh(new THREE.BoxGeometry(2.44, 2.55, 6.0), mat, Math.max(1, n20));
+  const dm = new THREE.Object3D(), col = new THREE.Color(); let i = 0, j = 0;
+  for (const b of b40) { const p = portCell(b.c, b.r), x = p.x - CELL / 2 + b.n * CELL / 2; for (let h = 0; h < b.h; h++) { dm.position.set(x + (rand() - 0.5) * 0.3, 1.29 + h * 2.6, p.z); dm.scale.set(b.n / 3, 1, 1); dm.updateMatrix(); m40.setMatrixAt(i, dm.matrix); m40.setColorAt(i++, col.set(cols[Math.floor(rand() * cols.length)])); } }
+  dm.scale.set(1, 1, 1);
+  for (const b of b20) { const p = portCell(b.c, b.r); for (let h = 0; h < b.h; h++) { dm.position.set(p.x, 1.29 + h * 2.6, p.z); dm.updateMatrix(); m20.setMatrixAt(j, dm.matrix); m20.setColorAt(j++, col.set(cols[Math.floor(rand() * cols.length)])); } }
+  m40.count = i; m20.count = j; for (const m of [m40, m20]) { m.castShadow = m.receiveShadow = true; levelGroup.add(m); }
+}
+function portCranes() {
+  const steel = new THREE.MeshStandardMaterial({ color: 0x3c6a9a, roughness: 0.6, metalness: 0.5 }), red = new THREE.MeshBasicMaterial({ color: 0xff2020 });
+  for (const cc of PORT.cranes) {
+    const x = portCell(cc, 0).x, zL = (PORT.qr - 6) * CELL + 2, zW = (PORT.qr - 1) * CELL + 2, add = (w, h, d, px, py, pz, m = steel) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(px, py, pz); b.castShadow = true; levelGroup.add(b); return b; };
+    for (const dx of [-8, 8]) for (const z of [zL, zW]) add(1.4, 40, 1.4, x + dx, 20, z);
+    add(18, 2, 2, x, 40, zL); add(18, 2, 2, x, 40, zW);
+    for (const dx of [-8, 8]) add(1.6, 2.2, 110, x + dx, 42, (zL + zW) / 2 + 30);
+    add(12, 6, 10, x, 45, zL - 4, new THREE.MeshStandardMaterial({ color: 0x2a2e34, roughness: 0.8 }));    // machinery house (the sniper's perch is on top)
+    add(3, 2.6, 3, x, 38.5, zW + 14, new THREE.MeshStandardMaterial({ color: 0x9aa0a6, roughness: 0.4, metalness: 0.4 }));
+    add(1, 1, 1, x, 50, zL - 4, red); add(1, 1, 1, x, 44, zW + 85, red);
+  }
+}
+function portShip(Q) {
+  const x0 = PORT.sc0 * CELL, x1 = x0 + 160, z0 = PORT.sr0 * CELL, z1 = z0 + 24, zc = (z0 + z1) / 2, D = PORT.deckY;
+  const hullM = pbr(new THREE.MeshStandardMaterial({ color: 0x2a1c1c, roughness: 0.7, metalness: 0.4 }), 'metal', { mode: 'detail', scale: 3 });
+  const deckM = pbr(new THREE.MeshStandardMaterial({ color: 0x6a4a3a, roughness: 0.8, metalness: 0.3, side: THREE.DoubleSide }), 'metal', { mode: 'detail', scale: 2 });
+  const whiteM = pbr(new THREE.MeshStandardMaterial({ color: 0xd8d6cc, roughness: 0.6, metalness: 0.2 }), 'plaster', { mode: 'detail', scale: 2 });
+  const add = (geo, mat, x, y, z, wall = true) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; levelGroup.add(m); if (wall) wallMeshes.push(m); return m; };
+  // hull: a box with a pointed bow (extruded outline)
+  const sh = new THREE.Shape(); sh.moveTo(x0 + 14, z0); sh.lineTo(x1, z0); sh.lineTo(x1, z1); sh.lineTo(x0 + 14, z1); sh.quadraticCurveTo(x0 + 2, z1 - 2, x0 - 2, zc); sh.quadraticCurveTo(x0 + 2, z0 + 2, x0 + 14, z0);
+  const sideGeo = new THREE.ExtrudeGeometry(sh, { depth: 16, bevelEnabled: false }); sideGeo.rotateX(Math.PI / 2); sideGeo.translate(0, D, 0);
+  const hull = new THREE.Mesh(sideGeo, hullM); hull.castShadow = hull.receiveShadow = true; levelGroup.add(hull);
+  const deck = new THREE.Mesh(new THREE.ShapeGeometry(sh), deckM); deck.rotation.x = Math.PI / 2; deck.position.y = D + 0.02; deck.receiveShadow = true; deck.userData.isFloor = true; levelGroup.add(deck);
+  const name = makeSign('NORDSTERN · MONROVIA', 12, 1.6, '#2a1c1c', '#f0f0f0', false); name.position.set(x1 - 20, D - 3, z0 - 0.05); name.rotation.y = Math.PI; levelGroup.add(name);
+  const rail = new THREE.MeshStandardMaterial({ color: 0xc8c8c0, roughness: 0.5, metalness: 0.6 });
+  for (const z of [z0 + 0.15, z1 - 0.15]) { const r = add(new THREE.BoxGeometry(146, 0.08, 0.08), rail, x0 + 14 + 73, D + 1.1, z, false); }
+  // deck containers + hatch covers
+  const cm = pbr(new THREE.MeshStandardMaterial({ color: 0x2a6fb0, roughness: 0.6, metalness: 0.3 }), 'corrugated', { mode: 'detail', scale: 0.9 });
+  const seen = new Set();
+  PORT_DECK.forEach((row, r) => { for (let c = 0; c < row.length; c++) if (row[c] === 'k' && !seen.has(r * 99 + c)) { for (let a = 0; a < 3; a++) for (let b = 0; b < 2; b++) seen.add((r + b) * 99 + c + a); const p = portCell(PORT.sc0 + c, PORT.sr0 + r);
+    for (let h = 0; h < 2; h++) add(new THREE.BoxGeometry(12, 2.55, 7.6), cm, p.x + CELL, D + 1.3 + h * 2.6, p.z + CELL / 2); } });
+  for (const hx of [x0 + 34, x0 + 62, x0 + 100]) add(new THREE.BoxGeometry(14, 0.8, 12), deckM, hx, D + 0.4, zc, false);
+  // superstructure: white block, bridge with windows on top, funnel
+  const sx0 = (PORT.sc0 + 30) * CELL, sx1 = sx0 + 32, sz0 = z0 + 4, sz1 = z1 - 4, scx = (sx0 + sx1) / 2;
+  const B = PORT.bridgeY, glass = new THREE.MeshStandardMaterial({ color: 0x40607a, roughness: 0.05, metalness: 0.4, transparent: true, opacity: 0.35, depthWrite: false });
+  add(new THREE.BoxGeometry(32, B - D - 0.2, 16), whiteM, scx, (D + B) / 2 - 0.1, (sz0 + sz1) / 2);
+  const bz0 = z0, bz1 = z1;   // the bridge is the full width of the ship (wings)
+  for (const z of [bz0 + 0.1, bz1 - 0.1]) add(new THREE.BoxGeometry(32, 1.2, 0.2), whiteM, scx, B + 0.6, z);
+  add(new THREE.BoxGeometry(0.2, 1.2, 24), whiteM, sx0 + 0.1, B + 0.6, zc); add(new THREE.BoxGeometry(0.2, 3.6, 24), whiteM, sx1 - 0.1, B + 1.8, zc);
+  const gl = new THREE.Mesh(new THREE.PlaneGeometry(24, 2.2), glass); gl.position.set(sx0 + 0.1, B + 2.3, zc); gl.rotation.y = -Math.PI / 2; levelGroup.add(gl);
+  for (const z of [bz0 + 0.1, bz1 - 0.1]) { const g2 = new THREE.Mesh(new THREE.PlaneGeometry(32, 2.2), glass); g2.position.set(scx, B + 2.3, z); levelGroup.add(g2); }
+  add(new THREE.BoxGeometry(32.4, 0.4, 24.4), whiteM, scx, B + 3.6, zc);
+  const fl = new THREE.Mesh(new THREE.PlaneGeometry(32, 24), deckM); fl.rotation.x = -Math.PI / 2; fl.position.set(scx, B + 0.02, zc); fl.userData.isFloor = true; levelGroup.add(fl);
+  add(new THREE.BoxGeometry(8, 1.1, 2), new THREE.MeshStandardMaterial({ color: 0x22262a, roughness: 0.5 }), sx0 + 3, B + 0.55, zc, false);   // console
+  const scr = new THREE.Mesh(new THREE.PlaneGeometry(6, 0.6), new THREE.MeshBasicMaterial({ color: 0x30d070 })); scr.position.set(sx0 + 2.1, B + 1.2, zc); scr.rotation.y = -Math.PI / 2; levelGroup.add(scr);
+  add(new THREE.BoxGeometry(6, 12, 5), new THREE.MeshStandardMaterial({ color: 0x1a1a1e, roughness: 0.6 }), sx1 - 8, B + 8, zc);
+  { const dS = portFind(PORT_DECK, PORT.sc0, PORT.sr0, 'S')[0], dH = portFind(PORT_DECK, PORT.sc0, PORT.sr0, 'H')[0], dark = new THREE.MeshStandardMaterial({ color: 0x202428, roughness: 0.5, metalness: 0.6 });
+    const door = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 2.4), dark); door.position.set(sx0 - 0.03, D + 1.2, dS.z); door.rotation.y = -Math.PI / 2; levelGroup.add(door);
+    const lit = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.15, 0.3), new THREE.MeshBasicMaterial({ color: 0x80ff90 })); lit.position.set(sx0 - 0.2, D + 2.7, dS.z); levelGroup.add(lit);
+    add(new THREE.BoxGeometry(2.6, 0.9, 2.6), dark, dH.x, D + 0.45, dH.z, false); const hole = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.6), new THREE.MeshBasicMaterial({ color: 0x050505 })); hole.rotation.x = -Math.PI / 2; hole.position.set(dH.x, D + 0.92, dH.z); levelGroup.add(hole); }
+  // below decks: walls from the map, a floor, a ceiling under the deck
+  const wallM = pbr(new THREE.MeshStandardMaterial({ color: 0x8a8070, roughness: 0.7, metalness: 0.4 }), 'metal', { mode: 'detail', scale: 2 });
+  const crateM = pbr(new THREE.MeshStandardMaterial({ color: 0x6a5a40, roughness: 0.8 }), 'wood', { mode: 'detail', scale: 1.5 });
+  const olive = new THREE.MeshStandardMaterial({ color: 0x3e4a2e, roughness: 0.7 });
+  const engM = new THREE.MeshStandardMaterial({ color: 0x5a6068, roughness: 0.4, metalness: 0.8 });
+  const Ly = PORT.belowY, Hh = D - 0.4 - Ly;
+  PORT_BELOW.forEach((row, r) => { for (let c = 0; c < row.length; c++) { const ch = row[c], p = portCell(PORT.sc0 + c, PORT.sr0 + r);
+    if (ch === '#') { const nb = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dc, dr]) => PORT_BELOW[r + dr] && PORT_BELOW[r + dr][c + dc] && PORT_BELOW[r + dr][c + dc] !== '#'); if (nb) add(new THREE.BoxGeometry(CELL, Hh, CELL), wallM, p.x, Ly + Hh / 2, p.z); }
+    if (ch === 'c') { add(new THREE.BoxGeometry(3.4, 2.4, 3.4), crateM, p.x, Ly + 1.2, p.z); if ((r + c) % 2) add(new THREE.BoxGeometry(2.6, 1.6, 2.6), crateM, p.x, Ly + 3.2, p.z); }
+    if (ch === 'P') { add(new THREE.BoxGeometry(3.6, 1.4, 1.6), olive, p.x, Ly + 0.7, p.z - 0.9); add(new THREE.BoxGeometry(3.6, 1.4, 1.6), olive, p.x, Ly + 0.7, p.z + 0.9); add(new THREE.BoxGeometry(3.6, 1.2, 1.6), olive, p.x, Ly + 2.1, p.z); }
+    if (ch === 'm') add(new THREE.BoxGeometry(CELL, 4.2, CELL), engM, p.x, Ly + 2.1, p.z);
+  } });
+  const sten = makeSign('PATRON · VILLA AURORA · FRAGILE', 4.2, 0.5, '#3e4a2e', '#f0e8c0', false); const P0 = portFind(PORT_BELOW, PORT.sc0, PORT.sr0, 'P')[0]; sten.position.set(P0.x + 4, Ly + 1.6, P0.z - 1.75); levelGroup.add(sten);
+  const fl2 = new THREE.Mesh(new THREE.PlaneGeometry(160, 24), deckM); fl2.rotation.x = -Math.PI / 2; fl2.position.set(x0 + 80, Ly + 0.02, zc); fl2.userData.isFloor = true; levelGroup.add(fl2);
+  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(160, 24), wallM); ceil.rotation.x = Math.PI / 2; ceil.position.set(x0 + 80, D - 0.4, zc); levelGroup.add(ceil);
+  // gangway
+  const g = PORT.gang, gm = new THREE.MeshStandardMaterial({ color: 0x8a8a84, roughness: 0.6, metalness: 0.6 }), len = Math.hypot(8, D);
+  const ramp = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.15, len), gm); ramp.position.set(g.x, D / 2, (g.z0 + g.z1) / 2); ramp.rotation.x = Math.atan2(D, 8); levelGroup.add(ramp);
+  for (const s of [-0.9, 0.9]) { const h = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, len), gm); h.position.set(g.x + s, D / 2 + 1, (g.z0 + g.z1) / 2); h.rotation.x = ramp.rotation.x; levelGroup.add(h); }
+  // the RHIB waiting at the quay
+  const X = portCell(PORT.exit.c, PORT.exit.r), boat = new THREE.Group();
+  const bh = new THREE.Mesh(new THREE.BoxGeometry(8, 1, 2.8), new THREE.MeshStandardMaterial({ color: 0x22252a, roughness: 0.7 })); bh.position.y = 0.3; boat.add(bh);
+  for (const s of [-1.3, 1.3]) { const t = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 8, 10), new THREE.MeshStandardMaterial({ color: 0x3a3a3a, roughness: 0.8 })); t.rotation.z = Math.PI / 2; t.position.set(0, 0.6, s); boat.add(t); }
+  boat.position.set(X.x, -2.2, X.z + 5); levelGroup.add(boat); PORT.boatMesh = boat;
+}
+function portLights(low) {
+  const L = [], sod = 0xffa040, pole = new THREE.MeshStandardMaterial({ color: 0x3a3c40, roughness: 0.6 });
+  const head = new THREE.MeshBasicMaterial({ color: 0xffd090 });
+  const spots = [[PORT.yard.c0 + 8, PORT.yard.r0 + 4], [PORT.yard.c0 + 30, PORT.yard.r0 + 14], [PORT.yard.c0 + 50, PORT.yard.r0 + 8], [PORT.gc + 2, PORT.qr - 2], [PORT.gc + 24, PORT.qr - 3]];
+  for (const [c, r] of spots) { const p = portCell(c, r); const pl = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 16, 6), pole); pl.position.set(p.x, 8, p.z); levelGroup.add(pl);
+    const hd = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.3, 0.6), head); hd.position.set(p.x, 16, p.z); levelGroup.add(hd);
+    const l = new THREE.PointLight(sod, low ? 700 : 900, 80, 1.5); l.position.set(p.x, 15, p.z); levelGroup.add(l); }
+  for (const [x, y, z, i] of [[(PORT.sc0 + 14) * CELL, PORT.deckY + 6, (PORT.sr0 + 3) * CELL, 120], [(PORT.sc0 + 34) * CELL, PORT.bridgeY + 3, (PORT.sr0 + 3) * CELL, 40], [(PORT.sc0 + 8) * CELL, PORT.belowY + 4, (PORT.sr0 + 3) * CELL, 60], [(PORT.sc0 + 33) * CELL, PORT.belowY + 4, (PORT.sr0 + 3) * CELL, 60], [(PORT.sc0 + 19) * CELL, PORT.belowY + 4, (PORT.sr0 + 3) * CELL, 50]]) {
+    const l = new THREE.PointLight(0xffe2c0, i, 30, 1.6); l.position.set(x, y, z); levelGroup.add(l); }
+}
+// ---- objectives / compass ----
+function portObjectives() {
+  const man = intelItems[0], pics = intelItems[1], ch = materiel.filter(m => m.type === 'generator'), down = ch.filter(m => m.destroyed).length;
+  return [
+    { text: 'Get through the container yard to the quay', done: PORT.yardDone },
+    { text: 'Take out the sniper on crane 2', done: !!PORT.sniper && PORT.sniper.state === 'dead' },
+    { text: 'Board the MV Nordstern (gangway)', done: PORT.boarded },
+    { text: "Photograph THE PATRON's shipment (hold 2)", done: !!pics && pics.collected },
+    { text: 'Take the cargo manifest (ship\'s bridge)', done: !!man && man.collected },
+    { text: `Scuttle her: C4 on the engine room charge points (${down} / ${ch.length || 2})`, done: ch.length > 0 && down === ch.length },
+    { text: 'BONUS: reach the ship without raising the alarm', done: PORT.boarded && !PORT.silentFail, bonus: true },
+    { text: 'BONUS: free the informant in hold 1', done: PORT.freed, bonus: true },
+  ];
+}
+function portObjective() {
+  const ob = portObjectives(), L = PORT.level, X = (map, ch, c0 = PORT.sc0) => portFind(map, c0, PORT.sr0, ch)[0];
+  const dS = X(PORT_DECK, 'S'), dH = X(PORT_DECK, 'H');
+  const g = PORT.gang, onShip = PORT.level !== 'A' || portInShip(camera.position.x, camera.position.z);
+  const toDeck = () => L === 'B' ? { ...X(PORT_BRIDGE, 'S', PORT.sc0 + 30), label: 'STAIRS ▼ DECK' } : { ...X(PORT_BELOW, 'H'), label: 'LADDER ▲ DECK' };
+  if (!ob[0].done) return { x: (PORT.yard.c1 - 2) * CELL, z: (PORT.qr - 2) * CELL, label: 'QUAY' };
+  if (!ob[1].done) { const p = PORT.sniper.group.position; return { x: p.x, z: p.z, label: 'CRANE SNIPER' }; }
+  if (!ob[2].done) return { x: g.x, z: g.z0, label: 'GANGWAY' };
+  if (!ob[3].done || !ob[5].done) {
+    if (L === 'B') return toDeck(); if (L === 'A') return { ...dH, label: 'HATCH ▼' };
+    if (!ob[3].done) return { x: PORT.shipSpot.x, z: PORT.shipSpot.z, label: 'SHIPMENT' };
+    let best = null, bd = 1e9; for (const m of materiel) if (m.type === 'generator' && !m.destroyed) { const d = dist2D(m.x, m.z, camera.position.x, camera.position.z); if (d < bd) { bd = d; best = m; } }
+    return best ? { x: best.x, z: best.z, label: 'CHARGE POINT' } : null;
+  }
+  if (!ob[4].done) { if (L === 'C') return toDeck(); if (L === 'A') return { ...dS, label: 'BRIDGE ▲' }; const M = X(PORT_BRIDGE, 'M', PORT.sc0 + 30); return { ...M, label: 'MANIFEST' }; }
+  if (L !== 'A') return toDeck();
+  return exitZone ? { x: exitZone.x, z: exitZone.z, label: onShip ? 'GANGWAY → RHIB' : 'RHIB' } : null;
+}
+// ---- team: HAWK + DOC follow, stack on the bridge door, and shoot what's shooting at you ----
+function portTeam(dt) {
+  const loud = enemies.some(e => e.state === 'chase' && e.portLevel === PORT.level);
+  for (const m of teammates) {
+    if (m.informant) continue;
+    m.fireT = (m.fireT === undefined ? 1 : m.fireT) - dt; if (m.fireT > 0) continue; m.fireT = 0.9 + Math.random() * 0.9;
+    const p = m.group.position; let tgt = null, bd = 32;
+    for (const e of enemies) { if (e.state === 'dead' || e.dummy || e.portLevel !== PORT.level || !(loud || e.state === 'chase')) continue; const q = e.group.position, d = dist2D(p.x, p.z, q.x, q.z);
+      if (d < bd && Math.abs(q.y - p.y) < 6 && hasLineOfSight(p.x, p.z, q.x, q.z)) { bd = d; tgt = e; } }
+    if (!tgt) continue;
+    const q = tgt.group.position; m.yaw = Math.atan2(q.x - p.x, q.z - p.z); m.group.rotation.y = m.yaw;
+    playNoise(0.07, 0.3 * volumeAt(p.x, p.z), 2600); spawnParticles(new THREE.Vector3(p.x + Math.sin(m.yaw) * 0.9, p.y + 1.35, p.z + Math.cos(m.yaw) * 0.9), 0xffd080, 4, 2, 0.04);
+    if (Math.random() < 0.55 - bd / 120) { tgt.health = 0; lastHit = null; killEnemy(tgt, Math.random() < 0.3, {}); addKillFeed(m.name + ': ' + (tgt.label || 'guard'));
+      if (Math.random() < 0.5) radioSay(m.name, ['Tango down.', 'Got him. He won\'t be loading anything again.', 'One less dockworker.', 'Down. Union\'s going to hear about this.'][Math.floor(Math.random() * 4)], 2.5); }
+  }
+  // stack on the superstructure door when you get close
+  const dS = portFind(PORT_DECK, PORT.sc0, PORT.sr0, 'S')[0];
+  if (PORT.stacked && !PORT.unstacked && (PORT.level !== 'A' || dist2D(camera.position.x, camera.position.z, dS.x, dS.z) > 30)) { PORT.unstacked = true; teammates.forEach(m => { m.goal = null; }); }
+  if (PORT.level === 'A' && !PORT.stacked && dist2D(camera.position.x, camera.position.z, dS.x, dS.z) < 12) {
+    PORT.stacked = true; const y = Math.PI / 2;
+    stackTeam([{ x: dS.x - CELL, z: dS.z - CELL, yaw: y }, { x: dS.x - CELL, z: dS.z + CELL, yaw: y }]);
+    radioSay('HAWK', 'Stacked on the bridge door. Your door, Wraith — we\'re right behind you.', 5);
+  }
+}
+// ---- every frame ----
+function updatePort(dt) {
+  if (currentMission !== 7 || state !== 'playing' || PORT.boat) return;
+  const x = camera.position.x, z = camera.position.z;
+  if (!PORT.yardDone && PORT.level === 'A' && z > (PORT.qr - 7) * CELL) { PORT.yardDone = true; radioSay('HAWK', 'Out of the stacks. Sniper on crane 2 — the blue one. Take him or we don\'t cross that quay.', 6); }
+  if (PORT.sniper && PORT.sniper.state === 'dead' && !PORT.said.sniper) { PORT.said.sniper = true; radioSay('DOC', 'Sniper\'s down. Forty metres is a long way to fall for a man who\'s already dead. Gangway, go.', 6); }
+  if (!PORT.boarded && enemies.some(e => e.state === 'chase')) PORT.silentFail = true;
+  if (!PORT.boarded && PORT.level === 'A' && portInShip(x, z)) { PORT.boarded = true; radioSay('HAWK', PORT.silentFail ? 'Aboard. Noisy, but aboard. Holds below the hatch, manifest on the bridge.' : 'Aboard, and nobody\'s the wiser. Holds below the hatch, manifest on the bridge.', 6); }
+  const pics = intelItems[1]; if (pics && pics.collected && !PORT.said.pics) { PORT.said.pics = true; radioSay('HAWK', 'Anti-tank missiles stolen from a Swiss depot... and a crate stencilled VILLA AURORA. That\'s his house, Wraith.', 7); }
+  const man = intelItems[0]; if (man && man.collected && !PORT.said.man) { PORT.said.man = true; radioSay('HAWK', 'Manifest says the consignee is a villa on Lake Como. THE PATRON\'s estate. We have our address.', 7); }
+  if (!PORT.said.done && objectivesComplete()) { PORT.said.done = true; radioSay('DOC', 'Charges set, ship\'s taking water. Off the boat, down the gangway, the RHIB\'s at the stern. Last one out buys the stroopwafels.', 7); showMessage('ALL OBJECTIVES DONE — RHIB at the quay, past the ship\'s stern.', 5); }
+  // the informant
+  if (!PORT.freed && PORT.level === 'C' && dist2D(x, z, PORT.informantSpot.x, PORT.informantSpot.z) < 2.6) {
+    PORT.freed = true; createTeammate(PORT.informantSpot.x, PORT.informantSpot.z, 'VOSS', {}); const m = teammates[teammates.length - 1]; m.informant = true; m.group.position.y = groundAt(m.group.position.x, m.group.position.z);
+    radioSay('VOSS', 'Thank God — they were going to feed me to the propeller. I\'m with you.', 5); showMessage('INFORMANT FREED — Voss follows you out.', 3);
+  }
+  // ladders / stairs between floors
+  const pick = (map, c0, ch) => portFind(map, c0, PORT.sr0, ch)[0];
+  if (!PORT.lift.armed) { if (dist2D(x, z, PORT.lift.from.x, PORT.lift.from.z) > 3) PORT.lift.armed = true; }
+  else {
+    const dS = pick(PORT_DECK, PORT.sc0, 'S'), dH = pick(PORT_DECK, PORT.sc0, 'H'), bS = pick(PORT_BRIDGE, PORT.sc0 + 30, 'S'), cH = pick(PORT_BELOW, PORT.sc0, 'H');
+    const go = (L, p, yaw, msg) => { portSetLevel(L, { x: p.x, z: p.z, yaw }); PORT.lift = { armed: false, from: { x: p.x, z: p.z } }; playNoise(0.5, 0.1, 500); showMessage(msg, 3); };
+    if (PORT.level === 'A' && dist2D(x, z, dS.x, dS.z) < 1.6) go('B', { x: bS.x + CELL, z: bS.z }, -Math.PI / 2, 'Up the stairs — THE BRIDGE.');
+    else if (PORT.level === 'A' && dist2D(x, z, dH.x, dH.z) < 1.6) { go('C', cH, Math.PI / 2, 'Down the ladder — the HOLDS.'); if (!PORT.said.holds) { PORT.said.holds = true; radioSay('DOC', 'Hold 2 is aft of this one. Engine room past that — charge points on the main engine and the sea chest. B to plant, Y to fire, and stand back.', 7); } }
+    else if (PORT.level === 'B' && dist2D(x, z, bS.x, bS.z) < 1.6) go('A', { x: dS.x - CELL, z: dS.z }, Math.PI / 2, 'Down to the main deck.');
+    else if (PORT.level === 'C' && dist2D(x, z, cH.x, cH.z) < 1.6) go('A', { x: dH.x, z: dH.z - CELL }, Math.PI / 2, 'Up on the main deck.');
+  }
+  portTeam(dt);
+}
+function portStartBoat() {
+  if (PORT.boat) return;
+  const b = PORT.boatMesh.position; PORT.boat = { t: 0, x: b.x, z: b.z, boom: 0 };
+  weaponRoot.visible = false; showMessage('IN THE RHIB — GO GO GO!', 2.5); playNoise(4, 0.2, 300);
+  radioSay('HAWK', 'Everyone in? Voss, sit down and hold on. Hit it!', 5);
+}
+function updatePortBoat(dt) {
+  const B = PORT.boat; B.t += dt; const t = B.t, sp = Math.min(14, t * 6);
+  B.z += sp * dt; B.x += sp * 0.35 * dt; PORT.boatMesh.position.set(B.x, -2.2 + Math.sin(t * 3) * 0.1, B.z);
+  camera.position.set(B.x - 1, -0.3 + Math.sin(t * 3) * 0.12, B.z - 0.5);
+  const ship = { x: (PORT.sc0 + 33) * CELL, z: (PORT.sr0 + 3) * CELL }; camera.rotation.set(0.05, Math.atan2(-(ship.x - B.x), -(ship.z - B.z)), Math.sin(t * 2.3) * 0.03, 'YXZ');
+  if (t > 2.5 && B.boom < 3 && t > 2.5 + B.boom * 0.9) {
+    const p = new THREE.Vector3(ship.x - 30 * B.boom, PORT.deckY + 4, ship.z); spawnParticles(p, 0xffa040, 40, 14, 0.4); spawnParticles(p, 0x303030, 25, 6, 0.6);
+    const l = new THREE.PointLight(0xff8030, 4000, 300, 1.4); l.position.copy(p); levelGroup.add(l); setTimeout(() => levelGroup.remove(l), 700);
+    playNoise(2.2, 0.5, 200); playTone(50, 25, 1.4, 0.35, 'sine'); B.boom++;
+    if (B.boom === 1) radioSay('DOC', 'And THAT is how you return to sender.', 5);
+  }
+  if (t > 8.5 && state === 'playing') { PORT.boat = null; endGame(true); }
+}
+
+// #####################################################################
 // ##  SECTION 14: GAME LOOP (runs ~60 times a second)                ##
 // #####################################################################
 const clock = new THREE.Clock();
@@ -8595,6 +8983,9 @@ function gameLoop() {
     debugInfo.updates++;
     if (DAM.jump) {                              // v0.6.29: the bungee exit
       safe('damJump', () => updateDamJump(dt));
+      safe('hud', () => updateHUD(dt));
+    } else if (PORT.on && PORT.boat) {           // v0.6.31: RHIB exfil
+      safe('portBoat', () => updatePortBoat(dt));
       safe('hud', () => updateHUD(dt));
     } else if (RAIL.on && RAIL.seq) {            // v0.6.30: bridge drop / viaduct jump
       safe('railSeq', () => updateRailSeq(dt));
@@ -8627,6 +9018,7 @@ function gameLoop() {
     safe('breachHint', () => breachDoorHint());
     safe('dam', () => updateDam(dt));
     safe('rail', () => updateRail(dt));
+    safe('port', () => updatePort(dt));
     }
   }
   if (!(state === 'playing' && haloActive()) && HA.on) { haloAudioMute(); if (document.body.classList.contains('haloOn')) document.body.classList.remove('haloOn'); }
@@ -10822,7 +11214,7 @@ if (!debugInfo.on) document.getElementById('debugHud').style.display = 'none';
 window.__game = {
   THREE, SOUNDS, sfxBuf: () => sfxBuf, renderer, setGraphics, worldSun: () => worldSun, gfx: () => SETTINGS.graphicsQuality, blastFX, demoBlast, explosionAt, DEMO_AT, demoTargets: () => demoTargets, materiel: () => materiel, reloadPose, knifeModel, reloadMag, fx: () => effects.length, startReload, weaponState: () => weaponState,
   endMission: won => endGame(won),
-  progress: () => ({ dev: DEV, unlockedIdx, unlocked: [0, 1, 2, 3, 4, 5, 6].filter(isUnlocked) }),
+  progress: () => ({ dev: DEV, unlockedIdx, unlocked: [0, 1, 2, 3, 4, 5, 6, 7].filter(isUnlocked) }),
   sig: () => SIG, fr: () => FR, orderCover, hjobAhead, coverOn, hawk, SIGAT, FRAT, cutJammer,
   SETTINGS, CALIBERS, WEAPONS, player, camera, startMission, switchWeapon,
   enemies: () => enemies, state: () => state, weaponState: () => weaponState, renderFrame: () => { updateFigureLOD(); renderer.render(scene, camera); }, figureLOD: () => enemies.filter(e => e.fig && e.fig.lod).length, glFinish: () => renderer.getContext().finish(), debugInfo, VERSION, aimOffset: () => aimOffset, lastShotInfo: () => lastShotInfo, lean, safeUnlock, endGame,
@@ -10857,6 +11249,8 @@ window.__game = {
   gateSideText, layoutHud: () => { hudLayoutAt = 0; layoutHud(); }, exitLockedText, exitZone: () => exitZone, showMessage, showQuip, radioSay,
   radioPressed, trainingOverview, teleportTo, curStep, trainGates: () => trainGates, obstacles: () => obstacles, chooseMission, currentWeapon: () => currentWeapon, aiming: () => aiming,
   aimAt: (x, y, z) => { const d = new THREE.Vector3(x, y, z).sub(camera.position); camera.rotation.set(Math.asin(THREE.MathUtils.clamp(d.y / d.length(), -1, 1)), Math.atan2(-d.x, -d.z), 0, 'YXZ'); },
+  // v0.6.31 port hooks
+  PORT, portObjectives, portObjective, portSetLevel, portFind, PORT_DECK, PORT_BELOW, PORT_BRIDGE, portCell, portStartBoat, killEnemy,
   // v0.6.30 train hooks
   RAIL, railObjectives, railObjective, railSpace, railTryJump, railOnBridge, railInTunnel, railForceViaduct, railTileAt,
   // v0.6.29 dam hooks
