@@ -19,3 +19,11 @@ props/knife.glb      "Knife" by Quaternius — CC0
                      serrated spine, close to a KA-BAR in shape; not a branded KA-BAR model.
 The gloved hand, the M112 C4 block, the linear door charge, the reload magazine and all explosion
 effects are drawn by the game itself (no outside assets).
+
+Vehicles (v0.6.35) - models/vehicles/
+- helicopter.glb: "Helicopter" by Zsky, CC-BY 3.0 (https://creativecommons.org/licenses/by/3.0/), via Poly Pizza https://poly.pizza/m/hG2Qr0A3zR
+  Used for the Oil Rig exfil helicopter and the Cold Horizon / Sniper materiel helicopter.
+- rhib.glb: "Military Boat" by Zsky, CC-BY 3.0, via Poly Pizza https://poly.pizza/m/wouBxOe3CD
+  Used for the RHIB at Port and Oil Rig and the Villa Aurora lake boat.
+- motoryacht.glb: "Yacht" by Alex Safayan, CC-BY 3.0, via Poly Pizza https://poly.pizza/m/9znU2c-dTSR
+  Used as THE PATRON's escape boat at Villa Aurora.

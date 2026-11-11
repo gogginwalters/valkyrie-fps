@@ -263,6 +263,7 @@
     <div class="controls" id="controlsStart"></div>
     <div class="credits"><b>CREDITS</b><br>Soldier model: <b>"SWAT"</b> by <b>Quaternius</b> (quaternius.com, via poly.pizza) — CC0 1.0 public domain. Tinted and fitted with rifles in-game.<br>
       Gun models: licensed low-poly firearms from Poly Pizza (AdamKokrito, Kristian M, J-Toastie, CreativeTrio, Pichuliru, austincford) — see models/guns/CREDITS.txt.<br>
+      Vehicles: "Helicopter" and "Military Boat" by <b>Zsky</b>, "Yacht" by <b>Alex Safayan</b> (poly.pizza) — CC-BY 3.0; plus Humvee (madtrollstudio) and M939 truck (J-Toastie), CC-BY — see models/CREDITS.txt.<br>
       3D engine: <b>Three.js</b> (MIT licence). Everything else made in code for this game.</div>
     <p id="loadError">Could not load the 3D library (Three.js). Check your internet connection and refresh.</p>
   </div>
@@ -411,7 +412,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 // ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
 // ##  part failed and why.                                           ##
 // #####################################################################
-const VERSION = 'v0.6.34';
+const VERSION = 'v0.6.35';
 // v0.6.6 MISSION UNLOCKS. Order: TRAINING (0) -> BLACK FILE (1) -> SNIPER LESSON (3) -> COLD HORIZON (2).
 // A new player has only TRAINING; winning a mission unlocks the next one (saved as valkyrieUnlocked =
 // how far along that list you've got, 0-3). Developer mode (?dev=1, remembered; ?dev=0 clears it)
@@ -1485,6 +1486,7 @@ function buildLevel_() {
   RAIL.on = false; RAIL.seq = null; RAIL.roof = false;   // v0.6.30
   PORT.on = false; PORT.boat = null;   // v0.6.31
   RIG.on = false; RIG.seq = null;   // v0.6.32
+  WATER_TEX.length = 0;   // v0.6.35
   EST.on = false; EST.seq = null;   // v0.6.33
   cinematicHud(false);   // v0.6.34
   if (levelGroup) { scene.remove(levelGroup); levelGroup.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
@@ -5220,7 +5222,7 @@ function buildSniperMission() {
       sunDirection: sunDir.clone(), sunColor: 0xffe0b0, waterColor: 0x1e3a48, distortionScale: 2.2, fog: true });
     sniperWater.material.uniforms.size.value = 4;
   } else {
-    sniperWater = new THREE.Mesh(lakeGeo, new THREE.MeshStandardMaterial({ color: 0x27475a, metalness: 0.85, roughness: 0.12 }));
+    sniperWater = cheapWater(lakeGeo, 0x27475a);   // v0.6.35
   }
   sniperWater.rotation.x = -Math.PI / 2; sniperWater.position.set(Lk.x, M2_WORLD.waterLevel, Lk.z);
   levelGroup.add(sniperWater);
@@ -5420,7 +5422,7 @@ function addMateriel(def) {
     for (const x of [-1.1, 1.1]) part(new THREE.BoxGeometry(0.12, 0.12, 4.2), mat(0x222222), x, 0.3, 0);
     const rotor = new THREE.Group(); rotor.position.set(0, 4.0, 0); g.add(rotor);
     for (const r of [0, Math.PI / 2]) { const blade = new THREE.Mesh(new THREE.BoxGeometry(13, 0.06, 0.4), mat(0x1e1e1e)); blade.rotation.y = r; blade.castShadow = true; rotor.add(blade); }
-    m.rotor = rotor;
+    m.rotor = rotor; rotor.position.y = 3.6; dressModel('heli', g, 14, 'z');   // v0.6.35: real helicopter model (parts stay as hit shapes)
   } else if (def.type === 'generator') {
     createGenerator(p.x, p.z);                     // reuse the stealth generator (sound masking!)
     const gen = masking.generator;
@@ -5583,6 +5585,7 @@ function updateMateriel(dt) {
   explosionLight.intensity *= Math.exp(-dt * 6);
   for (const s of smokers) if (s.until > masking.time && Math.random() < dt * 4) spawnParticles(s.pos, 0x3a3a3a, 1, 1.5, 0.6);
   for (const m of materiel) if (m.rotor && !m.destroyed) m.rotor.rotation.y += dt * 0.6;   // parked rotor turning slowly
+  tickWater(dt);   // v0.6.35
   if (sniperWater && sniperWater.material.uniforms && sniperWater.material.uniforms.time) sniperWater.material.uniforms.time.value += dt * 0.5;
 }
 
@@ -8020,7 +8023,7 @@ function buildDamMission() {
   resShape.lineTo(900, 1600); resShape.closePath();
   const resGeo = new THREE.ShapeGeometry(resShape, 1);
   if (Q) { sniperWater = new Water(resGeo, { textureWidth: 512, textureHeight: 512, waterNormals: makeWaterNormals(), sunDirection: sunDir.clone(), sunColor: 0xfff0d0, waterColor: 0x1f4a52, distortionScale: 2.0, fog: true }); sniperWater.material.uniforms.size.value = 4; }
-  else sniperWater = new THREE.Mesh(resGeo, new THREE.MeshStandardMaterial({ color: 0x2b5a60, metalness: 0.8, roughness: 0.12 }));
+  else sniperWater = cheapWater(resGeo, 0x2b5a60);   // v0.6.35
   sniperWater.rotation.x = -Math.PI / 2; sniperWater.position.set(C.x, DAM.HC - 9, C.z); levelGroup.add(sniperWater);
   const river = new THREE.Mesh(new THREE.PlaneGeometry(70, 1500), new THREE.MeshStandardMaterial({ color: 0x3a6a6a, metalness: 0.6, roughness: 0.2 }));
   river.rotation.x = -Math.PI / 2; river.position.set(C.x, -0.6, C.z + 820); levelGroup.add(river);
@@ -8212,6 +8215,11 @@ function updateDamJump(dt) {
   const k = Math.min(1, t / 0.8);
   camera.position.set(J.x0 + (J.x - J.x0) * k, top - Math.max(0, d), J.z0 + (J.z - J.z0) * k);
   camera.rotation.set(t < 0.8 ? -0.3 - 0.6 * k : -1.25 + 0.4 * Math.sin(t * 1.3), Math.PI, Math.sin(t * 0.7) * 0.15, 'YXZ');
+  // v0.6.35: the cord — from the crest anchor to your ankles, thinner as it stretches; on the rebound you look up at it
+  if (!J.cord) { J.cord = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 8), new THREE.MeshStandardMaterial({ color: 0xe0561c, roughness: 0.55, emissive: 0x5a1a04 })); levelGroup.add(J.cord); const a = damCrestPt(0, DAM.T); J.toDam = new THREE.Vector3(a.x - J.x, 0, a.z - J.z).normalize().multiplyScalar(0.8); J.anchor = new THREE.Vector3(J.x + J.toDam.x, DAM.HC + 0.3, J.z + J.toDam.z); }   // overhanging arm straight above you
+  { const foot = new THREE.Vector3(camera.position.x + J.toDam.x, camera.position.y - 1.2, camera.position.z + J.toDam.z), v = new THREE.Vector3().subVectors(J.anchor, foot), len = Math.max(0.2, v.length()), r = Math.max(0.05, 0.06 * Math.sqrt(20 / Math.max(20, len)));
+    J.cord.position.copy(foot).addScaledVector(v, 0.5); J.cord.scale.set(r, len, r); J.cord.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), v.normalize()); J.cord.visible = t > 0.5; }
+  if (t > 4.2) { const u = Math.min(1, (t - 4.2) / 2.2), e = u * u * (3 - 2 * u); camera.rotation.y = Math.PI * (1 + e); camera.rotation.x = -0.45 + 1.55 * e; }   // turn to face the dam and look up the cord
   if (t > 1 && !J.wind) { J.wind = true; playNoise(3.2, 0.3, 1200); }
   if (t > 4.2 && !J.snap) { J.snap = true; playTone(70, 40, 0.5, 0.3, 'sine'); }
   if (t > 9 && state === 'playing') { DAM.jump = null; endGame(true); }
@@ -8302,7 +8310,7 @@ function railBuildShared(Q) {
   S.stoneM = pbr(new THREE.MeshStandardMaterial({ color: 0x9c968a, roughness: 0.9 }), 'block', { mode: 'detail', scale: 3, local: true });
   S.rockM = pbr(new THREE.MeshStandardMaterial({ color: 0x6c6a66, roughness: 1 }), 'rock', { mode: 'detail', scale: 4, local: true });
   S.concreteM = pbr(new THREE.MeshStandardMaterial({ color: 0xa8a69e, roughness: 0.85 }), 'concrete', { mode: 'detail', scale: 3, local: true });
-  S.riverM = new THREE.MeshStandardMaterial({ color: 0x3f7f86, roughness: 0.15, metalness: 0.5 });
+  S.riverM = cheapWaterMat(0x3f7f86, 120, 12);   // v0.6.35: moving ripples
   S.trunkG = new THREE.CylinderGeometry(0.25, 0.35, 3, 6).translate(0, 1.5, 0);
   S.crownG = new THREE.ConeGeometry(2.3, 7.5, 7).translate(0, 6.2, 0);
   S.capG = new THREE.ConeGeometry(1.2, 2.6, 7).translate(0, 9.3, 0);
@@ -8746,7 +8754,7 @@ function buildPortMission() {
   const edge = new THREE.Mesh(new THREE.BoxGeometry(700, 0.25, 0.6), new THREE.MeshStandardMaterial({ color: 0xc8b030, roughness: 0.6 })); edge.position.set(C.x, 0.12, C.z - 0.5); levelGroup.add(edge);
   const wGeo = new THREE.PlaneGeometry(3000, 1600);
   if (Q) { sniperWater = new Water(wGeo, { textureWidth: 512, textureHeight: 512, waterNormals: makeWaterNormals(), sunDirection: new THREE.Vector3(-0.4, 0.6, 0.5).normalize(), sunColor: 0x8090b0, waterColor: 0x0a1a22, distortionScale: 2.5, fog: true }); sniperWater.material.uniforms.size.value = 3; }
-  else sniperWater = new THREE.Mesh(wGeo, new THREE.MeshStandardMaterial({ color: 0x0c1c24, metalness: 0.7, roughness: 0.2 }));
+  else sniperWater = cheapWater(wGeo, 0x0c1c24);   // v0.6.35
   sniperWater.rotation.x = -Math.PI / 2; sniperWater.position.set(C.x, -2, C.z + 800); levelGroup.add(sniperWater);
   // far shore: cranes and lights of the rest of the port
   { const glow = new THREE.MeshBasicMaterial({ color: 0xffb060 }), red = new THREE.MeshBasicMaterial({ color: 0xff2a20 }), dark = new THREE.MeshStandardMaterial({ color: 0x15171c, roughness: 1 });
@@ -8915,7 +8923,7 @@ function portShip(Q) {
   const X = portCell(PORT.exit.c, PORT.exit.r), boat = new THREE.Group();
   const bh = new THREE.Mesh(new THREE.BoxGeometry(8, 1, 2.8), new THREE.MeshStandardMaterial({ color: 0x22252a, roughness: 0.7 })); bh.position.y = 0.3; boat.add(bh);
   for (const s of [-1.3, 1.3]) { const t = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 8, 10), new THREE.MeshStandardMaterial({ color: 0x3a3a3a, roughness: 0.8 })); t.rotation.z = Math.PI / 2; t.position.set(0, 0.6, s); boat.add(t); }
-  boat.position.set(X.x, -2.2, X.z + 5); levelGroup.add(boat); PORT.boatMesh = boat;
+  boat.position.set(X.x, -2.2, X.z + 5); levelGroup.add(boat); PORT.boatMesh = boat; dressModel('rhib', boat, 8.5, 'z', { y: -0.3 });   // v0.6.35
 }
 function portLights(low) {
   const L = [], sod = 0xffa040, pole = new THREE.MeshStandardMaterial({ color: 0x3a3c40, roughness: 0.6 });
@@ -9087,7 +9095,7 @@ function buildRigMission() {
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); levelGroup.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 2, sizeAttenuation: false, fog: false }))); }
   const wGeo = new THREE.PlaneGeometry(4000, 4000);
   if (Q) { sniperWater = new Water(wGeo, { textureWidth: 512, textureHeight: 512, waterNormals: makeWaterNormals(), sunDirection: new THREE.Vector3(-0.5, 0.5, 0.6).normalize(), sunColor: 0x8090b0, waterColor: 0x08161e, distortionScale: 6, fog: true }); sniperWater.material.uniforms.size.value = 1.2; }
-  else sniperWater = new THREE.Mesh(wGeo, new THREE.MeshStandardMaterial({ color: 0x0a1820, metalness: 0.75, roughness: 0.25 }));
+  else sniperWater = cheapWater(wGeo, 0x0a1820);   // v0.6.35
   sniperWater.rotation.x = -Math.PI / 2; sniperWater.position.set(xc, 0, zc); levelGroup.add(sniperWater);
   // ---- four wall grids + stairs ----
   worldCols = worldRows = Math.ceil(size / CELL); worldOffset = { x: C.x - size / 2, z: C.z - size / 2 };
@@ -9182,11 +9190,11 @@ function rigBuild(Q, low) {
   for (const [c, r, L] of [[7, 6, 0], [6, 2, 1], [8, 8, 2], [11, 3, 3]]) { const p = rigCell(c, r), l = new THREE.PointLight(0xfff0d8, 160, 30, 1.6); l.position.set(p.x, RIG.Y[L] + 6, p.z); levelGroup.add(l); }
   // the boat (intro) and HAWK's helicopter (exfil)
   const boat = new THREE.Group(), dark = new THREE.MeshStandardMaterial({ color: 0x22252a, roughness: 0.7 });
-  const bh = new THREE.Mesh(new THREE.BoxGeometry(7, 1, 2.6), dark); bh.position.y = 0.3; boat.add(bh); levelGroup.add(boat); RIG.boat = boat;
+  const bh = new THREE.Mesh(new THREE.BoxGeometry(7, 1, 2.6), dark); bh.position.y = 0.3; boat.add(bh); levelGroup.add(boat); RIG.boat = boat; dressModel('rhib', boat, 7.5, 'x', { y: -0.5 });
   const heli = new THREE.Group(), hb = new THREE.Mesh(new THREE.BoxGeometry(3, 2.6, 9), new THREE.MeshStandardMaterial({ color: 0x2a3028, roughness: 0.6 })); heli.add(hb);
   const tail = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.8, 8), hb.material); tail.position.set(0, 0.6, -8); heli.add(tail);
   const rot = new THREE.Mesh(new THREE.BoxGeometry(16, 0.08, 0.5), dark); rot.position.y = 1.6; heli.add(rot); RIG.rotor = rot;
-  heli.visible = false; levelGroup.add(heli); RIG.heli = heli;
+  heli.visible = false; levelGroup.add(heli); RIG.heli = heli; dressModel('heli', heli, 17, 'z', { y: -2.4, keep: [rot] });   // v0.6.35
 }
 // ---- objectives / compass ----
 function rigObjectives() {
@@ -9254,11 +9262,11 @@ function updateRigSeq(dt) {
     const T = 9.5, t = S.t, u = Math.min(1, t / 6), p0 = S.p0;
     const pos = new THREE.Vector3(p0.x + 70 * u * u, p0.y + 45 * u, p0.z + 110 * u * u); camera.position.copy(pos);
     const rc = rigCell(8, 6); camera.lookAt(rc.x, RIG.Y[1], rc.z);
-    RIG.heli.position.set(pos.x + 1, pos.y + 1.5, pos.z); RIG.rotor.rotation.y += dt * 25;
+    RIG.heli.position.set(pos.x + 1, pos.y + 1.5, pos.z); RIG.rotor.rotation.y += dt * 25; tickBoomFX(S, dt);
     if (t > 2 && S.boom < 5 && t > 2 + S.boom * 0.8) {
       const m = materiel.filter(m => m.type === 'generator')[S.boom % 4], p = m ? new THREE.Vector3(m.x, m.y + 2, m.z) : new THREE.Vector3(rc.x, RIG.Y[1], rc.z);
       if (S.boom === 4) p.set(rc.x, RIG.Y[2] + 6, rc.z);
-      spawnParticles(p, 0xffa040, 50, 16, 0.5); spawnParticles(p, 0x302820, 30, 8, 0.7);
+      spawnParticles(p, 0xffa040, 50, 16, 0.5); spawnParticles(p, 0x302820, 30, 8, 0.7); boomFX(S, p);   // v0.6.35
       const l = new THREE.PointLight(0xff8030, 6000, 400, 1.4); l.position.copy(p); levelGroup.add(l); setTimeout(() => levelGroup.remove(l), 800);
       playNoise(2.4, 0.5, 180); playTone(45, 22, 1.6, 0.35, 'sine'); S.boom++;
       if (S.boom === 1) radioSay('DOC', 'Nordkapp Alpha is now a very expensive candle.', 5);
@@ -9269,7 +9277,7 @@ function updateRigSeq(dt) {
 }
 function rigStartHeli() {
   if (RIG.seq || RIG.level !== 3) return;
-  RIG.seq = { type: 'heli', t: 0, boom: 0, p0: camera.position.clone() }; weaponRoot.visible = false; cinematicHud(true);
+  RIG.seq = { type: 'heli', t: 0, boom: 0, p0: camera.position.clone() }; if (RIG.heli) RIG.heli.rotation.y = Math.PI / 4; weaponRoot.visible = false; cinematicHud(true);
   showMessage('ABOARD THE HELICOPTER — LIFT, LIFT, LIFT!', 2.5); playNoise(3, 0.25, 150);
   radioSay('HAWK', 'Got him! Pull up! Doc — the button, if you would.', 4);
 }
@@ -9334,7 +9342,7 @@ function buildEstateMission() {
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(P), 3)); levelGroup.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffc070, size: 2.5, sizeAttenuation: false, fog: false }))); }
   const wGeo = new THREE.PlaneGeometry(4000, 2400);
   if (Q) { sniperWater = new Water(wGeo, { textureWidth: 512, textureHeight: 512, waterNormals: makeWaterNormals(), sunDirection: new THREE.Vector3(0.4, 0.6, 0.5).normalize(), sunColor: 0x8090c0, waterColor: 0x0a1a24, distortionScale: 2.2, fog: true }); sniperWater.material.uniforms.size.value = 2.5; }
-  else sniperWater = new THREE.Mesh(wGeo, new THREE.MeshStandardMaterial({ color: 0x0c1c26, metalness: 0.7, roughness: 0.2 }));
+  else sniperWater = cheapWater(wGeo, 0x0c1c26);   // v0.6.35
   sniperWater.rotation.x = -Math.PI / 2; sniperWater.position.set(xc, -0.7, z1 - CELL + 1200); levelGroup.add(sniperWater);
   // ---- three wall grids + stairs ----
   worldCols = worldRows = Math.ceil(size / CELL); worldOffset = { x: C.x - size / 2, z: C.z - size / 2 };
@@ -9448,9 +9456,9 @@ function estBuild(Q, low) {
   // boathouse roof, jetty, HAWK's boat, THE PATRON's speedboat
   { const a = estCell(27, 23), b = estCell(34, 27); add(new THREE.BoxGeometry(b.x - a.x + CELL + 1, 0.4, b.z - a.z + CELL + 1), terracotta, (a.x + b.x) / 2, 3.8, (a.z + b.z) / 2, false);
     const j = estCell(36, 28); add(new THREE.BoxGeometry(3 * CELL, 0.3, 26), wood, j.x, -0.2, j.z + 13, false);
-    const boat = new THREE.Group(), hull = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1, 7), new THREE.MeshStandardMaterial({ color: 0x22262a, roughness: 0.6 })); hull.position.y = 0.2; boat.add(hull); boat.position.set(j.x + 4, -0.6, j.z + 18); levelGroup.add(boat); EST.boat = boat;
+    const boat = new THREE.Group(), hull = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1, 7), new THREE.MeshStandardMaterial({ color: 0x22262a, roughness: 0.6 })); hull.position.y = 0.2; boat.add(hull); boat.position.set(j.x + 4, -0.6, j.z + 18); levelGroup.add(boat); EST.boat = boat; dressModel('rhib', boat, 7.5, 'z', { y: -0.3 });
     const sp = new THREE.Group(), sh = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.9, 8), new THREE.MeshStandardMaterial({ color: 0xf2efe8, roughness: 0.3, metalness: 0.2 })), sw = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.8, 1.6), new THREE.MeshStandardMaterial({ color: 0x8a6a40, roughness: 0.3 }));
-    sw.position.set(0, 0.8, -0.6); sp.add(sh, sw); const s = estCell(31, 26); sp.position.set(s.x, -0.3, s.z); levelGroup.add(sp); EST.speedboat = sp;
+    sw.position.set(0, 0.8, -0.6); sp.add(sh, sw); const s = estCell(31, 26); sp.position.set(s.x, -0.3, s.z); levelGroup.add(sp); EST.speedboat = sp; dressModel('yacht', sp, 9, 'z', { y: -0.4 });
     const wt = new THREE.Mesh(new THREE.PlaneGeometry(3 * CELL, 3 * CELL), new THREE.MeshStandardMaterial({ color: 0x0c1c26, metalness: 0.7, roughness: 0.2 })); wt.rotation.x = -Math.PI / 2; wt.position.set(s.x, -0.6, s.z); levelGroup.add(wt); }
   // garden lamps (go dark when you cut the power), interior lights
   for (const [c, r] of [[21, 13], [22, 20], [30, 14], [12, 13], [34, 20], [21, 26]]) { const p = estCell(c, r);
@@ -9550,17 +9558,12 @@ function updateEstateSeq(dt) {
   }
   if (S.type === 'finale') {
     const T = 14, t = S.t, u = Math.min(1, t / 10), bx = j.x + 4 + 30 * u, bz = j.z + 18 + 110 * u * u;
-    EST.boat.position.set(bx, -0.6, bz); EST.boat.rotation.set(0, Math.PI, 0); camera.position.set(bx, 2 + u * 6, bz + 3); camera.lookAt(estCell(21, 7).x, 6, estCell(21, 7).z);
+    EST.boat.position.set(bx, -0.6, bz); EST.boat.rotation.set(0, 0, 0); camera.position.set(bx, 2 + u * 6, bz + 3); camera.lookAt(estCell(21, 7).x, 6, estCell(21, 7).z);
     if (t > 1.5 && S.boom < 6 && t > 1.5 + S.boom * 1.1) { const c = estCell(15 + S.boom * 3, 3 + (S.boom % 3) * 3), p = new THREE.Vector3(c.x, 6 + Math.random() * 4, c.z);
       spawnParticles(p, 0xffa040, 50, 14, 0.5); spawnParticles(p, 0x302820, 30, 7, 0.7); const l = new THREE.PointLight(0xff8030, 5000, 300, 1.4); l.position.copy(p); levelGroup.add(l); setTimeout(() => levelGroup.remove(l), 900);
       playNoise(2.2, 0.45, 180); playTone(48, 22, 1.5, 0.3, 'sine'); S.boom++;
-      // v0.6.34: big visible fireballs + fires that keep burning on the roof
-      const fb = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), new THREE.MeshBasicMaterial({ color: 0xffb050, transparent: true, opacity: 0.95, fog: false, depthWrite: false })); fb.position.copy(p); levelGroup.add(fb); S.balls.push({ m: fb, t: 0 });
-      const fire = new THREE.Mesh(new THREE.ConeGeometry(2.6, 8, 8), new THREE.MeshBasicMaterial({ color: 0xff6a20, transparent: true, opacity: 0.85, fog: false, depthWrite: false })); fire.position.set(p.x, 13, p.z); levelGroup.add(fire); S.fires.push(fire);
-      if (!S.glow) { S.glow = new THREE.PointLight(0xff7a30, 0, 260, 1.2); S.glow.position.set(estCell(21, 7).x, 14, estCell(21, 7).z); levelGroup.add(S.glow); } }
-    for (const b of S.balls) { b.t += dt; b.m.scale.setScalar(2 + b.t * 16); b.m.material.opacity = Math.max(0, 0.95 - b.t * 1.0); b.m.visible = b.t < 1; }
-    for (const f of S.fires) { const k = 1 + Math.sin(elapsed * 13 + f.position.x) * 0.15; f.scale.set(k, 1 + Math.sin(elapsed * 9 + f.position.z) * 0.2, k); }
-    if (S.glow) S.glow.intensity = Math.min(9000, S.fires.length * 1800) * (0.85 + Math.random() * 0.2);
+      boomFX(S, p, 13); }   // v0.6.35: fireball, lasting fire, smoke
+    tickBoomFX(S, dt);
     if (t > 2 && !S.m1) { S.m1 = true; radioSay('DOC', 'Villa Aurora. Eleven bedrooms, nine bathrooms, one very expensive bonfire.', 5); }
     if (t > 6.5 && !S.m2) { S.m2 = true; radioSay('HAWK', 'The ledger goes to every paper in Europe in the morning. His friends are going to have a very bad breakfast.', 6); }
     if (t > 11 && !S.m3) { S.m3 = true; showMessage('VALKYRIE — CAMPAIGN COMPLETE', 4); }
@@ -10944,6 +10947,50 @@ function updateDemo(dt) {
 // ---- Demolition targets (the range, mission 0) ----
 // v0.6.25: real vehicle models instead of boxes (licensed, see models/CREDITS.txt). The old boxes stay
 // as invisible hit / plant shapes, so gameplay is identical; only the look changes.
+// v0.6.35: real helicopter + boat models (licensed, see models/CREDITS.txt). Same idea as the jeeps:
+// the old boxes stay as invisible hit shapes, the model is fitted to the same length and faces the same way.
+const MODEL_GLB = { heli: ['models/vehicles/helicopter.glb', 0], rhib: ['models/vehicles/rhib.glb', 0], yacht: ['models/vehicles/motoryacht.glb', -Math.PI / 2] };
+function dressModel(kind, group, length, front = 'z', o = {}) {
+  const [path, rotY] = MODEL_GLB[kind];
+  getGunGltf(path).then(gltf => {
+    if (!group.parent) return;
+    const m = SkeletonUtils.clone(gltf.scene), holder = new THREE.Group(); holder.add(m); m.rotation.y = rotY;
+    const b = measureMeshBox(m, holder), sz = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3());
+    m.position.set(-c.x, -b.min.y, -c.z); holder.scale.setScalar(length / Math.max(sz.x, sz.z));
+    if (front === 'x') holder.rotation.y = Math.PI / 2; holder.position.y = o.y || 0;
+    holder.traverse(q => { if (q.isMesh) { q.castShadow = true; q.receiveShadow = true; } });
+    for (const ch of group.children) if (ch.isMesh && !(o.keep || []).includes(ch)) ch.visible = false;
+    group.add(holder); group.userData.dressed = holder;
+  }).catch(() => {});                                            // no model = keep the boxes
+}
+// v0.6.35: cheap animated water for Medium / Low graphics: dark, with moving normal-mapped ripples
+const WATER_TEX = [];
+function cheapWaterMat(color, size = 400, tile = 18) {
+  const n = makeWaterNormals(); n.wrapS = n.wrapT = THREE.RepeatWrapping; n.repeat.set(size / tile, size / tile); WATER_TEX.push(n);
+  return new THREE.MeshStandardMaterial({ color: new THREE.Color(color).multiplyScalar(0.75), roughness: 0.18, metalness: 0.3, normalMap: n, normalScale: new THREE.Vector2(1.1, 1.1) });
+}
+function cheapWater(geo, color) { const p = geo.parameters || {}; return new THREE.Mesh(geo, cheapWaterMat(color, Math.max(p.width || 0, p.height || 0, (p.radius || 0) * 2) || 400)); }
+function tickWater(dt) { for (const t of WATER_TEX) { t.offset.x += dt * 0.015; t.offset.y += dt * 0.009; } }
+// v0.6.35: explosions that leave something behind: fireball, a fire that keeps burning, a column of smoke
+const _smokeGeo = new THREE.SphereGeometry(1, 8, 6);
+function boomFX(S, p, fireY) {
+  const F = S.fx || (S.fx = { balls: [], fires: [], smoke: [], smokeT: 0 });
+  const fb = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), new THREE.MeshBasicMaterial({ color: 0xffb050, transparent: true, opacity: 0.95, fog: false, depthWrite: false })); fb.position.copy(p); levelGroup.add(fb); F.balls.push({ m: fb, t: 0 });
+  const fire = new THREE.Mesh(new THREE.ConeGeometry(2.6, 8, 8), new THREE.MeshBasicMaterial({ color: 0xff6a20, transparent: true, opacity: 0.85, fog: false, depthWrite: false })); fire.position.set(p.x, fireY === undefined ? p.y + 3 : fireY, p.z); levelGroup.add(fire); F.fires.push(fire);
+  if (!F.glow) { F.glow = new THREE.PointLight(0xff7a30, 0, 300, 1.2); F.glow.position.set(p.x, p.y + 8, p.z); levelGroup.add(F.glow); }
+}
+function tickBoomFX(S, dt) {
+  const F = S.fx; if (!F) return;
+  for (const b of F.balls) { b.t += dt; b.m.scale.setScalar(2 + b.t * 16); b.m.material.opacity = Math.max(0, 0.95 - b.t); b.m.visible = b.t < 1; }
+  for (const f of F.fires) { const k = 1 + Math.sin(elapsed * 13 + f.position.x) * 0.15; f.scale.set(k, 1 + Math.sin(elapsed * 9 + f.position.z) * 0.2, k); }
+  if (F.glow) F.glow.intensity = Math.min(9000, F.fires.length * 1800) * (0.85 + Math.random() * 0.2);
+  F.smokeT -= dt;
+  if (F.fires.length && F.smokeT <= 0 && F.smoke.length < 70) { F.smokeT = 0.12; const f = F.fires[Math.floor(Math.random() * F.fires.length)];
+    const m = new THREE.Mesh(_smokeGeo, new THREE.MeshBasicMaterial({ color: 0x25221f, transparent: true, opacity: 0.55, depthWrite: false })); m.position.set(f.position.x + (Math.random() - 0.5) * 2, f.position.y + 3, f.position.z + (Math.random() - 0.5) * 2); levelGroup.add(m);
+    F.smoke.push({ m, t: 0, vx: 1.5 + Math.random(), vz: Math.random() - 0.5 }); }
+  for (let i = F.smoke.length - 1; i >= 0; i--) { const q = F.smoke[i]; q.t += dt; q.m.position.y += dt * 5; q.m.position.x += q.vx * dt; q.m.position.z += q.vz * dt; q.m.scale.setScalar(1.5 + q.t * 2.2); q.m.material.opacity = Math.max(0, 0.55 - q.t * 0.12);
+    if (q.t > 4.5) { levelGroup.remove(q.m); q.m.material.dispose(); F.smoke.splice(i, 1); } }
+}
 const VEHICLE_GLB = { jeep: 'models/vehicles/humvee.glb', truck: 'models/vehicles/m939.glb' };
 function dressVehicle(kind, group, length, axis, onMeshes) {
   const path = VEHICLE_GLB[kind]; if (!path) return;
@@ -11883,6 +11930,8 @@ window.__game = {
   gateSideText, layoutHud: () => { hudLayoutAt = 0; layoutHud(); }, exitLockedText, exitZone: () => exitZone, showMessage, showQuip, radioSay,
   radioPressed, trainingOverview, teleportTo, curStep, trainGates: () => trainGates, obstacles: () => obstacles, chooseMission, currentWeapon: () => currentWeapon, aiming: () => aiming,
   aimAt: (x, y, z) => { const d = new THREE.Vector3(x, y, z).sub(camera.position); camera.rotation.set(Math.asin(THREE.MathUtils.clamp(d.y / d.length(), -1, 1)), Math.atan2(-d.x, -d.z), 0, 'YXZ'); },
+  // v0.6.35 hooks
+  scene: () => scene, WATER_TEX, dam: () => DAM,
   // v0.6.34 hooks
   props: () => props, circleHitsWall, wakeFloorAlerts,
   // v0.6.33 estate hooks
