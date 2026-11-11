@@ -406,7 +406,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 // ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
 // ##  part failed and why.                                           ##
 // #####################################################################
-const VERSION = 'v0.6.27';
+const VERSION = 'v0.6.28';
 // v0.6.6 MISSION UNLOCKS. Order: TRAINING (0) -> BLACK FILE (1) -> SNIPER LESSON (3) -> COLD HORIZON (2).
 // A new player has only TRAINING; winning a mission unlocks the next one (saved as valkyrieUnlocked =
 // how far along that list you've got, 0-3). Developer mode (?dev=1, remembered; ?dev=0 clears it)
@@ -988,6 +988,7 @@ const ENV_LEVEL = { 0: 0.35, 1: 0.4, 2: 0.7, 3: 0.8 };   // how strongly the sky
 function setEnvIntensity(root, k) { root.traverse(o => { if (!o.isMesh) return; for (const m of [].concat(o.material)) if (m && 'envMapIntensity' in m) m.envMapIntensity = k; }); }
 // Called after every level build (and when the Graphics setting changes).
 function applyGraphics() {
+  safe('tex', () => pbrGraphics());   // v0.6.28: Low = no normal maps
   const G = gfx(), m = currentMission, outdoors = m === 2 || m === 3 || m === 4, night = SETTINGS.nightOps;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, G.pr)); fitRenderer(true); if (nvReady) resizeNightVision();
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -1427,7 +1428,7 @@ function findPath(sc, sr, tc, tr, maxNodes = 8000) {
   return path;
 }
 
-function buildLevel() { buildLevel_(); safe('graphics', () => applyGraphics()); }
+function buildLevel() { buildLevel_(); safe('graphics', () => applyGraphics()); safe('tex', () => pbrAfterBuild()); }
 function buildLevel_() {
   if (levelGroup) { scene.remove(levelGroup); levelGroup.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
   worldSun = null;
@@ -1621,6 +1622,173 @@ const zoneMat = {
   lobby:     { wall: new THREE.MeshStandardMaterial({ map: zoneTex.lobbyWall, roughness: 0.3, emissive: 0x202224 }), floor: new THREE.MeshStandardMaterial({ map: zoneTex.lobbyFloor, roughness: 0.25, metalness: 0.1 }) },
 };
 zoneMat.offices.wall = brickMaterial; zoneMat.warehouse.wall = concreteMaterial;
+// #####################################################################
+// ##  SECTION 4b: REAL TEXTURES (v0.6.28)                            ##
+// #####################################################################
+// CC0 photo-scanned PBR textures from Poly Haven (see tex/CREDITS.txt): colour + normal (bumps) + roughness, 1k webp.
+// They are projected in WORLD space from three sides ("triplanar"), so a brick is the same size on every wall and nothing
+// stretches. They load in the background after the game starts; until each set arrives you see the old look.
+// Low graphics skips the normal maps (never even downloads them).
+const PBR_SETS = ['brick', 'block', 'concrete', 'plaster', 'metal', 'corrugated', 'wood', 'asphalt', 'gravel', 'snow', 'rock', 'grass'];
+const PBR = {};
+for (const k of PBR_SETS) PBR[k] = { map: { value: null }, nor: { value: null }, rough: { value: null }, ready: { value: 0 }, norReady: { value: 0 }, avg: { value: new THREE.Vector3(0.5, 0.5, 0.5) }, ravg: { value: 0.5 }, loading: false, norLoading: false };
+function pbrAvg(img) {           // average colour of a texture, worked out once on load (saves the GPU a lookup per pixel)
+  try { const c = document.createElement('canvas'); c.width = c.height = 8; const g = c.getContext('2d'); g.drawImage(img, 0, 0, 8, 8); const d = g.getImageData(0, 0, 8, 8).data; let r = 0, gg = 0, b = 0;
+    for (let i = 0; i < d.length; i += 4) { r += d[i]; gg += d[i + 1]; b += d[i + 2]; } const n = d.length / 4 * 255; return [r / n, gg / n, b / n]; } catch (e) { return [0.5, 0.5, 0.5]; }
+}
+const pbrNorOn = { value: 1 }, pbrMats = [];
+const PBR_BLANK = new THREE.DataTexture(new Uint8Array([128, 128, 255, 255]), 1, 1); PBR_BLANK.needsUpdate = true;
+for (const k of PBR_SETS) { PBR[k].map.value = PBR[k].nor.value = PBR[k].rough.value = PBR_BLANK; }
+const pbrLoader = new THREE.TextureLoader();
+function pbrTex(url, srgb, done) {
+  pbrLoader.load(url, t => { t.wrapS = t.wrapT = THREE.RepeatWrapping; if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = SETTINGS.graphicsQuality === 'low' ? 1 : 4; done(t); },
+    undefined, () => { debugInfo.errors['tex:' + url] = 'failed'; });
+}
+function pbrLoad(k) {          // colour + roughness first; normals only when graphics isn't Low
+  const S = PBR[k]; if (!S) return;
+  if (!S.loading) { S.loading = true; let n = 0; const go = () => { if (++n === 2) { S.ready.value = 1; for (const m of pbrMats) if (m.userData.pbr.set === k && m.userData.pbrInstall) m.userData.pbrInstall(); } };
+    pbrTex(`tex/${k}_diff.webp`, true, t => { const a = pbrAvg(t.image).map(v => Math.pow(v, 2.2)); S.avg.value.set(Math.max(0.04, a[0]), Math.max(0.04, a[1]), Math.max(0.04, a[2])); S.map.value = t; go(); });
+    pbrTex(`tex/${k}_rough.webp`, false, t => { S.ravg.value = Math.max(0.05, pbrAvg(t.image)[1]); S.rough.value = t; go(); }); }
+  if (!S.norLoading && SETTINGS.graphicsQuality !== 'low') { S.norLoading = true; pbrTex(`tex/${k}_nor.webp`, false, t => { S.nor.value = t; S.norReady.value = 1; }); }
+}
+function pbrGraphics() {
+  const on = SETTINGS.graphicsQuality !== 'low'; pbrNorOn.value = on ? 1 : 0;
+  for (const m of pbrMats) { if (!m.userData.pbrOn) continue; const has = 'PBR_NOR' in m.defines; if (has !== on) { if (on) m.defines.PBR_NOR = ''; else delete m.defines.PBR_NOR; m.needsUpdate = true; } }
+  if (on) for (const k of PBR_SETS) if (PBR[k].loading) pbrLoad(k);
+}
+const PBR_GLSL = `
+  varying vec3 vPbrW;
+  uniform sampler2D pbrMap, pbrRough;
+  uniform float pbrReady, pbrScale, pbrMode, pbrStrength, pbrAvgR;
+  uniform vec3 pbrTint, pbrAvgC;
+  #ifdef PBR_NOR
+    uniform sampler2D pbrNor; uniform float pbrNorReady, pbrNs;
+  #endif
+  #ifdef PBR2
+    uniform sampler2D pbrMap2, pbrRough2; uniform float pbrReady2, pbrScale2, pbrMix2, pbrThr2, pbrAvgR2; uniform vec3 pbrAvgC2;
+    #ifdef PBR_NOR
+      uniform sampler2D pbrNor2; uniform float pbrNorReady2;
+    #endif
+  #endif
+  #ifdef PBR_BLEND
+    vec3 pbrW3(vec3 n) { vec3 w = pow(abs(n), vec3(4.0)); return w / (w.x + w.y + w.z); }
+    vec4 pbrS(sampler2D t, vec3 p, vec3 w) { return texture(t, p.zy) * w.x + texture(t, p.xz) * w.y + texture(t, p.xy) * w.z; }
+    vec3 pbrSN(sampler2D t, vec3 p, vec3 w, vec3 n, float s) {
+      vec3 a = texture(t, p.zy).xyz * 2.0 - 1.0, b = texture(t, p.xz).xyz * 2.0 - 1.0, c = texture(t, p.xy).xyz * 2.0 - 1.0;
+      a.xy *= s; b.xy *= s; c.xy *= s;
+      a = vec3(a.xy + n.zy, abs(a.z) * n.x); b = vec3(b.xy + n.xz, abs(b.z) * n.y); c = vec3(c.xy + n.xy, abs(c.z) * n.z);
+      return normalize(a.zyx * w.x + b.xzy * w.y + c * w.z);
+    }
+  #else
+    // walls / floors / boxes: one projection, picked by the face direction (1 lookup instead of 3)
+    vec3 pbrW3(vec3 n) { vec3 m = abs(n); return m.x > m.y && m.x > m.z ? vec3(1.0, 0.0, 0.0) : m.y > m.z ? vec3(0.0, 1.0, 0.0) : vec3(0.0, 0.0, 1.0); }
+    vec2 pbrUV(vec3 p, vec3 w) { return w.x > 0.5 ? p.zy : w.y > 0.5 ? p.xz : p.xy; }
+    vec4 pbrS(sampler2D t, vec3 p, vec3 w) { return texture(t, pbrUV(p, w)); }
+    vec3 pbrSN(sampler2D t, vec3 p, vec3 w, vec3 n, float s) {
+      vec3 a = texture(t, pbrUV(p, w)).xyz * 2.0 - 1.0; a.xy *= s;
+      if (w.x > 0.5) { a = vec3(a.xy + n.zy, abs(a.z) * n.x); return normalize(a.zyx); }
+      if (w.y > 0.5) { a = vec3(a.xy + n.xz, abs(a.z) * n.y); return normalize(a.xzy); }
+      a = vec3(a.xy + n.xy, abs(a.z) * n.z); return normalize(a);
+    }
+  #endif
+`;
+// opts: scale (metres per tile), mode 'replace' (the photo IS the surface; tint multiplies it) or 'detail' (keeps the
+// material's own colours and adds the photo's detail), ns = bump strength, set2 + when2 ('slope' | 'bright') + thr2.
+function pbr(mat, set, o = {}) {
+  if (!mat || !PBR[set] || mat.userData.pbr) return mat;
+  const S = PBR[set], S2 = o.set2 ? PBR[o.set2] : null;
+  mat.userData.pbr = { set, set2: o.set2 || null }; mat.userData.pbrUsed = true; pbrMats.push(mat);
+  const tint = Array.isArray(o.tint) ? new THREE.Vector3(...o.tint) : new THREE.Vector3(1, 1, 1);
+  const U = { pbrMap: S.map, pbrNor: S.nor, pbrRough: S.rough, pbrReady: S.ready, pbrNorReady: S.norReady, pbrNorOn,
+    pbrMap2: S2 ? S2.map : S.map, pbrNor2: S2 ? S2.nor : S.nor, pbrRough2: S2 ? S2.rough : S.rough, pbrReady2: S2 ? S2.ready : { value: 0 }, pbrNorReady2: S2 ? S2.norReady : { value: 0 },
+    pbrScale: { value: 1 / (o.scale || 2.5) }, pbrScale2: { value: 1 / (o.scale2 || o.scale || 2.5) }, pbrMode: { value: o.mode === 'detail' ? 1 : 0 },
+    pbrStrength: { value: o.strength === undefined ? 1 : o.strength }, pbrNs: { value: o.ns === undefined ? 1 : o.ns }, pbrTint: { value: tint },
+    pbrMix2: { value: !S2 ? 0 : o.when2 === 'bright' ? 2 : 1 }, pbrAvgC: S.avg, pbrAvgR: S.ravg, pbrAvgC2: S2 ? S2.avg : S.avg, pbrAvgR2: S2 ? S2.ravg : S.ravg, pbrThr2: { value: o.thr2 === undefined ? 0.8 : o.thr2 } };
+  const install = () => { if (mat.userData.pbrOn) return; mat.userData.pbrOn = true; mat.onBeforeCompile = sh => {
+    Object.assign(sh.uniforms, U);
+    sh.vertexShader = 'varying vec3 vPbrW;\n' + sh.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
+      vec4 pbrP = vec4(transformed, 1.0);
+      #ifdef USE_INSTANCING
+        pbrP = instanceMatrix * pbrP;
+      #endif
+      vPbrW = (modelMatrix * pbrP).xyz;`);
+    sh.fragmentShader = PBR_GLSL + sh.fragmentShader.replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+      if (pbrReady > 0.5) {
+        vec3 pbrNW = normalize((vec4(normal, 0.0) * viewMatrix).xyz), pbrWt = pbrW3(pbrNW), pbrP1 = vPbrW * pbrScale;
+        vec3 pbrCol = pbrS(pbrMap, pbrP1, pbrWt).rgb / pbrAvgC;
+        float pbrR = pbrS(pbrRough, pbrP1, pbrWt).g / pbrAvgR;
+        #ifdef PBR2
+          float pbrK2 = 0.0;
+          if (pbrReady2 > 0.5) {
+            if (pbrMix2 < 1.5) pbrK2 = smoothstep(pbrThr2, pbrThr2 - 0.15, pbrNW.y);
+            #ifdef USE_COLOR
+              else pbrK2 = smoothstep(pbrThr2 - 0.1, pbrThr2 + 0.05, dot(vColor.rgb, vec3(0.333)));
+            #endif
+          }
+          vec3 pbrP2 = vPbrW * pbrScale2;
+          if (pbrK2 > 0.001) { pbrCol = mix(pbrCol, pbrS(pbrMap2, pbrP2, pbrWt).rgb / pbrAvgC2, pbrK2); pbrR = mix(pbrR, pbrS(pbrRough2, pbrP2, pbrWt).g / pbrAvgR2, pbrK2); }
+        #endif
+        if (pbrMode < 0.5) diffuseColor.rgb = mix(diffuseColor.rgb, pbrTint * pbrCol * pbrAvgC, pbrStrength);
+        else diffuseColor.rgb *= mix(vec3(1.0), clamp(pbrCol, 0.0, 2.2), pbrStrength);
+        roughnessFactor = clamp(roughnessFactor * mix(1.0, pbrR, pbrStrength), 0.04, 1.0);
+        #ifdef PBR_NOR
+          if (pbrNorReady > 0.5) {
+            vec3 nw = pbrSN(pbrNor, pbrP1, pbrWt, pbrNW, pbrNs);
+            #ifdef PBR2
+              if (pbrK2 > 0.001 && pbrNorReady2 > 0.5) nw = normalize(mix(nw, pbrSN(pbrNor2, pbrP2, pbrWt, pbrNW, pbrNs), pbrK2));
+            #endif
+            normal = normalize((viewMatrix * vec4(nw, 0.0)).xyz);
+          }
+        #endif
+      }`);
+  };
+  mat.defines = Object.assign(mat.defines || {}, S2 ? { PBR2: '' } : {}, o.blend ? { PBR_BLEND: '' } : {}, SETTINGS.graphicsQuality !== 'low' ? { PBR_NOR: '' } : {});
+  mat.customProgramCacheKey = () => 'pbr628b';
+  mat.needsUpdate = true; };
+  mat.userData.pbrInstall = install;
+  if (S.ready.value) install();   // otherwise it switches on when the textures arrive (no slow first frame)
+  return mat;
+}
+// Small rocks and grass clumps that look like rocks and grass (they used to be cones / 12-sided dice)
+function rockGeo(r) {
+  const g = new THREE.IcosahedronGeometry(r, 1), p = g.attributes.position, v = new THREE.Vector3();
+  const h = (x, y, z) => { const s = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719) * 43758.5453; return s - Math.floor(s); };
+  for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i); const k = 0.72 + 0.5 * h(+v.x.toFixed(4), +v.y.toFixed(4), +v.z.toFixed(4)); v.multiplyScalar(k); if (v.y < 0) v.y *= 0.55; p.setXYZ(i, v.x, v.y, v.z); }
+  g.computeVertexNormals(); return g;
+}
+function tuftGeo(r, h, blades = 7) {
+  const pos = [], nor = []; let s = 7;
+  const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+  for (let i = 0; i < blades; i++) {
+    const a = (i / blades) * Math.PI * 2 + rnd(), d = r * (0.2 + 0.5 * rnd()), bx = Math.cos(a) * d, bz = Math.sin(a) * d;
+    const w = 0.03 + 0.03 * rnd(), lean = r * (0.6 + 0.8 * rnd()), hh = h * (0.6 + 0.5 * rnd()), px = -Math.sin(a) * w, pz = Math.cos(a) * w;
+    pos.push(bx - px, 0, bz - pz, bx + px, 0, bz + pz, bx + Math.cos(a) * lean, hh, bz + Math.sin(a) * lean);
+    for (let k = 0; k < 3; k++) nor.push(Math.cos(a) * 0.3, 0.9, Math.sin(a) * 0.3);
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); return g;
+}
+let pbrTagged = false;
+function pbrTagAll() {           // the shared materials (built once); per-level ones are tagged where they're made
+  if (pbrTagged) return; pbrTagged = true;
+  const T = (f) => { try { f(); } catch (e) { pbrTagged = false; } };
+  T(() => { pbr(brickMaterial, 'brick', { scale: 2.4 }); pbr(concreteMaterial, 'concrete', { scale: 3, mode: 'detail' }); pbr(floorMaterial, 'concrete', { scale: 3, mode: 'detail' }); });
+  T(() => { pbr(zoneMat.warehouse.floor, 'concrete', { scale: 3, mode: 'detail' }); pbr(zoneMat.power.wall, 'block', { scale: 3.2, mode: 'detail' }); pbr(zoneMat.power.floor, 'concrete', { scale: 3, mode: 'detail' });
+    pbr(zoneMat.armory.floor, 'metal', { scale: 1.5, tint: [0.8, 0.82, 0.85] }); pbr(zoneMat.records.wall, 'plaster', { scale: 3, tint: [0.95, 0.92, 0.85] }); pbr(zoneMat.lobby.wall, 'plaster', { scale: 3, tint: [1.0, 1.0, 1.0] }); });
+  T(() => { pbr(propMat.crate, 'wood', { scale: 1.2 }); pbr(propMat.desk, 'wood', { scale: 1.5, mode: 'detail', strength: 0.8 }); pbr(propMat.metal, 'metal', { scale: 1.2, mode: 'detail', strength: 0.7 }); });
+  T(() => { pbr(trainMats.wood, 'wood', { scale: 1.5 }); });
+  T(() => { for (const z of TRAIN_ZONES) { const zm = zoneMat[z.id]; pbr(zm.wall, 'plaster', { mode: 'detail', scale: 2.5, strength: 0.75, ns: 1.4 });
+    if (z.id === 't_locker') pbr(zm.floor, 'metal', { mode: 'detail', scale: 1.5 }); else if (z.id !== 't_knife' && z.id !== 't_garrote') pbr(zm.floor, 'concrete', { mode: 'detail', scale: 3 }); } });
+  T(() => { const B = buildingMaterials; pbr(B.barracks, 'plaster', { scale: 3, tint: [0.85, 0.8, 0.7] }); pbr(B.hq, 'block', { scale: 3.2, mode: 'detail' });
+    pbr(B.hangar, 'corrugated', { scale: 2.5, tint: [0.7, 0.76, 0.68] }); pbr(B.depot, 'brick', { scale: 2.6 }); pbr(B.roof, 'corrugated', { scale: 2.5, tint: [0.5, 0.48, 0.46] });
+    pbr(B.metal, 'metal', { scale: 1.5, mode: 'detail' }); pbr(B.wood, 'wood', { scale: 1.5 }); });
+  T(() => { pbr(fxDirt, 'gravel', { scale: 1, mode: 'detail' }); });
+}
+function pbrAfterBuild() {
+  pbrTagAll();
+  const used = new Set();
+  levelGroup.traverse(o => { const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []; for (const m of ms) if (m.userData && m.userData.pbr) { used.add(m.userData.pbr.set); if (m.userData.pbr.set2) used.add(m.userData.pbr.set2); } });
+  [...used].forEach((k, i) => setTimeout(() => safe('tex', () => pbrLoad(k)), 200 + i * 200));
+}
 
 // Canvas text: a sign (text on a coloured plate). Returns a plane mesh, w x h metres.
 const signCache = {};
@@ -4865,7 +5033,7 @@ function buildSniperMission() {
   }
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   groundDetailTexture.repeat.set(size / 8, size / 8);
-  const terrainMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, map: groundDetailTexture });
+  const terrainMat = pbr(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, map: groundDetailTexture }), 'grass', { mode: 'detail', scale: 5, strength: 0.9, set2: 'rock', scale2: 9, thr2: 0.86, blend: true });
   const terrain = new THREE.Mesh(geo, terrainMat);
   terrain.rotation.x = -Math.PI / 2; terrain.position.set(C.x, 0, C.z);
   terrain.receiveShadow = true;
@@ -4880,7 +5048,7 @@ function buildSniperMission() {
     op.setZ(k, inside ? -60 : terrainHeight(wx, wz) + smooth(2500, 6000, far) * 300 * (0.6 + 0.4 * fbm(wx / 1500, wz / 1500, 3)));
   }
   outerGeo.computeVertexNormals();
-  const outer = new THREE.Mesh(outerGeo, new THREE.MeshStandardMaterial({ color: 0x4b5233, roughness: 1 }));
+  const outer = new THREE.Mesh(outerGeo, pbr(new THREE.MeshStandardMaterial({ color: 0x4b5233, roughness: 1 }), 'grass', { mode: 'detail', scale: 8 }));
   outer.rotation.x = -Math.PI / 2; outer.position.set(C.x, -0.5, C.z);
   levelGroup.add(outer);
   buildMountains();
@@ -4941,7 +5109,7 @@ function buildSniperMission() {
   // 6. Compound: airstrip, buildings, towers, floodlights
   const A = SNIPER_LAYOUT.airstrip, AW = L2W(A.x, A.z);
   asphaltTexture.repeat.set(1, A.length / 30);
-  const strip = new THREE.Mesh(new THREE.PlaneGeometry(A.width, A.length), new THREE.MeshStandardMaterial({ map: asphaltTexture, roughness: 0.9 }));
+  const strip = new THREE.Mesh(new THREE.PlaneGeometry(A.width, A.length), pbr(new THREE.MeshStandardMaterial({ map: asphaltTexture, roughness: 0.9 }), 'asphalt', { mode: 'detail', scale: 4 }));
   strip.rotation.set(-Math.PI / 2, 0, Math.PI / 2); strip.position.set(AW.x, 2.05, AW.z); strip.receiveShadow = true;
   levelGroup.add(strip);
   for (const b of SNIPER_LAYOUT.buildings) addBuilding(b);
@@ -4997,7 +5165,7 @@ function buildMountains() {
     }
     g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     g.computeVertexNormals();
-    const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, flatShading: true }));
+    const m = new THREE.Mesh(g, pbr(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, flatShading: true }), 'rock', { mode: 'detail', scale: 40, set2: 'snow', scale2: 25, when2: 'bright', thr2: 0.72, blend: true }));
     m.position.set(C.x + Math.sin(ang) * dist, height / 2 - 150, C.z + Math.cos(ang) * dist);
     levelGroup.add(m);
   }
@@ -5349,7 +5517,7 @@ function scatterVegetation(Q) {
   levelGroup.add(trunks, crowns);
   // Rocks
   const nRocks = Q ? 700 : 250;
-  const rocks = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }), nRocks);
+  const rocks = new THREE.InstancedMesh(rockGeo(1), pbr(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }), 'rock', { mode: 'detail', scale: 1.6 }), nRocks);
   for (let k = 0; k < nRocks; k++) {
     let x, z, t = 0; do { x = C.x + (rand() - 0.5) * size * 0.9; z = C.z + (rand() - 0.5) * size * 0.9; t++; } while (!okSpot(x, z) && t < 20);
     const s = 0.4 + rand() * rand() * 3.5;
@@ -5359,7 +5527,7 @@ function scatterVegetation(Q) {
   rocks.castShadow = rocks.receiveShadow = true; levelGroup.add(rocks);
   // Grass tufts across the hills near you and around the compound
   const nTufts = Q ? 9000 : 3000;
-  const tufts = new THREE.InstancedMesh(new THREE.ConeGeometry(0.35, 0.7, 5).translate(0, 0.35, 0), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1 }), nTufts);
+  const tufts = new THREE.InstancedMesh(tuftGeo(0.35, 0.75), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, side: THREE.DoubleSide }), nTufts);
   for (let k = 0; k < nTufts; k++) {
     const nearNest = k < nTufts * 0.6, R = nearNest ? 350 : 900, cx = nearNest ? N.x : C.x, cz = nearNest ? N.z + 150 : C.z;
     let x = cx + (rand() - 0.5) * R * 2, z = cz + (rand() - 0.5) * R * 2;
@@ -6878,8 +7046,8 @@ function buildHaloWorld() {
   const vg = new THREE.BufferGeometry(); vg.setAttribute('position', new THREE.Float32BufferAttribute(vl, 3)); vg.setAttribute('color', new THREE.Float32BufferAttribute(vc, 3));
   levelGroup.add(new THREE.Points(vg, new THREE.PointsMaterial({ size: 2, sizeAttenuation: false, vertexColors: true, fog: false })));
   // the meadow: tufts + rocks so the ground visibly rushes up at you in the last 100 ft
-  const n = 700, tuft = new THREE.InstancedMesh(new THREE.ConeGeometry(0.18, 0.5, 5), new THREE.MeshStandardMaterial({ color: 0x5c6a3a, roughness: 1 }), n);
-  const rock = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(0.3, 0), new THREE.MeshStandardMaterial({ color: 0x6a6660, roughness: 0.95 }), 160);
+  const n = 700, tuft = new THREE.InstancedMesh(tuftGeo(0.2, 0.55).translate(0, -0.2, 0), new THREE.MeshStandardMaterial({ color: 0x5c6a3a, roughness: 1, side: THREE.DoubleSide }), n);
+  const rock = new THREE.InstancedMesh(rockGeo(0.3), pbr(new THREE.MeshStandardMaterial({ color: 0x6a6660, roughness: 0.95, flatShading: true }), 'rock', { mode: 'detail', scale: 1.2 }), 160);
   const d = new THREE.Object3D();
   for (let i = 0; i < n; i++) { const a = rand() * Math.PI * 2, r = Math.sqrt(rand()) * 130, x = L.x + Math.cos(a) * r, z = L.z + Math.sin(a) * r; d.position.set(x, groundAt(x, z) + 0.2, z); d.rotation.set(0, rand() * 6, 0); d.scale.setScalar(0.6 + rand() * 0.9); d.updateMatrix(); tuft.setMatrixAt(i, d.matrix); }
   for (let i = 0; i < 160; i++) { const a = rand() * Math.PI * 2, r = 20 + Math.sqrt(rand()) * 110, x = L.x + Math.cos(a) * r, z = L.z + Math.sin(a) * r; d.position.set(x, groundAt(x, z) + 0.05, z); d.rotation.set(rand() * 3, rand() * 3, 0); d.scale.set(0.6 + rand() * 1.4, 0.4 + rand() * 0.6, 0.6 + rand() * 1.4); d.updateMatrix(); rock.setMatrixAt(i, d.matrix); }
@@ -7016,7 +7184,7 @@ const haloUI = (() => {
   return ui;
 })();
 function haloJM(who, text, signal, todo, secs = 9) {
-  if (H) H.lastJM = [who, text, signal, todo];
+  if (H) { H.lastJM = [who, text, signal, todo]; H.jmAbove = /You're <b>above<\/b> us/.test(text); }
   haloUI.jm.innerHTML = `<b>${who}:</b> ${text}${signal ? `<div class="sig">✋ hand signal: ${signal}</div>` : ''}${todo ? `<div class="do">▶ ${todo}</div>` : ''}`;
   haloUI.jm.style.display = 'block'; haloUI.jmUntil = performance.now() + secs * 1000;
 }
@@ -7140,6 +7308,9 @@ function fallRateFactor(altDZ) { return 1 / Math.sqrt(Math.exp(-(Math.max(0, alt
 const FF_VT = { box: 55, turnL: 55, turnR: 55, wave: 53, pull: 54, dock: 54, dearch: 45, dive: 72, forward: 56, track: 44 };   // sea-level terminal, m/s
 const FF_DRIVE = { forward: 4.5, track: 19, dearch: -1.6 };                                                                  // horizontal drive, m/s
 function freefallUpdate(dt) {
+  if (H.jmAbove) {   // v0.6.28: drop HAWK's "you're above us" tip once it's no longer true
+    const hk = H.mates[0]; if (H.docked || (hk && hk.phase === 'free' && H.pos.y - hk.pos.y < 4) || H.brokeOff) { H.jmAbove = false; haloUI.jm.style.display = 'none'; H.lastJM = null; }
+  }
   const fac = fallRateFactor(H.altDZ), wind = haloWind(H.altDZ), anyKey = keys.KeyW || keys.KeyS || keys.KeyA || keys.KeyD || keys.KeyE;
   let mode = 'box';
   if (H.tumble > 0) {

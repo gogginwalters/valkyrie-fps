@@ -1,0 +1,16 @@
+Valkyrie - textures (v0.6.28)
+All textures below are from Poly Haven (https://polyhaven.com) and are CC0 1.0 (public domain, no attribution required - credited anyway).
+Downloaded at 1k, re-encoded to WebP (colour, OpenGL normal, roughness).
+
+brick       Brick Wall 001          https://polyhaven.com/a/brick_wall_001        Rob Tuytel, Dimitrios Savva
+block       Concrete Block Wall     https://polyhaven.com/a/concrete_block_wall   Charlotte Baglioni
+concrete    Concrete Floor          https://polyhaven.com/a/concrete_floor        eye-candy.xyz
+plaster     Painted Plaster Wall    https://polyhaven.com/a/painted_plaster_wall  Amal Kumar
+metal       Metal Plate             https://polyhaven.com/a/metal_plate           Rob Tuytel
+corrugated  Corrugated Iron 02      https://polyhaven.com/a/corrugated_iron_02    Jenelle van Heerden, Sergej Majboroda
+wood        Brown Planks 05         https://polyhaven.com/a/brown_planks_05       Rob Tuytel
+asphalt     Asphalt 02              https://polyhaven.com/a/asphalt_02            Rob Tuytel
+gravel      Gravel Floor            https://polyhaven.com/a/gravel_floor          Jenelle van Heerden, Matterfield
+snow        Snow 02                 https://polyhaven.com/a/snow_02               Rob Tuytel
+rock        Aerial Rocks 02         https://polyhaven.com/a/aerial_rocks_02       Rob Tuytel
+grass       Sparse Grass            https://polyhaven.com/a/sparse_grass          Amal Kumar
