@@ -227,6 +227,7 @@
       <label id="m1Card"><input type="radio" name="mission" value="1"><b>MISSION 01 — BLACK FILE</b><br>Indoor raid on a Valkyrie facility. Close quarters, stealth.</label>
       <label id="m3Card"><input type="radio" name="mission" value="3"><b>SNIPER LESSON</b><br>Range day with GRAVEL. Exploding steel, 100–1,200 m.</label>
       <label id="m2Card"><input type="radio" name="mission" value="2"><b>MISSION 02 — COLD HORIZON</b><br>Outdoor long-range sniper op. Ridge nest, 100–1,600 m.</label>
+      <label id="m4Card"><input type="radio" name="mission" value="4"><b>MISSION 03 — HALO INSERTION</b><br>Night HALO jump from 25,000 ft with HAWK and DOC, then a quiet raid.</label>
     </div>
     <button class="startBtn" id="startBtn">▶ CLICK OR TAP TO BEGIN MISSION</button>
     <div id="briefText"></div>
@@ -405,12 +406,12 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 // ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
 // ##  part failed and why.                                           ##
 // #####################################################################
-const VERSION = 'v0.6.26';
+const VERSION = 'v0.6.27';
 // v0.6.6 MISSION UNLOCKS. Order: TRAINING (0) -> BLACK FILE (1) -> SNIPER LESSON (3) -> COLD HORIZON (2).
 // A new player has only TRAINING; winning a mission unlocks the next one (saved as valkyrieUnlocked =
 // how far along that list you've got, 0-3). Developer mode (?dev=1, remembered; ?dev=0 clears it)
 // unlocks everything and turns the skips back on.
-const MISSION_ORDER = [0, 1, 3, 2];
+const MISSION_ORDER = [0, 1, 3, 2, 4];   // v0.6.27: 4 = HALO INSERTION (after Cold Horizon)
 let DEV = false, unlockedIdx = 0;
 try {
   const dv = [...location.search.matchAll(/[?&]dev=([01])/gi)].pop();
@@ -418,7 +419,7 @@ try {
   DEV = localStorage.getItem('valkyrieDev') === '1';
 } catch (err) { DEV = /[?&]dev=1/.test(location.search); }
 try {
-  let n = Math.max(0, Math.min(3, Math.floor(+localStorage.getItem('valkyrieUnlocked') || 0)));
+  let n = Math.max(0, Math.min(MISSION_ORDER.length - 1, Math.floor(+localStorage.getItem('valkyrieUnlocked') || 0)));
   if (localStorage.getItem('valkyrieTrainingDone')) n = Math.max(n, 1);        // older saves: training done = Black File open
   if (localStorage.getItem('valkyrieSniperLessonDone')) n = Math.max(n, 3);    // sniper lesson done = Cold Horizon open
   unlockedIdx = n; localStorage.setItem('valkyrieUnlocked', String(n));
@@ -427,7 +428,7 @@ const isUnlocked = m => DEV || MISSION_ORDER.indexOf(m) <= unlockedIdx;
 const earnedMission = () => MISSION_ORDER[unlockedIdx];               // furthest mission you've EARNED
 function unlockAfterWin(m) {
   const next = MISSION_ORDER.indexOf(m) + 1;
-  if (next > unlockedIdx && next <= 3) { unlockedIdx = next; try { localStorage.setItem('valkyrieUnlocked', String(next)); } catch (err) {} }
+  if (next > unlockedIdx && next < MISSION_ORDER.length) { unlockedIdx = next; try { localStorage.setItem('valkyrieUnlocked', String(next)); } catch (err) {} }
 }
 // v0.4.4: the game must only ever start ONCE per page (one canvas, one camera, one loop).
 // If this script somehow ran a second time, stop the second copy right here.
@@ -659,6 +660,9 @@ const MISSION_OVERRIDES = {
        alertShoutRadius: 40, searchDuration: 40, killWitnessRange: 150, bodySightRange: 110, shotErrorBase: 10,
        enemyFieldOfView: 110, teammates: 0 },
   3: { teammates: 0, sunElevation: 38, enemyDamage: 0, ammoDropChance: 0, maskingEnabled: false },   // v0.6 sniper lesson: bright daytime range, nobody shoots back
+  // v0.6.27 HALO: night raid on the airfield from Cold Horizon. Guards see less in the dark; HAWK and DOC join you on landing.
+  4: { enemySightRange: 150, enemyHearingRange: 260, enemyAttackRange: 220, enemyAccuracy: 0.3, silencedAlertRadius: 25,
+       alertShoutRadius: 40, searchDuration: 40, killWitnessRange: 80, bodySightRange: 60, shotErrorBase: 8, enemyFieldOfView: 110, teammates: 0 },
 };
 const BASE_SETTINGS = { ...SETTINGS };   // the values above, so Mission 1 gets them back
 
@@ -801,6 +805,14 @@ const KNIFE_QUIPS = [
 //   8. Depot demolition — plant charges on a fuel/ammo depot, exfil before the blast.
 //   9. Final showdown  — corner The Conductor (and maybe unmask The Patron).
 const BRIEFINGS = {
+  4: `<p><b>Wraith,</b> Valkyrie has rebuilt the airfield you hit in Cold Horizon and put a new <b>radar</b> on it. Every road in is watched, so you're going in from the sky: a night <b>HALO</b> jump — High Altitude, Low Opening — from a C-130 at <b>25,000 ft</b>, with HAWK and DOC.</p>
+    <ul><li><b>In the aircraft:</b> the JUMPMASTER gives the commands (and the hand signals). <b>B</b> = switch to your bailout oxygen. Walk to the ramp; on the <b>green light</b> press <b>Space</b> to dive out — face out, look level, no turning.</li>
+    <li><b>Freefall</b> (about 90 seconds): no keys = stable arch. <b>E</b> arms in (fall faster), <b>S</b> de-arch (fall slower), <b>W</b> legs out (forward; hold = full track), <b>A D</b> turn. Fly to your slot in front of HAWK and press <b>F</b> to take grips.</li>
+    <li><b>5,500 ft = break-off:</b> turn your back on the formation and TRACK away (hold W). <b>4,000 ft:</b> Space = wave off, Space again = <b>PULL</b>.</li>
+    <li><b>Under canopy:</b> <b>A D</b> toggles, <b>S</b> hold = both toggles down (brakes / flare), <b>C</b> half brakes, <b>R</b> rear risers. Follow the GPS ◆, land <b>into the wind</b> (west — the windsock's mouth). <b>Flare at 10–15 ft</b>: too high = you stall and drop, too late = you slam in.</li>
+    <li>Rare emergencies: line twists (kick out: A, D, A, D…) or a malfunction (<b>X</b> cut away, <b>Space</b> reserve).</li>
+    <li><b>On the ground:</b> blow the radar dish (C4: <b>B</b> plant, <b>Y</b> fire), grab the flight logs at the HQ, exfil at the west end of the runway. Quietly. Night vision: <b>N</b>.</li></ul>
+    <p style="color:#9a9">Hold <b>Shift</b> to speed up time ×4 in the slow parts (high in freefall, high under canopy). Every keystroke is explained on screen as you go.</p>`,
   0: `<p><b>CAMP HALYARD — NAVAL SPECIAL WARFARE TRAINING ANNEX.</b> Before anyone hands you a Black File, CHIEF wants to see you can walk, talk and shoot without hurting yourself. Or him.</p>
     <ul><li><b>13 stations</b> in a row: movement · look · comms · live-fire range · sniper lane · weapons locker · knife · garrote · <b>navigation maze</b> · <b>demolition range</b> · <b>breaching shoot house</b> (door charge, shotgun, ram, torch, wall charge, flashbangs, team stack, hostages) · <b>signals</b> (bug a phone line, intercept a transmission, cut a jammer and a junction box, order HAWK to cover a door) · and a timed <b>FINAL RUN</b> that uses all of it, then graduation.</li>
     <li>CHIEF's box at the top of the screen tells you exactly what to press — worded for <b>your</b> device (Magic Keyboard + trackpad, mouse, or touch).</li>
@@ -976,7 +988,7 @@ const ENV_LEVEL = { 0: 0.35, 1: 0.4, 2: 0.7, 3: 0.8 };   // how strongly the sky
 function setEnvIntensity(root, k) { root.traverse(o => { if (!o.isMesh) return; for (const m of [].concat(o.material)) if (m && 'envMapIntensity' in m) m.envMapIntensity = k; }); }
 // Called after every level build (and when the Graphics setting changes).
 function applyGraphics() {
-  const G = gfx(), m = currentMission, outdoors = m === 2 || m === 3, night = SETTINGS.nightOps;
+  const G = gfx(), m = currentMission, outdoors = m === 2 || m === 3 || m === 4, night = SETTINGS.nightOps;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, G.pr)); fitRenderer(true); if (nvReady) resizeNightVision();
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = outdoors ? (night ? 0.9 : 0.8) : night ? 1.2 : m === 0 ? 0.72 : 1.1;
@@ -1425,7 +1437,7 @@ function buildLevel_() {
   heightField = null; materiel = []; smokers.length = 0; projectiles.length = 0; sniperWater = null; lastLase = null;
   obstacles = []; popTargets = []; trainGates = {}; lookPanels = []; trainMarker = null; trainRP = {}; demoTargets = [];
   disposeEnv();
-  if (currentMission === 2 || currentMission === 3) { buildSniperMission(); return; }   // the outdoor sniper map (SECTION 15); 3 = sniper lesson
+  if (currentMission === 2 || currentMission === 3 || currentMission === 4) { buildSniperMission(); return; }   // 4 = HALO insertion (same valley, at night)   // the outdoor sniper map (SECTION 15); 3 = sniper lesson
   applyLighting();
 
   // Copy the MAP into a grid. Pad short rows with walls so a typo can't crash the game.
@@ -1864,6 +1876,7 @@ document.addEventListener('keydown', e => {
   e.preventDefault();
   keys[e.code] = true;
   if (e.repeat) return;                                // holding a key: act once
+  if (typeof haloActive === 'function' && haloActive() && haloKey(e.code)) return;   // v0.6.27: the HALO jump has its own keys
   // [ ] always dial the scope; ↑ ↓ dial only with a sniper rifle in hand (with other guns they look up/down).
   const sniperInHand = !!WEAPONS[currentWeapon].projectile;
   const arrow = e.code === 'ArrowUp' || e.code === 'ArrowDown';
@@ -3077,7 +3090,7 @@ function loadFigures() {
       for (const a of gltf.animations) FIGURES.clips[a.name.split('|').pop()] = a;
       FIGURES.status = 'ok';
       // Still on the briefing screen? Rebuild the level behind it with the new figures.
-      if (state === 'start') safe('figures:rebuild', () => { buildLevel(); resetPlayer(); resetWeapons(); resetMasking(); if (currentMission === 2 || currentMission === 3) missionStartPose(); });
+      if (state === 'start') safe('figures:rebuild', () => { buildLevel(); resetPlayer(); resetWeapons(); resetMasking(); if (currentMission >= 2) missionStartPose(); });
     }, undefined, err => { clearTimeout(timer); FIGURES.status = 'failed'; FIGURES.error = String((err && err.message) || err).slice(0, 80); });
   } catch (err) { clearTimeout(timer); FIGURES.status = 'failed'; FIGURES.error = String(err.message || err); }
 }
@@ -4142,7 +4155,7 @@ function renderNightVision(time) {
 // ##  SECTION 10: OBJECTIVES & PICKUPS                               ##
 // #####################################################################
 function createIntel(x, z, name) {
-  const g = new THREE.Group(); g.position.set(x, 0, z);
+  const g = new THREE.Group(); g.position.set(x, groundAt(x, z), z);   // v0.6.27: sits on the ground outdoors too
   const side = new THREE.MeshStandardMaterial({ color: 0xc9a24a, emissive: 0x221100 });
   const top = new THREE.MeshStandardMaterial({ map: intelTexture, emissive: 0x332200 });
   const folder = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.06, 0.38), [side, side, top, side, side, side]);
@@ -4188,6 +4201,7 @@ function createPickup(x, z, type) {
 // v0.6.22: why the exit is still shut, and what to do (all levels).
 function exitLockedText() {
   if (currentMission === 0 || currentMission === 3) { const n = TRAIN ? TRAIN.done.filter(d => !d).length : 0; return `GRADUATION LOCKED — ${n} station${n === 1 ? '' : 's'} still to do. Follow the yellow ◆ to the next one.`; }
+  if (currentMission === 4) { const left = haloObjectives().filter(o => !o.done && !o.bonus).length; return `EXFIL NOT READY — ${left} objective${left === 1 ? '' : 's'} left (top left). Follow the yellow ◆.`; }
   if (currentMission === 2) { const left = sniperObjectives().filter(o => !o.done && !o.bonus).length; return `LZ NOT READY — ${left} objective${left === 1 ? '' : 's'} left (see the list, top left). Follow the yellow ◆.`; }
   const n = intelItems.filter(i => !i.collected).length;
   return `ELEVATOR LOCKED — ${n} intel file${n === 1 ? '' : 's'} still to find. Follow the yellow ◆; it opens when you have them all.`;
@@ -4234,13 +4248,14 @@ function updateObjectives(dt, time) {
     if (!exitZone.unlocked && allIntelCollected()) {
       exitZone.unlocked = true;
       if (currentMission === 2) showMessage('ALL TARGETS DOWN — exfil to the LZ behind the ridge (green beam)!', 5);
+      if (currentMission === 4) { showMessage('ALL OBJECTIVES DONE — exfil: helicopter at the west end of the runway (green beam)!', 5); radioSay('HAWK', 'That\'s everything. Bird\'s inbound to the west end of the runway. Move.', 5); }
       if (currentMission === 0) radioSay('CHIEF', 'That\'s every station. Graduation pad is green. Walk onto it before I find another drill.', 6);
       exitZone.padMat.color.set(0x30ff60); exitZone.beamMat.color.set(0x30ff60);
     }
     exitZone.beamMat.opacity = 0.12 + Math.sin(time * 4) * 0.05;
     const exD = Math.hypot(exitZone.x - px, exitZone.z - pz);
     if (exD < exitZone.radius && exitZone.unlocked) endGame(true);
-    else if (!exitZone.unlocked && exD < (currentMission === 2 ? 30 : CELL * 2) && time - exitZone.warned > 4) { exitZone.warned = time; showMessage(exitLockedText(), 3.5); }   // v0.6.22: says why, from a few steps away
+    else if (!exitZone.unlocked && exD < (heightField ? 30 : CELL * 2) && time - exitZone.warned > 4) { exitZone.warned = time; showMessage(exitLockedText(), 3.5); }   // v0.6.22: says why, from a few steps away
     if (exitZone.statusSign && exitZone.statusOpen !== exitZone.unlocked) setExitStatusSign(exitZone.unlocked);
   }
 }
@@ -4367,11 +4382,15 @@ function updateHUD(dt) {
   else if (currentMission === 2) {
     for (const o of sniperObjectives()) html += `<div class="${o.done ? 'done' : ''}">${o.done ? '☑' : '☐'} ${o.text}</div>`;
     html += `<div class="${ready ? '' : 'locked'}">${ready ? '☐ Exfil to the LZ behind the ridge' : '🔒 Exfil LZ (finish the list first)'}</div>`;
+  } else if (currentMission === 4) {
+    for (const o of haloObjectives()) html += `<div class="${o.done ? 'done' : ''}">${o.done ? '☑' : '☐'} ${o.text}</div>`;
+    html += `<div class="${ready ? '' : 'locked'}">${ready ? '☐ Exfil: helicopter at the west end of the runway' : '🔒 Exfil (finish the list first)'}</div>`;
+    if (H && H.landed) html += `<div style="margin-top:4px;color:#8a8">Jump score: ${haloScoreTotal()} / 100</div>`;
   } else {
     for (const item of intelItems) html += `<div class="${item.collected ? 'done' : ''}">${item.collected ? '☑' : '☐'} Retrieve: ${item.name}</div>`;
     html += `<div class="${ready ? '' : 'locked'}">${ready ? '☐ Reach the extraction elevator' : '🔒 Extraction elevator (locked)'}</div>`;
   }
-  if (currentMission === 1 || currentMission === 2) html += `<div style="margin-top:6px;color:#8a8">Guards down: ${player.kills} / ${enemies.length}</div>`;
+  if (currentMission === 1 || currentMission === 2 || currentMission === 4) html += `<div style="margin-top:6px;color:#8a8">Guards down: ${player.kills} / ${enemies.length}</div>`;
   if (hud.objectives.innerHTML !== html) hud.objectives.innerHTML = html;
   hud.modeTag.textContent = (SETTINGS.realisticMode ? 'REALISTIC BALLISTICS' : 'ARCADE') + (SETTINGS.oneShotOneKill ? ' · ONE SHOT ONE KILL' : '') + (SETTINGS.gore ? '' : ' · GORE OFF');
   // Fading effects
@@ -4746,7 +4765,13 @@ function valueNoise(x, z) {
 function fbm(x, z, octaves) { let s = 0, a = 0.5, f = 1; for (let o = 0; o < octaves; o++) { s += a * valueNoise(x * f, z * f); f *= 2.03; a *= 0.5; } return s; }
 function smooth(a, b, x) { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); }
 // The height (metres) of the ground at world position x,z.
+// v0.6.27: on the HALO mission a meadow north-west of the compound is levelled out as the LZ.
 function terrainHeight(x, z) {
+  let h = terrainHeight0(x, z);
+  if (currentMission === 4) { const L = haloLZ(), hl = terrainHeight0(L.x, L.z), f = smooth(150, 80, Math.hypot(x - L.x, z - L.z)); h += (hl - h) * f; }
+  return h;
+}
+function terrainHeight0(x, z) {
   const C = M2_WORLD.center, rx = x - C.x, rz = z - C.z;
   const s = rz - SNIPER_LAYOUT.nest.z;                     // distance south of the ridge crest
   const ridge = (s < 0 ? 175 * Math.exp(-((s / 330) ** 2)) : 175 * Math.exp(-s / 260)) * (0.85 + 0.15 * fbm(x / 450, z / 450, 3));
@@ -4877,6 +4902,10 @@ function buildSniperMission() {
   sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.6;
   levelGroup.add(sun, sun.target); worldSun = sun; worldSun.userData.outdoor = true;   // v0.6.26: shadows follow the player (see SECTION 3b)
   hemiLight.intensity = night ? 0.06 : 0.6; hemiLight.color.set(night ? 0x405070 : 0xbcd2ff); hemiLight.groundColor.set(0x4a3f2a);
+  if (currentMission === 4) {   // v0.6.27 HALO: a half moon high in the south-west (enough to see the ground, and your canopy's shadow)
+    const md = new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(90 - 34), THREE.MathUtils.degToRad(215));
+    sun.color.set(0x9fb4e8); sun.intensity = 0.45; sun.position.copy(md).multiplyScalar(1500).add(new THREE.Vector3(C.x, 0, C.z)); hemiLight.intensity = 0.12;
+  }
   ambientLight.intensity = night ? 0.03 : 0.05;
   scene.background = new THREE.Color(night ? 0x05070c : 0x9fb6d0);
   scene.fog = new THREE.FogExp2(night ? 0x0a0e18 : 0xc8d4e0, SETTINGS.hazeDensity);   // very light haze only
@@ -4931,6 +4960,13 @@ function buildSniperMission() {
 
   // 10. Player nest, spotter, extraction LZ, a little ammo
   const N = L2W(SNIPER_LAYOUT.nest.x, SNIPER_LAYOUT.nest.z);
+  if (currentMission === 4) {   // v0.6.27 HALO: no nest, no spotter. LZ, flight logs at the HQ, exfil at the runway's west end
+    const LZ = haloLZ(), HQ = SNIPER_LAYOUT.buildings.find(b => b.type === 'hq'), Lg = L2W(HQ.x - 4, HQ.z + HQ.d / 2 + 2.2), X4 = L2W(HALO.exfil.x, HALO.exfil.z);
+    playerStart = { x: LZ.x, z: LZ.z, yaw: UPWIND_YAW };
+    createIntel(Lg.x, Lg.z, 'Flight logs + radar codes'); createExit(X4.x, X4.z);
+    createPickup(LZ.x + 3, LZ.z + 2, 'ammo'); createPickup(Lg.x - 6, Lg.z + 3, 'health');
+    finalizeTargets(); return;
+  }
   playerStart = { x: N.x, z: N.z, yaw: Math.PI };                        // facing south, at the compound
   createTeammate(N.x + 1.2, N.z - 2.3, 'GRAVEL', { noMarker: true });     // lies beside you (his head next to your shoulder)
   const spotter = teammates[teammates.length - 1];
@@ -5130,7 +5166,7 @@ function destroyMateriel(m, quiet = false) {
   if (m.type === 'dish' && m.dishMesh) m.dishMesh.rotation.x = -0.2;           // dish droops
   if (m.type === 'generator') cutCompoundLights();
   addKillFeed(`${m.label} ${m.type === 'truck' || m.type === 'jeep' ? 'disabled' : 'destroyed'}, ${fmtDist(dist2D(shooterPos().x, shooterPos().z, m.x, m.z))}`);
-  if (!quiet) spotterLine(m.type === 'generator' ? 'lightsOut' : 'materielDown', { label: m.label.toLowerCase() }, 0);
+  if (!quiet && currentMission === 2) spotterLine(m.type === 'generator' ? 'lightsOut' : 'materielDown', { label: m.label.toLowerCase() }, 0);
   investigateNoise(m.x, m.z, 250);
 }
 function cutCompoundLights() {
@@ -5288,6 +5324,7 @@ function scatterVegetation(Q) {
     if (Math.abs(rz - SNIPER_LAYOUT.airstrip.z) < 60 && Math.abs(rx) < 680) return false; // airstrip
     if (Math.abs(rx) < 170 && rz > SNIPER_LAYOUT.nest.z - 10 && rz < -300) return false; // keep your view clear
     if (dist2D(x, z, N.x, N.z) < 25) return false;
+    if (currentMission === 4) { const L = haloLZ(); if (dist2D(x, z, L.x, L.z) < 140) return false; }   // keep the LZ meadow clear
     return true;
   };
   // Pines: trunk + two cone layers
@@ -5363,6 +5400,7 @@ function sniperObjectives() {
 function objectivesComplete() {
   if (currentMission === 0 || currentMission === 3) return trainingDoneAll();
   if (currentMission === 2) return sniperObjectives().every(o => o.done || o.bonus);
+  if (currentMission === 4) return haloObjectives().every(o => o.done || o.bonus);
   return intelItems.every(i => i.collected);
 }
 // Distance written nicely: "1,243 m"
@@ -6146,6 +6184,7 @@ function playerDistances() {
 function currentObjective() {
   if (currentMission === 0) return trainingObjective();
   if (currentMission === 3) return lessonObjective();
+  if (currentMission === 4) return haloObjective();
   if (currentMission === 1) {
     const left = intelItems.filter(i => !i.collected);
     if (left.length) {
@@ -6197,7 +6236,7 @@ function drawCompass() {
 }
 // Remember where you've been (for the map), and what you've seen.
 function updateNavigation(dt) {
-  if (currentMission === 2 || currentMission === 3 || !navInfo) return;
+  if (currentMission >= 2 || !navInfo) return;
   const [c, r] = cellOf(camera.position.x, camera.position.z);
   for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
     const cc = c + dc, rr = r + dr; if (cc < 0 || rr < 0 || cc >= worldCols || rr >= worldRows) continue;
@@ -6234,7 +6273,7 @@ function giveHint() {
 let mapOpenedAt = 0;
 function openMap() {
   if (state !== 'playing') return;
-  if (currentMission === 2 || currentMission === 3 || !navInfo) { showMessage('No floor plan for an outdoor op — follow the yellow ◆ on the compass.', 2.5); return; }
+  if (currentMission >= 2 || !navInfo) { showMessage('No floor plan for an outdoor op — follow the yellow ◆ on the compass.', 2.5); return; }
   trainEvent('mapOpen');
   releaseInputs(); state = 'map'; mapOpenedAt = performance.now();
   $('mapScreen').style.display = 'flex'; drawMap();
@@ -6408,24 +6447,26 @@ function applyMission(m) {
   SETTINGS.xrayCam = $('optXray').checked;
   SETTINGS.graphicsQuality = $('optQuality').value;
   if (m === 3) SETTINGS.nightOps = false;                              // the lesson is always in daylight
-  const outdoors = m === 2 || m === 3, high = SETTINGS.graphicsQuality === 'high';
+  if (m === 4) SETTINGS.nightOps = true;                               // v0.6.27: HALO is always a night jump
+  if (m !== 4 && typeof haloOff === 'function') haloOff();
+  const outdoors = m === 2 || m === 3 || m === 4, high = SETTINGS.graphicsQuality === 'high';
   if (!GFX_LEVELS[SETTINGS.graphicsQuality]) SETTINGS.graphicsQuality = autoGfx();
   safe('graphics', () => applyGraphics());                          // v0.6.26: tone mapping, shadows, sky light (SECTION 3b)
   camera.near = outdoors ? 0.1 : 0.05; camera.far = outdoors ? SETTINGS.viewDistance : 200; camera.updateProjectionMatrix();
   document.querySelectorAll('.m2only').forEach(el => (el.style.display = outdoors ? 'flex' : 'none'));
-  document.querySelectorAll('.equiponly').forEach(el => (el.style.display = m === 0 || m === 1 ? 'flex' : 'none'));   // v0.6.2 demolition kit + waypoint
+  document.querySelectorAll('.equiponly').forEach(el => (el.style.display = m === 0 || m === 1 || m === 4 ? 'flex' : 'none'));   // v0.6.2 demolition kit + waypoint
   document.querySelectorAll('.trainonly').forEach(el => (el.style.display = (m === 0 || (m === 3 && el.id === 'tSkip')) && (el.id !== 'tSkip' || DEV) ? 'flex' : 'none'));   // v0.6.6: SKIP button only in dev mode
   $('trainBox').style.display = m === 0 || m === 3 ? 'block' : 'none';
-  for (const k of [0, 1, 2, 3]) $('m' + k + 'Card').classList.toggle('sel', missionPicked && m === k);
+  for (const k of [0, 1, 2, 3, 4]) $('m' + k + 'Card').classList.toggle('sel', missionPicked && m === k);
   $('briefText').innerHTML = BRIEFINGS[m];
 }
 // v0.4.6 (iPad fix): the chosen mission lives in a variable, not only in the radio button,
 // because on some iPads tapping the mission card never ticked its radio (always Mission 1).
 let chosenMission = 1, missionPicked = true;   // v0.6.5: false = plain link for a returning player: pick a card first
-const MISSION_NAMES = { 0: 'CAMP HALYARD', 1: 'BLACK FILE', 2: 'COLD HORIZON', 3: 'SNIPER LESSON' };
+const MISSION_NAMES = { 0: 'CAMP HALYARD', 1: 'BLACK FILE', 2: 'COLD HORIZON', 3: 'SNIPER LESSON', 4: 'HALO INSERTION' };
 function selectedMission() { return chosenMission; }
 function chooseMission(m, rebuild = true) {
-  m = m === 2 || m === 0 || m === 3 ? m : 1;
+  m = m === 2 || m === 0 || m === 3 || m === 4 ? m : 1;
   if (!isUnlocked(m)) { showLockNote(lockReason(m)); noteInput('locked mission ' + m); showPicked(); return; }   // v0.6.6
   const changed = m !== chosenMission;
   chosenMission = m; missionPicked = true;
@@ -6434,10 +6475,10 @@ function chooseMission(m, rebuild = true) {
     applyMission(m); buildLevel(); resetPlayer(); resetWeapons(); resetMasking(); missionStartPose();
   }
 }
-const MISSION_TITLES = { 0: 'Training', 1: 'Black File', 2: 'Cold Horizon', 3: 'the Sniper Lesson' };
+const MISSION_TITLES = { 0: 'Training', 1: 'Black File', 2: 'Cold Horizon', 3: 'the Sniper Lesson', 4: 'HALO Insertion' };
 const lockReason = m => 'Locked — beat ' + MISSION_TITLES[MISSION_ORDER[MISSION_ORDER.indexOf(m) - 1]] + ' first';
 function showLocks() {
-  for (const k of [0, 1, 2, 3]) {
+  for (const k of [0, 1, 2, 3, 4]) {
     const card = $('m' + k + 'Card'), locked = !isUnlocked(k);
     card.classList.toggle('locked', locked); card.setAttribute('aria-disabled', locked ? 'true' : 'false');
     const r = card.querySelector('input'); if (r) r.disabled = locked;
@@ -6453,9 +6494,9 @@ function showLockNote(txt) { $('lockNote').textContent = txt; clearTimeout(lockN
 function showPicked() {
   const m = chosenMission, p = missionPicked;
   document.querySelectorAll('input[name="mission"]').forEach(r => (r.checked = p && +r.value === m));
-  for (const k of [0, 1, 2, 3]) $('m' + k + 'Card').classList.toggle('sel', p && m === k);
+  for (const k of [0, 1, 2, 3, 4]) $('m' + k + 'Card').classList.toggle('sel', p && m === k);
   $('startBtn').textContent = p ? '▶ START: ' + MISSION_NAMES[m] : '▲ PICK A MISSION ABOVE, THEN START';
-  const headlines = { 0: 'CAMP HALYARD TRAINING', 1: 'OPERATION: BLACK FILE', 2: 'OPERATION: COLD HORIZON', 3: 'SNIPER LESSON' };
+  const headlines = { 0: 'CAMP HALYARD TRAINING', 1: 'OPERATION: BLACK FILE', 2: 'OPERATION: COLD HORIZON', 3: 'SNIPER LESSON', 4: 'OPERATION: HALO INSERTION' };
   const h1 = document.querySelector('#startScreen h1');
   if (h1 && p) h1.textContent = headlines[m] || headlines[1];
   document.title = (p ? (headlines[m] || 'VALKYRIE') : 'VALKYRIE') + ' — ' + VERSION;
@@ -6490,6 +6531,7 @@ const endOpen = () => (state === 'won' || state === 'lost') && $('endScreen').st
 function missionStartPose() {
   zeroRange = 100; scopeState.breath = SETTINGS.holdBreathTime; scopeState.gasp = 0;
   resetWind();
+  if (currentMission === 4) { player.stance = 'stand'; switchWeapon(3); switchTimer = 0; safe('halo', () => haloBegin()); return; }   // v0.6.27: starts in the aircraft
   if (currentMission === 2 || currentMission === 3) {
     player.stance = 'prone'; player.eyeY = SETTINGS.proneEyeHeight;
     switchWeapon(7); switchTimer = 0; fireCooldown = 0;       // CheyTac ready
@@ -6528,6 +6570,7 @@ function startMission() {
   safe('start:training', () => { garrote.active = false; garrote.anim = 0; if (currentMission === 0 || currentMission === 3) resetTraining(); });
   showMessage(currentMission === 0 ? 'Welcome to CAMP HALYARD. Read CHIEF\'s box at the top. Follow the yellow ◆ and the floor rings.'
     : currentMission === 3 ? 'SNIPER LESSON. Read GRAVEL\'s box at the top — he\'ll walk you through every shot.'
+    : currentMission === 4 ? 'HALO INSERTION. Listen to the JUMPMASTER (red box at the top). Keys for each step are listed on the right.'
     : currentMission === 2 ? 'Operation COLD HORIZON. Lase (F), dial ([ ] or ↑ ↓), breathe (Shift), send it.' : 'Mission start. Find the intel. Your squad (green ▼ HAWK, DOC) follows you — guards are deeper in. (V = knife, hold H = garrote)', 3.5);
   if (currentMission === 0 || currentMission === 3) { const m = currentMission; setTimeout(() => { if (state === 'playing' && currentMission === m && TRAIN && !TRAIN.begun) beginStation(); }, 600); }
   if (cameFromTouch()) touch.active = true;   // started with a tap: show the touch buttons
@@ -6549,14 +6592,16 @@ function endGame(won) {
   safeUnlock();
   const secs = Math.round((performance.now() - player.startTime) / 1000);
   const acc = player.shotsFired ? Math.round(player.shotsHit / player.shotsFired * 100) : 0;
-  $('endTitle').textContent = won ? (currentMission === 0 ? 'TRAINING COMPLETE' : currentMission === 3 ? 'QUALIFIED — SNIPER LESSON COMPLETE' : 'MISSION COMPLETE') : 'MISSION FAILED';
+  $('endTitle').textContent = won && currentMission === 4 ? 'MISSION COMPLETE — HALO INSERTION' : won ? (currentMission === 0 ? 'TRAINING COMPLETE' : currentMission === 3 ? 'QUALIFIED — SNIPER LESSON COMPLETE' : 'MISSION COMPLETE') : 'MISSION FAILED';
   $('endTitle').style.color = won ? '#7f7' : '#f66';
-  $('endSubtitle').textContent = won ? (currentMission === 0 ? 'CHIEF: "Congratulations, Wraith. You are now marginally less likely to die. Black File is waiting."' : currentMission === 3 ? 'GRAVEL: "Measure, dial, breathe, squeeze, stay. Now do it when they shoot back."' : currentMission === 2 ? 'Exfil complete. The Conductor just lost an airfield.' : 'Extraction successful. Good work, Agent.')
+  $('endSubtitle').textContent = currentMission === 4 ? (won ? 'HAWK: "In by parachute, out by helicopter. They never knew we were there."' : (H && H.phase !== 'ground' ? 'DOC: "That\'s why we practise in the wind tunnel, Wraith."' : 'Wraith down on the airfield. HAWK and DOC carry you out.')) : won ? (currentMission === 0 ? 'CHIEF: "Congratulations, Wraith. You are now marginally less likely to die. Black File is waiting."' : currentMission === 3 ? 'GRAVEL: "Measure, dial, breathe, squeeze, stay. Now do it when they shoot back."' : currentMission === 2 ? 'Exfil complete. The Conductor just lost an airfield.' : 'Extraction successful. Good work, Agent.')
     : (currentMission === 2 ? 'Wraith down. Gravel is going to be insufferable about this.' : 'Agent down. The intel is lost.');
   if (won) unlockAfterWin(currentMission);                            // v0.6.6: winning opens the next mission
   if (won && currentMission === 0) { try { localStorage.setItem('valkyrieTrainingDone', '1'); } catch (err) {} }
   if (won && currentMission === 3) { try { localStorage.setItem('valkyrieSniperLessonDone', '1'); } catch (err) {} }
-  const objLine = currentMission === 3
+  const objLine = currentMission === 4
+    ? haloObjectives().map(o => (o.done ? '☑ ' : '☐ ') + o.text).join('<br>') + '<div style="margin-top:8px;text-align:left;font-size:13px">' + haloScoreHTML() + '</div>'
+    : currentMission === 3
     ? 'Lessons: ' + TRAIN.done.filter(Boolean).length + ' / ' + LESSON.length + (TRAIN.skipped.some(Boolean) ? ' (skipped: ' + LESSON.filter((s, i) => TRAIN.skipped[i]).map(s => s.name).join(', ') + ')' : ' — none skipped')
       + '<br><b>Press Enter (or tap CONTINUE) for MISSION 02 — COLD HORIZON</b> · R = run the lesson again'
     : currentMission === 0
@@ -6568,7 +6613,7 @@ function endGame(won) {
     : `Intel recovered: ${intelItems.filter(i => i.collected).length} / ${intelItems.length}`;
   $('endStats').innerHTML = `Time: ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}<br>
     ${currentMission === 3 ? 'Plates hit: ' + player.shotsHit : 'Guards neutralised: ' + player.kills + ' / ' + enemies.length}<br>Accuracy: ${acc}% &nbsp; Headshots: ${player.headshots}<br>${objLine}`;
-  $('restartBtn').textContent = won && currentMission === 0 ? '▶ CONTINUE: MISSION 01 — BLACK FILE (Enter)' : won && currentMission === 3 ? '▶ CONTINUE: MISSION 02 — COLD HORIZON (Enter)' : '↻ CLICK / TAP TO RESTART MISSION (Enter)';
+  $('restartBtn').textContent = won && currentMission === 0 ? '▶ CONTINUE: MISSION 01 — BLACK FILE (Enter)' : won && currentMission === 3 ? '▶ CONTINUE: MISSION 02 — COLD HORIZON (Enter)' : won && currentMission === 2 ? '▶ CONTINUE: MISSION 03 — HALO INSERTION (Enter)' : '↻ CLICK / TAP TO RESTART MISSION (Enter)';
   $('endScreen').style.display = 'flex';
   safe('end:sound', () => (won ? SOUNDS.win() : SOUNDS.lose()));
 }
@@ -6584,7 +6629,7 @@ document.querySelectorAll('.gfxSel').forEach(el => el.addEventListener('change',
 document.querySelectorAll('input[name="mission"]').forEach(r => r.addEventListener('change', () => { if (r.checked && startOpen()) chooseMission(+r.value); }));
 // Tapping / clicking anywhere on a mission card picks it (pointer, touch AND click, whichever arrives).
 // v0.6.5: a genuine tap or click only, and only while the start screen is up (see onTap).
-for (const [id, m] of [['m0Card', 0], ['m1Card', 1], ['m3Card', 3], ['m2Card', 2]])
+for (const [id, m] of [['m0Card', 0], ['m1Card', 1], ['m3Card', 3], ['m2Card', 2], ['m4Card', 4]])
   onTap($(id), how => { noteInput('mission card ' + m + ' (' + how + ')'); chooseMission(m); }, { when: startOpen });
 // A link can pick the mission: ...?mission=2  or  ...#m2
 {
@@ -6594,9 +6639,9 @@ for (const [id, m] of [['m0Card', 0], ['m1Card', 1], ['m3Card', 3], ['m2Card', 2
   const params = new URLSearchParams(location.search);
   const q = (params.get('mission') || '').toLowerCase();
   const h = (location.hash || '').toLowerCase();
-  const fromName = { '0': 0, training: 0, train: 0, halyard: 0, camphalyard: 0, '1': 1, black: 1, blackfile: 1, mission1: 1, '2': 2, cold: 2, horizon: 2, mission2: 2, '3': 3, sniper: 3, lesson: 3 };
+  const fromName = { '0': 0, training: 0, train: 0, halyard: 0, camphalyard: 0, '1': 1, black: 1, blackfile: 1, mission1: 1, '2': 2, cold: 2, horizon: 2, mission2: 2, '3': 3, sniper: 3, lesson: 3, '4': 4, halo: 4, jump: 4, insertion: 4, mission3: 4 };
   const want = Object.prototype.hasOwnProperty.call(fromName, q) ? fromName[q]
-    : (h === '#m3' || h === '#sniper' || h === '#lesson' ? 3 : h === '#m2' || h === '#mission2' || h === '#horizon' ? 2 : h === '#m1' || h === '#mission1' || h === '#blackfile' ? 1
+    : (h === '#halo' || h === '#m4' ? 4 : h === '#m3' || h === '#sniper' || h === '#lesson' ? 3 : h === '#m2' || h === '#mission2' || h === '#horizon' ? 2 : h === '#m1' || h === '#mission1' || h === '#blackfile' ? 1
     : h === '#m0' || h === '#training' || h === '#halyard' ? 0 : -1);
   // v0.6.6: no mission in the link = the furthest mission you've earned, ticked, on the picker.
   // A link to a LOCKED mission falls back to the furthest one you've earned, with a short note.
@@ -6612,6 +6657,7 @@ onTap($('restartBtn'), () => continueOrRestart(), { prevent: true, when: endOpen
 function continueOrRestart() {
   if (state === 'won' && currentMission === 0) { chooseMission(1, false); lastStartAt = -1e9; }
   if (state === 'won' && currentMission === 3) { chooseMission(2, false); lastStartAt = -1e9; }
+  else if (state === 'won' && currentMission === 2) { chooseMission(4, false); lastStartAt = -1e9; }   // v0.6.27
   startMission();
 }
 // v0.6.5: Skip training needs a genuine tap AND a second tap to confirm (it sits below the briefing now).
@@ -6651,6 +6697,898 @@ document.addEventListener('pointerlockerror', () => {
 document.addEventListener('visibilitychange', () => { if (document.hidden) pauseGame('Paused'); });
 
 // #####################################################################
+// ##  SECTION 26: HALO INSERTION (v0.6.27) — MISSION 03              ##
+// ##  A night HALO jump (High Altitude, Low Opening) from a C-130 at ##
+// ##  25,000 ft, freefall in formation with HAWK and DOC, break-off  ##
+// ##  at 5,500 ft, pull at 4,000 ft, fly the canopy to the LZ, flare ##
+// ##  and land; then the stealth raid on the Valkyrie airfield.      ##
+// ##  Phases: cabin -> freefall -> deploy -> canopy -> landed ->     ##
+// ##  ground. Until 'ground' this section moves the camera itself    ##
+// ##  (the normal walking code is switched off).                     ##
+// #####################################################################
+const HALO = {
+  lz: { x: -420, z: -430 },        // the LZ meadow (layout coordinates, metres from the compound centre)
+  exfil: { x: -660, z: 200 },      // helicopter pick-up: west end of the runway
+  exitAGL: 7620,                   // 25,000 ft above the LZ
+  breakAGL: 1676,                  // 5,500 ft: break-off
+  pullAGL: 1219,                   // 4,000 ft: pull
+  planeSpeed: 67,                  // m/s (130 knots)
+  fieldElev: 1800,                 // the LZ is 1,800 m above sea level (thin air up high = faster freefall)
+  exitOffset: -2350,               // the release point is this far WEST (upwind) of the LZ
+};
+const FT = 3.28084, MPH = 2.23694;
+let H = null;                      // the jump; null when not on this mission
+let haloLzH = null;                // ground height at the LZ
+let haloFlareTipDone = false; try { haloFlareTipDone = localStorage.getItem('valkyrieFlareTip') === '1'; } catch (err) { /* private mode */ }
+function haloActive() { return currentMission === 4 && !!H && H.phase !== 'ground'; }
+function haloLZ() { return L2W(HALO.lz.x, HALO.lz.z); }
+// Wind blows TOWARDS +x (from the west): 4 m/s on the ground, 18 m/s at exit altitude.
+function haloWind(agl) { const k = THREE.MathUtils.clamp(agl / 7600, 0, 1); return { x: 4 + 14 * k, z: 0.5 + 1.2 * k }; }
+const fwdX = yaw => -Math.sin(yaw), fwdZ = yaw => -Math.cos(yaw);      // camera convention: yaw 0 = looking -z (north)
+const wrapA = a => Math.atan2(Math.sin(a), Math.cos(a));
+const UPWIND_YAW = Math.PI / 2;                                         // facing -x (west) = into the wind
+
+// ---------- materials + models ----------
+const HM = {
+  suit: new THREE.MeshStandardMaterial({ color: 0x2c3127, roughness: 0.9 }),
+  gear: new THREE.MeshStandardMaterial({ color: 0x45432f, roughness: 0.85 }),
+  rig: new THREE.MeshStandardMaterial({ color: 0x1f221c, roughness: 0.75 }),
+  helmet: new THREE.MeshStandardMaterial({ color: 0x2b2f2a, roughness: 0.45 }),
+  glove: new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.6 }),
+  bottle: new THREE.MeshStandardMaterial({ color: 0x55703c, roughness: 0.45, metalness: 0.5 }),
+  visor: new THREE.MeshStandardMaterial({ color: 0x0b0d12, roughness: 0.12, metalness: 0.7 }),
+  canopy: new THREE.MeshStandardMaterial({ color: 0x30363d, roughness: 0.7, side: THREE.DoubleSide }),
+  rib: new THREE.MeshStandardMaterial({ color: 0x20252b, roughness: 0.8, side: THREE.DoubleSide }),
+  line: new THREE.LineBasicMaterial({ color: 0x5c5c52, transparent: true, opacity: 0.35 }),
+  glow: new THREE.MeshBasicMaterial({ color: 0x3cff6e }),
+  toggle: new THREE.MeshStandardMaterial({ color: 0xc9a227, roughness: 0.55 }),
+  hull: new THREE.MeshStandardMaterial({ color: 0x3b4146, roughness: 0.7, metalness: 0.3 }),
+  hullIn: new THREE.MeshStandardMaterial({ color: 0x4a5040, roughness: 0.85, side: THREE.BackSide }),
+  floor: new THREE.MeshStandardMaterial({ color: 0x3a3c3a, roughness: 0.8, metalness: 0.3 }),
+  seat: new THREE.MeshStandardMaterial({ color: 0x8a2a1e, roughness: 0.9 }),
+  yellow: new THREE.MeshBasicMaterial({ color: 0xd8b020 }),
+  red: new THREE.MeshBasicMaterial({ color: 0xff2a18 }), redOff: new THREE.MeshBasicMaterial({ color: 0x3a0a08 }),
+  green: new THREE.MeshBasicMaterial({ color: 0x30ff50 }), greenOff: new THREE.MeshBasicMaterial({ color: 0x0a2a0e }),
+  prop: new THREE.MeshBasicMaterial({ color: 0x202428, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false }),
+  sock: new THREE.MeshStandardMaterial({ color: 0xe05a20, roughness: 0.8, side: THREE.DoubleSide }),
+  pole: new THREE.MeshStandardMaterial({ color: 0x777777, roughness: 0.5, metalness: 0.6 }),
+};
+// a limb = a pivot group with a cylinder hanging DOWN from it (rotating the pivot swings the limb)
+function hLimb(len, r, mat, parent, x, y, z) {
+  const g = new THREE.Group(); g.position.set(x, y, z); parent.add(g);
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.82, len, 8), mat); m.position.y = -len / 2; m.castShadow = true; g.add(m);
+  return g;
+}
+// A jumper (HAWK, DOC, the jumpmaster): HALO rig, O2 bottle, helmet + mask, ruck. Built standing,
+// facing -z; poseJumper() bends it into box-man, track, canopy or standing.
+function buildJumper(name, opts = {}) {
+  const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
+  const add = (geo, mat, x, y, z, p = body) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; p.add(m); return m; };
+  add(new THREE.BoxGeometry(0.42, 0.62, 0.26), HM.suit, 0, 0.12, 0);                       // torso
+  add(new THREE.BoxGeometry(0.44, 0.34, 0.3), HM.gear, 0, 0.2, -0.01);                      // chest rig
+  add(new THREE.SphereGeometry(0.11, 12, 10), HM.suit, 0, 0.56, 0);                         // head
+  const helm = add(new THREE.SphereGeometry(0.14, 14, 10), HM.helmet, 0, 0.6, 0.01); helm.scale.set(1, 0.85, 1.08);
+  add(new THREE.BoxGeometry(0.2, 0.08, 0.05), HM.visor, 0, 0.58, -0.13);                    // goggles
+  add(new THREE.BoxGeometry(0.1, 0.09, 0.07), HM.rig, 0, 0.5, -0.12);                        // O2 mask
+  if (!opts.noRig) {
+    add(new THREE.BoxGeometry(0.38, 0.56, 0.2), HM.rig, 0, 0.12, 0.23);                       // main + reserve container
+    add(new THREE.CylinderGeometry(0.05, 0.05, 0.34, 10), HM.bottle, -0.24, 0.12, 0.08);     // bailout bottle
+    add(new THREE.BoxGeometry(0.36, 0.32, 0.22), HM.gear, 0, -0.42, -0.2);                    // ruck under the reserve
+  }
+  if (!opts.noGlow) add(new THREE.BoxGeometry(0.05, 0.02, 0.05), HM.glow, 0, 0.72, 0.06);     // glow tape on the helmet
+  const arms = [-1, 1].map(s => { const sh = hLimb(0.3, 0.055, HM.suit, body, s * 0.25, 0.36, 0); const el = hLimb(0.28, 0.048, HM.suit, sh, 0, -0.3, 0);
+    add(new THREE.BoxGeometry(0.08, 0.1, 0.06), HM.glove, 0, -0.3, 0, el); return { sh, el }; });
+  const legs = [-1, 1].map(s => { const hp = hLimb(0.44, 0.075, HM.suit, body, s * 0.12, -0.2, 0); const kn = hLimb(0.44, 0.06, HM.suit, hp, 0, -0.44, 0);
+    add(new THREE.BoxGeometry(0.11, 0.1, 0.24), HM.rig, 0, -0.46, -0.05, kn); return { hp, kn }; });
+  const strobe = makeStrobe(body, 0, 0.78, 0.04);
+  const marker = friendlyMarker(name); marker.position.y = 1.15; if (opts.noMarker) marker.visible = false; root.add(marker);
+  return { root, body, arms, legs, strobe, marker, name };
+}
+// pose: 'stand' | 'box' | 'track' | 'dearch' | 'dive' | 'forward' | 'wave' | 'canopy'
+function poseJumper(j, pose, t = 0, brake = 0) {
+  const A = j.arms, L = j.legs, flat = pose !== 'stand' && pose !== 'canopy';
+  j.body.rotation.x = flat ? -Math.PI / 2 : 0;
+  const set = (o, x, y, z) => o.rotation.set(x, y, z);
+  if (pose === 'stand') { A.forEach((a, i) => { const s = i ? 1 : -1; set(a.sh, 0, 0, s * 0.12); set(a.el, -0.5, 0, 0); }); L.forEach(l => { set(l.hp, 0, 0, 0); set(l.kn, 0, 0, 0); }); return; }
+  if (pose === 'canopy') { A.forEach((a, i) => { const s = i ? 1 : -1; set(a.sh, 0, 0, s * (2.75 - 2.1 * brake)); set(a.el, 0, 0, s * 0.25); });
+    L.forEach((l, i) => { set(l.hp, -0.35, 0, (i ? 1 : -1) * 0.06); set(l.kn, 0.4, 0, 0); }); return; }
+  // freefall poses (body frame: +y = head, -z = belly). Box-man: arms out + up, elbows 90°, knees bent, shins up.
+  let sh = 2.0, el = 1.45, hp = 0.32, kn = -1.2, hx = -0.25;
+  if (pose === 'track') { sh = 0.3; el = 0; hp = 0.06; kn = -0.05; hx = 0; }
+  if (pose === 'dive') { sh = 1.2; el = 1.1; hp = 0.15; kn = -0.4; }
+  if (pose === 'dearch') { sh = 2.45; el = 0.7; hp = 0.45; kn = -0.6; hx = 0.15; }
+  if (pose === 'forward') { sh = 1.75; el = 1.3; hp = 0.28; kn = -0.5; }
+  A.forEach((a, i) => {
+    const s = i ? 1 : -1; let a1 = sh, e1 = el;
+    if (pose === 'wave') { a1 = 2.9 + Math.sin(t * 9 + i) * 0.35; e1 = 0.3; }
+    set(a.sh, 0, 0, s * a1); set(a.el, 0, 0, s * e1);
+  });
+  L.forEach((l, i) => { const s = i ? 1 : -1; set(l.hp, hx, 0, s * hp); set(l.kn, kn, 0, 0); });
+}
+// A ram-air canopy: 9 cells, slight arc, suspension lines down to the risers. Leading edge = -z.
+function buildCanopy(reserve = false) {
+  const g = new THREE.Group(), cells = new THREE.Group(); g.add(cells);
+  const n = reserve ? 7 : 9, w = reserve ? 0.85 : 0.95, chord = reserve ? 2.9 : 3.4, pts = [];
+  for (let i = 0; i < n; i++) {
+    const k = i - (n - 1) / 2, x = k * w, y = -0.035 * k * k;
+    const geo = new THREE.BoxGeometry(w * 0.97, 0.34, chord, 1, 1, 4), p = geo.attributes.position;
+    for (let v = 0; v < p.count; v++) { const t = (p.getZ(v) + chord / 2) / chord; p.setY(v, p.getY(v) * (0.35 + 0.8 * (1 - t))); }   // fat nose, thin tail
+    geo.computeVertexNormals();
+    const cell = new THREE.Mesh(geo, HM.canopy); cell.position.set(x, y, 0); cell.rotation.z = -k * 0.07; cell.castShadow = true; cells.add(cell);
+    const rib = new THREE.Mesh(new THREE.PlaneGeometry(chord, 0.22), HM.rib); rib.rotation.y = Math.PI / 2; rib.position.set(x + w / 2, y, 0); cells.add(rib);
+    for (const z of [-chord * 0.42, -chord * 0.15, chord * 0.12, chord * 0.42]) pts.push(x, y - 0.17, z, Math.sign(k || 0.001) * 0.22, -4.55, 0.05);
+  }
+  const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+  const lines = new THREE.LineSegments(lg, HM.line); g.add(lines);
+  return { group: g, cells, lines };
+}
+// ---------- the aircraft: a C-130 with the ramp at the back (local +x = nose; local origin = ramp hinge, floor level) ----------
+function buildPlane() {
+  const g = new THREE.Group(), add = (geo, mat, x, y, z, p = g) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); p.add(m); return m; };
+  add(new THREE.CylinderGeometry(2.05, 2.05, 22, 20, 1, true), HM.hull, 11, 1.25, 0).rotation.z = Math.PI / 2;
+  add(new THREE.CylinderGeometry(1.98, 1.98, 21.6, 20, 1, true), HM.hullIn, 11, 1.25, 0).rotation.z = Math.PI / 2;
+  const nose = add(new THREE.SphereGeometry(2.05, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2), HM.hull, 22, 1.25, 0); nose.rotation.z = -Math.PI / 2; nose.scale.set(1, 1.5, 1);
+  add(new THREE.CircleGeometry(1.98, 20), HM.floor, 21.9, 1.25, 0).rotation.y = -Math.PI / 2;      // front bulkhead
+  add(new THREE.BoxGeometry(12, 1.4, 2.4), HM.hull, -6, 2.6, 0);                                     // tail boom above the ramp
+  add(new THREE.BoxGeometry(4.2, 6.5, 0.3), HM.hull, -10.5, 5.8, 0);                                // fin
+  add(new THREE.BoxGeometry(3.6, 0.25, 13), HM.hull, -10.5, 3.2, 0);                                // tailplane
+  add(new THREE.BoxGeometry(4.4, 0.45, 40), HM.hull, 12, 3.35, 0);                                  // wing
+  const props = [];
+  for (const z of [-11, -5.5, 5.5, 11]) {
+    add(new THREE.CylinderGeometry(0.55, 0.5, 4.6, 10), HM.hull, 13.2, 2.9, z).rotation.z = Math.PI / 2;
+    const disc = add(new THREE.CircleGeometry(2.05, 24), HM.prop, 15.6, 2.9, z); disc.rotation.y = Math.PI / 2; props.push(disc);
+  }
+  add(new THREE.BoxGeometry(21.6, 0.08, 3.1), HM.floor, 11, 0, 0);                                  // cargo floor
+  for (const z of [-0.7, 0.7]) add(new THREE.BoxGeometry(21.6, 0.04, 0.12), HM.pole, 11, 0.05, z); // roller rails
+  for (const s of [-1, 1]) { add(new THREE.BoxGeometry(13, 0.08, 0.45), HM.seat, 9.5, 0.45, s * 1.35); add(new THREE.BoxGeometry(13, 0.6, 0.04), HM.seat, 9.5, 0.85, s * 1.56); }
+  const ramp = new THREE.Group(); g.add(ramp);                                                       // the ramp pivots at the hinge
+  add(new THREE.BoxGeometry(3.4, 0.1, 3.0), HM.floor, -1.7, 0, 0, ramp);
+  add(new THREE.BoxGeometry(0.08, 0.03, 2.8), HM.yellow, -1.0, 0.06, 0, ramp);                      // "stop here" line
+  const door = add(new THREE.BoxGeometry(0.12, 2.0, 3.0), HM.hull, -0.2, 1.4, 0);                  // upper cargo door
+  const lights = new THREE.Group(); lights.position.set(0.3, 2.05, -1.3); g.add(lights);           // jump lights by the ramp
+  const red = add(new THREE.SphereGeometry(0.07, 10, 8), HM.redOff, 0, 0, 0, lights), grn = add(new THREE.SphereGeometry(0.07, 10, 8), HM.greenOff, 0, -0.2, 0, lights);
+  const cabinLight = new THREE.PointLight(0xff2a14, 3, 16, 1.4); cabinLight.position.set(5, 2.2, 0); g.add(cabinLight);   // dim red night lighting
+  const jumpLight = new THREE.PointLight(0xff2a14, 0, 6, 1.5); jumpLight.position.set(0.4, 1.9, -1); g.add(jumpLight);
+  const jm = buildJumper('JUMPMASTER', { noMarker: true, noGlow: true }); jm.root.position.set(-0.4, 0.95, -1.2); jm.root.rotation.y = -Math.PI / 2; g.add(jm.root); poseJumper(jm, 'stand');
+  return { group: g, ramp, door, red, grn, props, cabinLight, jumpLight, jm };
+}
+function buildWindsock(p, h) {
+  const g = new THREE.Group(); g.position.set(p.x, h, p.z);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 5, 8), HM.pole); pole.position.y = 2.5; g.add(pole);
+  const geo = new THREE.CylinderGeometry(0.35, 0.16, 2.2, 12, 4, true); geo.rotateZ(Math.PI / 2); geo.translate(1.15, 0, 0);   // mouth into the wind, tail points downwind (+x)
+  const sock = new THREE.Mesh(geo, HM.sock); sock.position.set(0, 4.9, 0); g.add(sock);
+  const chem = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), HM.glow); chem.position.set(0, 5.05, 0); g.add(chem);
+  levelGroup.add(g); return sock;
+}
+// ---------- HALO world extras: moon, stars, valley lights, LZ meadow clutter, windsock ----------
+function buildHaloWorld() {
+  const L = haloLZ(), lzh = groundAt(L.x, L.z), rand = makeRandom(404);
+  const sp = []; for (let i = 0; i < 1800; i++) { const u = rand() * 2 - 1, a = rand() * Math.PI * 2, r = Math.sqrt(1 - u * u); if (u < -0.05) continue; sp.push(r * Math.cos(a) * 9000, u * 9000, r * Math.sin(a) * 9000); }
+  const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3));
+  const stars = new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xdfe6ff, size: 1.6, sizeAttenuation: false, fog: false, transparent: true, opacity: 0.85, depthWrite: false }));
+  levelGroup.add(stars);
+  const moonDir = new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(90 - 34), THREE.MathUtils.degToRad(215));
+  const moon = new THREE.Mesh(new THREE.CircleGeometry(150, 32), new THREE.MeshBasicMaterial({ color: 0xe9eefc, fog: false }));
+  levelGroup.add(moon);
+  // villages in the far valleys: tiny warm lights you see from altitude
+  const vl = [], vc = [], col = new THREE.Color();
+  for (const [vx, vz, n] of [[-5200, 3800, 70], [7600, -2600, 90], [3200, 9000, 60], [-8000, -6000, 50], [9000, 7000, 80]]) {
+    for (let i = 0; i < n; i++) { vl.push(M2_WORLD.center.x + vx + (rand() - 0.5) * 500, 40, M2_WORLD.center.z + vz + (rand() - 0.5) * 500); col.setHSL(0.1 + rand() * 0.04, 0.8, 0.55 + rand() * 0.2); vc.push(col.r, col.g, col.b); }
+  }
+  const vg = new THREE.BufferGeometry(); vg.setAttribute('position', new THREE.Float32BufferAttribute(vl, 3)); vg.setAttribute('color', new THREE.Float32BufferAttribute(vc, 3));
+  levelGroup.add(new THREE.Points(vg, new THREE.PointsMaterial({ size: 2, sizeAttenuation: false, vertexColors: true, fog: false })));
+  // the meadow: tufts + rocks so the ground visibly rushes up at you in the last 100 ft
+  const n = 700, tuft = new THREE.InstancedMesh(new THREE.ConeGeometry(0.18, 0.5, 5), new THREE.MeshStandardMaterial({ color: 0x5c6a3a, roughness: 1 }), n);
+  const rock = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(0.3, 0), new THREE.MeshStandardMaterial({ color: 0x6a6660, roughness: 0.95 }), 160);
+  const d = new THREE.Object3D();
+  for (let i = 0; i < n; i++) { const a = rand() * Math.PI * 2, r = Math.sqrt(rand()) * 130, x = L.x + Math.cos(a) * r, z = L.z + Math.sin(a) * r; d.position.set(x, groundAt(x, z) + 0.2, z); d.rotation.set(0, rand() * 6, 0); d.scale.setScalar(0.6 + rand() * 0.9); d.updateMatrix(); tuft.setMatrixAt(i, d.matrix); }
+  for (let i = 0; i < 160; i++) { const a = rand() * Math.PI * 2, r = 20 + Math.sqrt(rand()) * 110, x = L.x + Math.cos(a) * r, z = L.z + Math.sin(a) * r; d.position.set(x, groundAt(x, z) + 0.05, z); d.rotation.set(rand() * 3, rand() * 3, 0); d.scale.set(0.6 + rand() * 1.4, 0.4 + rand() * 0.6, 0.6 + rand() * 1.4); d.updateMatrix(); rock.setMatrixAt(i, d.matrix); }
+  tuft.receiveShadow = rock.receiveShadow = true; levelGroup.add(tuft, rock);
+  const sock = buildWindsock({ x: L.x + 18, z: L.z - 12 }, groundAt(L.x + 18, L.z - 12));
+  const lzStrobe = makeStrobe(levelGroup, L.x, lzh + 0.4, L.z);       // IR strobe on the LZ (night vision only)
+  return { stars, moon, moonDir, sock, lzStrobe };
+}
+// ---------- your own body in first person (drawn in the gun scene so it never clips) ----------
+const haloFP = (() => {
+  const g = new THREE.Group(); g.visible = false; weaponScene.add(g);
+  const mk = s => {
+    const up = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.045, 1, 8), HM.suit), lo = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.04, 1, 8), HM.suit);
+    const hand = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.06, 0.11), HM.glove), cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.052, 0.06, 8), HM.rig);
+    const tog = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.09, 0.03), HM.toggle); g.add(up, lo, hand, cuff, tog);
+    return { s, up, lo, hand, cuff, tog, cur: new THREE.Vector3(s * 0.3, -0.7, 0), el: new THREE.Vector3() };
+  };
+  const arms = [mk(-1), mk(1)];
+  const c = document.createElement('canvas'); c.width = 128; c.height = 80;                         // wrist altimeter face
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  const alti = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.02, 0.075), [HM.rig, HM.rig, new THREE.MeshBasicMaterial({ map: tex }), HM.rig, HM.rig, HM.rig]); g.add(alti);
+  const lines = new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(new Array(12).fill(0), 3)), HM.line); g.add(lines);
+  return { g, arms, alti, altiCanvas: c, altiTex: tex, lines, altiAt: 0 };
+})();
+const _ha = new THREE.Vector3(), _hb = new THREE.Vector3(), _hup = new THREE.Vector3(0, 1, 0);
+function placeBetween(mesh, a, b) {
+  const len = a.distanceTo(b); mesh.position.copy(a).add(b).multiplyScalar(0.5); mesh.scale.set(1, Math.max(0.001, len), 1);
+  mesh.quaternion.setFromUnitVectors(_hup, _hb.copy(b).sub(a).normalize());
+}
+// where each hand goes (camera space: x right, y up, -z ahead) for the body position you're flying
+function fpHandTarget(s, pose, t, brake, tl, tr) {
+  switch (pose) {
+    case 'box': return [s * 0.33, -0.03, -0.44];                    // box-man: hands up by your head
+    case 'dearch': return [s * 0.42, 0.02, -0.56];                 // arms pushed out
+    case 'dive': return [s * 0.3, -0.42, 0.0];                    // arms in
+    case 'forward': return [s * 0.36, -0.12, -0.36];
+    case 'track': return [s * 0.24, -0.6, 0.15];                  // swept back by your hips
+    case 'turnL': return s < 0 ? [-0.42, -0.16, -0.3] : [0.4, 0.13, -0.42];
+    case 'turnR': return s > 0 ? [0.42, -0.16, -0.3] : [-0.4, 0.13, -0.42];
+    case 'wave': return [s * (0.12 + 0.08 * Math.sin(t * 10)), 0.42, -0.36];
+    case 'pull': return s > 0 ? [0.22, -0.55, 0.08] : [-0.43, 0.02, -0.36];
+    case 'dock': return [s * 0.17, -0.06, -0.55];                 // gripping HAWK's harness
+    case 'canopy': { const d = Math.max(brake, s < 0 ? tl : tr); return [s * 0.3, 0.3 - 0.62 * d, -0.26 - 0.1 * d]; }
+    case 'cut': return [s * 0.12, -0.35, -0.25];
+    default: return [s * 0.3, -0.7, 0];
+  }
+}
+function updateFP(dt) {
+  const show = haloActive() && (H.phase === 'freefall' || H.phase === 'deploy' || H.phase === 'canopy');
+  haloFP.g.visible = show; if (!show) return;
+  const k = 1 - Math.exp(-dt * 9), pose = H.fpPose || 'box';
+  for (const a of haloFP.arms) {
+    const t = fpHandTarget(a.s, pose, H.T, H.brake, H.tl, H.tr);
+    a.cur.x += (t[0] - a.cur.x) * k; a.cur.y += (t[1] - a.cur.y) * k; a.cur.z += (t[2] - a.cur.z) * k;
+    const sh = _ha.set(a.s * 0.3, -0.36, 0.12);
+    a.el.copy(sh).add(a.cur).multiplyScalar(0.5); a.el.x += a.s * 0.12; a.el.y -= 0.1;   // elbow out and down
+    placeBetween(a.up, sh, a.el); placeBetween(a.lo, a.el, a.cur);
+    a.hand.position.copy(a.cur); a.hand.quaternion.copy(a.lo.quaternion);
+    a.cuff.position.copy(a.el).lerp(a.cur, 0.82); a.cuff.quaternion.copy(a.lo.quaternion); a.cuff.scale.set(1, 1, 1);
+    a.tog.visible = pose === 'canopy'; a.tog.position.copy(a.cur); a.tog.position.y += 0.06;
+  }
+  const L = haloFP.arms[0];
+  haloFP.alti.position.copy(L.el).lerp(L.cur, 0.68); haloFP.alti.position.y += 0.035; haloFP.alti.quaternion.copy(L.lo.quaternion); haloFP.alti.rotateX(-0.6);
+  haloFP.alti.visible = pose !== 'canopy';
+  const now = performance.now();
+  if (now - haloFP.altiAt > 150) {
+    haloFP.altiAt = now; const c = haloFP.altiCanvas.getContext('2d'), ft = Math.max(0, H.altDZ * FT);
+    c.fillStyle = '#9fb08a'; c.fillRect(0, 0, 128, 80); c.fillStyle = '#111'; c.font = 'bold 40px monospace'; c.textAlign = 'center';
+    c.fillText((ft / 1000).toFixed(1), 64, 48); c.font = 'bold 13px monospace'; c.fillText('x1000 FT', 64, 70);
+    if (ft < 5500 && H.phase === 'freefall' && (now % 500) < 250) { c.fillStyle = '#c00'; c.fillRect(0, 0, 128, 8); }
+    haloFP.altiTex.needsUpdate = true;
+  }
+  const p = haloFP.lines.geometry.attributes.position;                                        // brake lines up out of view
+  haloFP.arms.forEach((a, i) => { p.setXYZ(i * 2, a.cur.x, a.cur.y + 0.08, a.cur.z); p.setXYZ(i * 2 + 1, a.s * 0.35, 1.6, -0.6); });
+  p.needsUpdate = true; haloFP.lines.visible = pose === 'canopy';
+}
+
+// ---------- sound: aircraft drone, wind roar, canopy flutter (made live, nothing to download) ----------
+const HA = { on: false };
+function haloAudioStart() {
+  if (HA.on || !audioCtx || !noiseBuffer || !masterGain) return;
+  try {
+    const ac = audioCtx, filt = (type, freq, q) => { const f = ac.createBiquadFilter(); f.type = type; f.frequency.value = freq; if (q) f.Q.value = q; return f; };
+    const noise = () => { const s = ac.createBufferSource(); s.buffer = noiseBuffer; s.loop = true; s.playbackRate.value = 0.7 + Math.random() * 0.1; s.start(); return s; };
+    HA.windG = ac.createGain(); HA.windG.gain.value = 0; HA.windF = filt('lowpass', 500, 0.7);       // roar
+    noise().connect(HA.windF).connect(HA.windG).connect(masterGain);
+    HA.hissG = ac.createGain(); HA.hissG.gain.value = 0; noise().connect(filt('bandpass', 2600, 0.8)).connect(HA.hissG).connect(masterGain);   // hiss
+    HA.flapG = ac.createGain(); HA.flapG.gain.value = 0; const am = ac.createGain(); am.gain.value = 0.5;   // canopy fabric flutter
+    const lfo = ac.createOscillator(); lfo.frequency.value = 11; const lg = ac.createGain(); lg.gain.value = 0.5; lfo.connect(lg).connect(am.gain); lfo.start(); HA.lfo = lfo;
+    noise().connect(filt('bandpass', 380, 1.2)).connect(am).connect(HA.flapG).connect(masterGain);
+    HA.engG = ac.createGain(); HA.engG.gain.value = 0; const ef = filt('lowpass', 420, 1);            // C-130: four turboprops
+    [68, 136, 204, 102].forEach((f, i) => { const o = ac.createOscillator(); o.type = i === 3 ? 'triangle' : 'sawtooth'; o.frequency.value = f * (1 + i * 0.003); const gg = ac.createGain(); gg.gain.value = [0.5, 0.25, 0.12, 0.3][i]; o.connect(gg).connect(ef); o.start(); });
+    noise().connect(filt('lowpass', 180)).connect(ef); ef.connect(HA.engG).connect(masterGain);
+    HA.on = true;
+  } catch (err) { noteSoundError(err); }
+}
+function haloAudioSet(wind, hissK, flap, eng, roarHz) {
+  if (!HA.on) return; const t = audioCtx.currentTime;
+  HA.windG.gain.setTargetAtTime(wind, t, 0.12); HA.hissG.gain.setTargetAtTime(wind * hissK, t, 0.12);
+  HA.flapG.gain.setTargetAtTime(flap, t, 0.1); HA.engG.gain.setTargetAtTime(eng, t, 0.3);
+  if (roarHz) HA.windF.frequency.setTargetAtTime(roarHz, t, 0.2);
+}
+function haloAudioMute() { if (HA.on) haloAudioSet(0, 0, 0, 0); }
+function altiBeep(n, hi = false) { for (let i = 0; i < n; i++) playTone(hi ? 3400 : 2900, hi ? 3400 : 2900, 0.12, 0.2, 'square', i * 0.18); }
+
+// ---------- HUD: goggle frame, jumpmaster box, chest nav board, key legend, AGL ----------
+const haloUI = (() => {
+  const css = document.createElement('style');
+  css.textContent = `
+  #haloMask{position:fixed;inset:0;pointer-events:none;display:none;
+    background:radial-gradient(ellipse 64% 60% at 50% 46%,rgba(0,0,0,0) 72%,rgba(0,0,0,.55) 87%,rgba(0,0,0,.93) 100%);}
+  #haloMask:after{content:'';position:absolute;left:50%;bottom:-4%;width:20%;height:20%;transform:translateX(-50%);
+    background:radial-gradient(ellipse at 50% 100%,rgba(6,6,6,.96) 52%,rgba(0,0,0,0) 72%);}
+  #haloJM{position:fixed;top:56px;left:50%;transform:translateX(-50%);width:min(600px,86vw);background:rgba(12,10,10,.8);border:1px solid #d33;
+    color:#fff;font:15px/1.35 system-ui,sans-serif;padding:8px 14px;border-radius:6px;text-align:center;display:none;pointer-events:none;box-sizing:border-box}
+  #haloJM b{color:#ff9a7a} #haloJM .sig{color:#ffd28a;font-size:13px;margin-top:3px} #haloJM .do{color:#9f9;font-weight:bold;margin-top:3px}
+  #haloBoard{position:fixed;bottom:6px;left:50%;transform:translateX(-50%);width:460px;max-width:96vw;display:none;pointer-events:none}
+  #haloLegend{position:fixed;right:10px;top:110px;background:rgba(0,0,0,.62);color:#cfe8cf;font:12px/1.45 'Courier New',monospace;padding:7px 9px;border-radius:5px;
+    white-space:pre;display:none;pointer-events:none;border:1px solid rgba(120,255,120,.25)}
+  #haloLegend b{color:#ffe28a}
+  #haloForm{position:fixed;top:60%;left:50%;transform:translateX(-50%);color:#9f9;font:bold 15px 'Courier New',monospace;text-shadow:0 0 4px #000,0 0 2px #000;
+    display:none;pointer-events:none;text-align:center;white-space:pre}
+  #haloAGL{position:fixed;top:28%;left:50%;transform:translateX(-50%);font:bold 46px 'Courier New',monospace;color:#ffd24a;text-shadow:0 0 8px #000;display:none;pointer-events:none;text-align:center}
+  #haloAGL small{display:block;font-size:15px;color:#ffe9a8}
+  #haloScore{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,.85);border:1px solid #6c6;color:#efe;font:14px/1.5 system-ui,sans-serif;
+    padding:14px 22px;border-radius:8px;display:none;pointer-events:none;width:min(560px,90vw);box-sizing:border-box}
+  #haloScore h3{margin:0 0 6px;color:#9f9;font-size:17px}
+  body.haloOn #crosshair, body.haloOn #ammoBox, body.haloOn #compass, body.haloOn #objectives, body.haloOn #stanceText, body.haloOn #alertBox,
+  body.haloOn #friendTag, body.haloOn #maskTag, body.haloOn #killFeed, body.haloOn #modeTag, body.haloOn #spotter { display:none !important; }`;
+  document.head.appendChild(css);
+  const root = $('hud'), mk = (id, tag = 'div') => { const d = document.createElement(tag); d.id = id; root.appendChild(d); return d; };
+  const ui = { mask: mk('haloMask'), jm: mk('haloJM'), board: mk('haloBoard', 'canvas'), legend: mk('haloLegend'), form: mk('haloForm'), agl: mk('haloAGL'), score: mk('haloScore'), boardAt: 0, jmUntil: 0 };
+  ui.board.width = 460; ui.board.height = 150;
+  return ui;
+})();
+function haloJM(who, text, signal, todo, secs = 9) {
+  if (H) H.lastJM = [who, text, signal, todo];
+  haloUI.jm.innerHTML = `<b>${who}:</b> ${text}${signal ? `<div class="sig">✋ hand signal: ${signal}</div>` : ''}${todo ? `<div class="do">▶ ${todo}</div>` : ''}`;
+  haloUI.jm.style.display = 'block'; haloUI.jmUntil = performance.now() + secs * 1000;
+}
+const HALO_LEGEND = {
+  cabin: '<b>B</b>      oxygen → bailout bottle\n<b>W A S D</b>  walk\n<b>Space</b>  EXIT (when told GO)\n<b>Shift</b>  hold = skip the wait ×4\n<b>O</b>      repeat the last order\ntrackpad: look around',
+  freefall: '(no keys) stable ARCH (box-man)\n<b>W</b>      legs out = forward\n         hold 2 s = full TRACK\n<b>S</b>      de-arch: fall slower\n<b>E</b>      arms in: fall faster\n<b>A D</b>    turn\n<b>F</b>      take / let go of grips\n<b>Space</b>  wave off, <b>Space</b> again PULL\n<b>Shift</b>  hold ×4 time (above 6,000 ft)\ntrackpad: look around',
+  canopy: '<b>A D</b>    left / right toggle (turn)\n<b>S</b>      hold = BOTH toggles down\n         brakes / FLARE (goes deeper\n         the longer you hold)\n<b>C</b>      half-brakes on / off\n<b>R</b>      hold = rear risers (flatter)\n<b>Shift</b>  hold ×4 time (above 300 ft)\n<b>X</b>      cut away   <b>Space</b> reserve',
+  twist: '<b>LINE TWISTS!</b>\nRisers apart and kick:\n<b>A</b>, <b>D</b>, <b>A</b>, <b>D</b>… (alternate)\nStill twisted at 2,500 ft?\n<b>X</b> cut away, then <b>Space</b> reserve',
+  malf: '<b>MALFUNCTION!</b>\n<b>X</b>      cut away the main\n<b>Space</b>  then pull the RESERVE',
+};
+// ---------- start the jump (called by missionStartPose on this mission) ----------
+function haloBegin() {
+  if (currentMission !== 4) return;
+  const L = haloLZ(); haloLzH = groundAt(L.x, L.z);
+  const world = buildHaloWorld(), plane = buildPlane();
+  const P0 = new THREE.Vector3(L.x + HALO.exitOffset, haloLzH + HALO.exitAGL, L.z - 40);
+  plane.group.position.copy(P0); levelGroup.add(plane.group);
+  H = { phase: 'cabin', t: 0, T: 0, step: 0, stepT: 0, world, plane, P0, planeGone: false, ff: false,
+    pos: new THREE.Vector3(6, 0, 0.6), vel: new THREE.Vector3(), yaw: UPWIND_YAW, turn: 0, trackT: 0, mode: 'box', tumble: 0, tumbleRate: new THREE.Vector3(),
+    altDZ: HALO.exitAGL, agl: HALO.exitAGL, o2: false, rampOpen: 0, green: false, goAt: -1, mates: [], docked: false, dockedT: 0, strain: 0,
+    brokeOff: false, waved: false, waveT: 0, pullT: -1, deployT: 0, malf: null, twist: 0, kickLast: '', cut: false, reserve: false, aad: false, entangle: false,
+    brake: 0, tl: 0, tr: 0, half: false, V: 0, W: 0, roll: 0, pitchOff: 0, shakeX: 0, shakeY: 0, appliedP: 0, appliedY: 0, eye: 1.7, beeps: {}, said: {},
+    looked: { l: false, r: false }, landing: null, score: {}, fpPose: 'none', exitStable: null, canopy: null, lastJM: null, forceMalf: null };
+  for (const [i, name] of [[0, 'HAWK'], [1, 'DOC']]) {                  // HAWK and DOC stand ahead of you, nearer the ramp
+    const j = buildJumper(name); levelGroup.add(j.root); poseJumper(j, 'stand');
+    H.mates.push({ j, name, phase: 'cabin', local: new THREE.Vector3(2.4 - i * 1.0, 0.95, i ? -0.6 : 0.6), pos: new THREE.Vector3(), vel: new THREE.Vector3(), yaw: UPWIND_YAW,
+      docked: false, trackYaw: 0, trackT: 0, pulled: false, canopy: null, V: 10.5, W: 4.2, landed: false, exitT: 0, openT: 0 });
+  }
+  camera.near = 0.1; camera.far = 60000; camera.updateProjectionMatrix();
+  camera.position.copy(P0).add(new THREE.Vector3(6, 1.7, 0.6)); camera.rotation.set(-0.05, UPWIND_YAW, 0);
+  weaponRoot.visible = false; dualRoot.visible = false;
+  for (const el of [haloUI.score, haloUI.agl, haloUI.form]) el.style.display = 'none';
+  haloJM('JUMPMASTER', 'TEN MINUTES! You\'re breathing from the aircraft\'s oxygen console. Before you stand up, switch to the small <b>bailout bottle</b> on your rig.', 'both hands, fingers spread, flashed twice = 10 minutes', 'Press B to switch your oxygen to the bailout bottle', 60);
+  setPlaneLights(false, false);
+}
+function setPlaneLights(red, green) {
+  const p = H.plane; p.red.material = red ? HM.red : HM.redOff; p.grn.material = green ? HM.green : HM.greenOff;
+  p.jumpLight.color.set(green ? 0x30ff50 : 0xff2a14); p.jumpLight.intensity = red || green ? 2.5 : 0;
+}
+function haloOff() {
+  H = null; haloFP.g.visible = false; haloAudioMute(); document.body.classList.remove('haloOn');
+  for (const el of [haloUI.mask, haloUI.jm, haloUI.board, haloUI.legend, haloUI.form, haloUI.agl, haloUI.score]) el.style.display = 'none';
+}
+function haloRepeat() {           // O on the radio: say the last order again
+  if (H && H.lastJM) { const [w, t, s, d] = H.lastJM; haloJM(w, t, s, d, 9); } 
+}
+// ---------- keys (called from the main key handler while the jump is on) ----------
+const HALO_PASS_KEYS = ['KeyP', 'KeyN', 'KeyM', 'KeyO', 'Backquote', 'KeyL'];
+function haloKey(code) {
+  if (!haloActive()) return false;
+  const ph = H.phase;
+  if (ph === 'cabin') {
+    if (code === 'KeyB' && !H.o2) { H.o2 = true; playNoise(0.35, 0.2, 2500); playTone(500, 300, 0.12, 0.1, 'sine'); H.step = 1; H.stepT = 0;
+      haloJM('JUMPMASTER', 'Good — you\'re on your <b>bailout bottle</b> now. Without it you\'d black out in under a minute up here (25,000 ft).', null, 'Wait for the next command', 6); }
+    if (code === 'Space') haloExit(false);
+  } else if (ph === 'freefall') {
+    if (code === 'KeyF') haloGrip();
+    if (code === 'Space') { if (H.cut && !H.reserve) haloReserve(); else haloPullPress(); }
+  } else if (ph === 'canopy') {
+    if (code === 'KeyC') { H.half = !H.half; showMessage(H.half ? 'HALF BRAKES — slower, flatter, more time to look. You still FLARE at the end (hold S).' : 'Brakes off: full drive.', 2.5); }
+    if (code === 'KeyX') haloCutaway();
+    if (code === 'Space') haloReserve();
+    if ((code === 'KeyA' || code === 'KeyD') && H.twist > 0) {
+      if (H.kickLast && H.kickLast !== code) { H.twist = Math.max(0, H.twist - 0.5); playNoise(0.1, 0.08, 900); if (H.twist <= 0) haloTwistCleared(); }
+      H.kickLast = code;
+    }
+  }
+  return !HALO_PASS_KEYS.includes(code);
+}
+// ---------- the cabin ----------
+function cabinUpdate(dt) {
+  const p = H.plane;
+  H.stepT += dt;
+  const e = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ');
+  const f = { x: fwdX(e.y), z: fwdZ(e.y) }, r = { x: -f.z, z: f.x };
+  const a = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0), s = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0), sp = H.step >= 1 ? 1.5 : 0;
+  H.pos.x += (f.x * a + r.x * s) * sp * dt; H.pos.z += (f.z * a + r.z * s) * sp * dt;
+  H.pos.x = THREE.MathUtils.clamp(H.pos.x, H.green ? -3.6 : -0.95, 9.5); H.pos.z = THREE.MathUtils.clamp(H.pos.z, -1.2, 1.2);
+  camera.position.copy(H.P0).add(_ha.set(H.pos.x, 1.7 + Math.sin(H.T * 0.7) * 0.012, H.pos.z));
+  p.props.forEach((d, i) => (d.rotation.z += dt * 40 + i));
+  const next = (secs, fn) => { if (H.stepT > secs) { H.step++; H.stepT = 0; fn(); } };
+  if (H.step === 1) next(3, () => haloJM('JUMPMASTER', 'STAND UP!', 'palms up, both arms lifted', 'You\'re on your feet.', 5));
+  else if (H.step === 2) next(3, () => haloJM('JUMPMASTER', 'CHECK EQUIPMENT!', 'hands patting the chest', 'Rig ✓  altimeter ✓  GPS board ✓  O2 ✓  rifle strapped ✓', 5));
+  else if (H.step === 3) next(3.5, () => { haloJM('JUMPMASTER', 'RAMP COMING DOWN. It\'s minus 30 °C out there.', 'arm swept towards the tail', null, 5); playNoise(1.2, 0.2, 300); setPlaneLights(true, false); });
+  else if (H.step === 4) { H.rampOpen = Math.min(1, H.rampOpen + dt / 4); if (H.rampOpen >= 1) next(0.5, () => haloJM('JUMPMASTER', 'MOVE TO THE RAMP! Stop at the yellow line.', 'both arms pointing at the ramp', 'Walk forward (W) to the yellow line', 30)); }
+  else if (H.step === 5) { if (H.pos.x < -0.8) { H.step++; H.stepT = 0; haloJM('JUMPMASTER', 'ONE MINUTE!', 'one index finger held up', 'HAWK goes first, then DOC, then you. Then you fly down to them and take grips.', 6); } }
+  else if (H.step === 6) next(4, () => haloJM('JUMPMASTER', 'THIRTY SECONDS!', 'thumb and finger almost touching', 'On GO: Space to dive out. Face out, look at the horizon, no turning — then ARCH.', 6));
+  else if (H.step === 7) next(3, () => haloJM('JUMPMASTER', 'STAND BY…', 'pointing at the open ramp', null, 4));
+  else if (H.step === 8) next(2.5, () => { H.green = true; setPlaneLights(false, true); H.goAt = H.T; H.step = 9; haloJM('JUMPMASTER', 'GREEN LIGHT — GO, GO, GO!', 'arm chopping out towards the sky', 'HAWK… DOC… now YOU: press Space', 9); });
+  else if (H.step === 9 && H.T - H.goAt > 9) { haloJM('JUMPMASTER', 'Out you go, Wraith!', 'a hand in your back', null, 3); haloExit(true); return; }
+  p.ramp.rotation.z = -1.05 * (1 - H.rampOpen); p.door.position.y = 1.4 + 1.1 * H.rampOpen;
+  H.mates.forEach((m, i) => {
+    if (m.phase !== 'cabin') return;
+    if (H.step >= 5) m.local.x = Math.max(-1.6 - i * 0.3, m.local.x - dt * 1.2);
+    if (H.green && H.T - H.goAt > i * 0.8) { m.phase = 'free'; m.pos.copy(H.P0).add(m.local); m.vel.set(HALO.planeSpeed, -1, 0); m.yaw = UPWIND_YAW; m.exitT = H.T; return; }
+    m.j.root.position.copy(H.P0).add(m.local); m.j.root.rotation.y = UPWIND_YAW; poseJumper(m.j, 'stand');
+  });
+  haloAudioSet(0.04 + 0.3 * H.rampOpen, 0.3, 0, 0.32 - 0.08 * H.rampOpen, 600);
+  if (H.pos.x < -3.4) haloExit(true);                                   // walked off the end of the ramp
+}
+function haloExit(pushed) {
+  if (!H || H.phase !== 'cabin') return;
+  if (!H.green) { showMessage(H.o2 ? 'Wait for the GREEN light and the jumpmaster\'s GO.' : 'Oxygen first: press B (bailout bottle).', 2.5); return; }
+  if (H.pos.x > -0.6 && !pushed) { showMessage('Walk to the end of the ramp first (W).', 2); return; }
+  const e = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ');
+  const facingOut = Math.cos(wrapA(e.y - UPWIND_YAW)) > 0.8, level = Math.abs(e.x) < 0.6, still = !keys.KeyA && !keys.KeyD;
+  H.exitStable = facingOut && level && still && !pushed;
+  H.phase = 'freefall'; H.t = 0; H.pos.copy(camera.position); H.vel.set(HALO.planeSpeed, -1, 0); H.yaw = e.y; H.fpPose = 'box';
+  H.mates.forEach((m, i) => { if (m.phase === 'cabin') {               // HAWK and DOC were already out ahead of you (a second or two)
+    m.phase = 'free'; m.pos.copy(H.P0).add(m.local); m.pos.x -= 3 + (1 - i) * 1.5; m.pos.y -= 8 + (1 - i) * 6; m.vel.set(HALO.planeSpeed * 0.7, -12 - (1 - i) * 6, 0); m.yaw = UPWIND_YAW; m.exitT = H.T - 1.5 + i * 0.8; } });
+  if (!H.exitStable) { H.tumble = 3.2; H.tumbleRate.set(0, (Math.random() < 0.5 ? -1 : 1) * (2 + Math.random() * 2), (Math.random() - 0.5) * 4); }
+  playNoise(1.4, 0.35, 900); playTone(90, 50, 0.8, 0.25, 'sine');
+  haloScore('Exit', H.exitStable ? 10 : 4, H.exitStable ? 'stable dive exit' : pushed ? 'shoved out — tumbled in the prop wash' : 'unstable exit — tumbled (face out, look level, no turning)');
+  if (H.exitStable) haloJM('HAWK', 'Nice exit. You\'re <b>above</b> us — dive down to our level (hold E: arms in), then fly to your slot in front of me.', null, 'Hold E to dive down to HAWK (green ▼)', 9);
+  else haloJM('HAWK', 'You\'re tumbling in the prop wash! Let go of everything: no keys, arch your back — it settles you belly-to-earth.', null, 'Hands off the keys until it stops', 6);
+}
+function haloScore(what, pts, note) { if (H) H.score[what] = { pts, note }; }
+// ---------- freefall ----------
+// Terminal speed depends on body position AND air density: at 25,000 ft the air is so thin you fall ~1.7x faster.
+function fallRateFactor(altDZ) { return 1 / Math.sqrt(Math.exp(-(Math.max(0, altDZ) + HALO.fieldElev) / 8500)); }
+const FF_VT = { box: 55, turnL: 55, turnR: 55, wave: 53, pull: 54, dock: 54, dearch: 45, dive: 72, forward: 56, track: 44 };   // sea-level terminal, m/s
+const FF_DRIVE = { forward: 4.5, track: 19, dearch: -1.6 };                                                                  // horizontal drive, m/s
+function freefallUpdate(dt) {
+  const fac = fallRateFactor(H.altDZ), wind = haloWind(H.altDZ), anyKey = keys.KeyW || keys.KeyS || keys.KeyA || keys.KeyD || keys.KeyE;
+  let mode = 'box';
+  if (H.tumble > 0) {
+    const k = Math.min(1, H.tumble); H.tumble -= dt * (anyKey ? 0.25 : 1);
+    turnCamera(-H.tumbleRate.y * dt * k, 0); H.yaw += H.tumbleRate.y * dt * k; H.roll = Math.sin(H.T * H.tumbleRate.z) * 0.9 * k;
+    if (H.tumble <= 0) { H.tumble = 0; showMessage('STABLE. Belly to earth.', 1.5); }
+  } else if (H.waveT > 0) { mode = 'wave'; H.waveT -= dt; }
+  else if (H.pullT >= 0) mode = 'pull';
+  else if (H.docked) mode = 'dock';
+  else {
+    if (keys.KeyW) H.trackT += dt; else H.trackT = Math.max(0, H.trackT - dt * 2);
+    mode = keys.KeyE ? 'dive' : keys.KeyS ? 'dearch' : keys.KeyW ? (H.trackT > 1.6 ? 'track' : 'forward') : 'box';
+    const tIn = (keys.KeyA ? 1 : 0) - (keys.KeyD ? 1 : 0), maxT = mode === 'track' ? 0.5 : 1.5;
+    H.turn += (tIn * maxT - H.turn) * Math.min(1, dt * 3);
+    if (tIn && mode === 'box') mode = tIn > 0 ? 'turnL' : 'turnR';
+  }
+  if (!H.docked && H.tumble <= 0) { H.yaw += H.turn * dt; turnCamera(-H.turn * dt, 0); } else if (H.docked) H.turn = 0;
+  H.mode = mode; H.fpPose = mode;
+  const vt = (FF_VT[mode] || 55) * fac, drive = (FF_DRIVE[mode] || 0) * Math.sqrt(fac);
+  let v = -H.vel.y; v += THREE.MathUtils.clamp(9.81 * (1 - (v / vt) * (v / vt)), -16, 9.81) * dt; H.vel.y = -v;
+  const kk = 1 - Math.exp(-dt / (mode === 'track' ? 4.5 : 3.2));
+  H.vel.x += (wind.x + fwdX(H.yaw) * drive - H.vel.x) * kk; H.vel.z += (wind.z + fwdZ(H.yaw) * drive - H.vel.z) * kk;
+  const base = H.mates[0];
+  if (H.docked && base.phase === 'free') {             // docked: your grips hold you in the slot
+    H.pos.lerp(slotPos(base, 2), 1 - Math.exp(-dt * 5)); H.vel.copy(base.vel);
+    const dy = wrapA(base.yaw + Math.PI - H.yaw) * Math.min(1, dt * 3); H.yaw += dy; turnCamera(-dy, 0);
+    H.dockedT += dt;
+    if (keys.KeyW || keys.KeyS || keys.KeyE) { H.strain += dt; if (H.strain > 0.6) { H.docked = false; H.strain = 0; showMessage('You pulled out of your grips (W / S / E while docked). Fly back in and press F.', 3); } } else H.strain = Math.max(0, H.strain - dt);
+  } else H.pos.addScaledVector(H.vel, dt);
+  const sp = H.vel.length(), buf = Math.min(1, sp / 90);              // buffeting + wind roar rise with speed
+  H.shakeX = (Math.random() - 0.5) * 0.006 * buf; H.shakeY = (Math.random() - 0.5) * 0.006 * buf;
+  haloAudioSet(0.1 + 0.5 * buf * buf, 0.45, 0, 0, 300 + 700 * buf);
+  if (H.brokeOff) { const e = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ'), off = wrapA(e.y - H.yaw); if (off > 0.7) H.looked.l = true; if (off < -0.7) H.looked.r = true; }
+  const ft = H.altDZ * FT;
+  if (ft < 12000 && !H.said.o2) { H.said.o2 = true; showMessage('12,000 ft. Air you could breathe from here down — but the mask stays on till you\'re under canopy.', 3); }
+  if (ft <= 5500 && !H.brokeOff) haloBreakOff();
+  if (ft <= 4500 && !H.beeps[4500]) { H.beeps[4500] = 1; altiBeep(2); if (!H.waved && H.pullT < 0) haloJM('HAWK', '4,500 ft — <b>wave off</b>: arms over your head so anyone above sees you\'re about to open.', null, 'Space = wave off, Space again = PULL', 8); }
+  if (ft <= 4000 && !H.beeps[4000]) { H.beeps[4000] = 1; altiBeep(3, true); if (H.pullT < 0) haloJM('HAWK', '4,000 ft — <b>PULL!</b>', null, 'Space (twice if you haven\'t waved off)', 6); }
+  if (ft <= 3000 && (H.beeps.lo || 0) < H.T) { H.beeps.lo = H.T + 0.6; altiBeep(1, true); }
+  if (H.agl < 229 && v > 35 && !H.aad) {             // AAD: fires the reserve at 750 ft if you're still falling fast
+    H.aad = true; H.reserve = true; haloScore('Pull', -10, 'NO PULL — your AAD fired the reserve at 750 ft (that\'s a grounding offence)');
+    showMessage('AAD FIRE! The automatic opener just saved your life.', 4); haloDeploy(true); return;
+  }
+  if (H.agl <= 0) { haloImpact(); return; }
+  if (H.pullT >= 0) { H.pullT += dt; if (H.pullT > 0.7) haloDeploy(false); }
+}
+// your slot (2): in front of HAWK, facing him. DOC's slot (1): on HAWK's right.
+function slotPos(base, which) {
+  const y = which === 2 ? base.yaw : base.yaw - Math.PI / 2, d = 2.05;
+  return new THREE.Vector3(base.pos.x + fwdX(y) * d, base.pos.y, base.pos.z + fwdZ(y) * d);
+}
+function haloGrip() {
+  const base = H.mates[0];
+  if (H.docked) { H.docked = false; showMessage('Grips released.', 1.5); return; }
+  if (H.brokeOff) { showMessage('Break-off has been called — no more grips. Turn away and TRACK (hold W).', 2.5); return; }
+  if (base.phase !== 'free') return;
+  const s = slotPos(base, 2), d = Math.hypot(s.x - H.pos.x, s.z - H.pos.z), dy = H.pos.y - s.y;
+  const rel = Math.hypot(H.vel.x - base.vel.x, H.vel.y - base.vel.y, H.vel.z - base.vel.z);
+  if (d > 1.3) showMessage(`Too far from your slot to grab (${d.toFixed(1)} m). Fly in closer — W gently.`, 2);
+  else if (Math.abs(dy) > 0.8) showMessage(`Not level: you're ${Math.abs(dy).toFixed(1)} m ${dy > 0 ? 'HIGH (E = fall faster)' : 'LOW (S = de-arch, slow down)'}.`, 2);
+  else if (rel > 1.8) showMessage(`Closing too fast (${rel.toFixed(1)} m/s) — you'd bounce off him. Stop, then go in slowly.`, 2);
+  else {
+    H.docked = true; H.strain = 0; playNoise(0.08, 0.12, 1400); showMessage('GRIPS! You\'re docked on HAWK — three-way formation. Hold still (no keys).', 3.5);
+    if (!H.said.dock) { H.said.dock = true; haloJM('HAWK', 'Got you. Hold it — no keys — and watch your altimeter. Break-off at 5,500.', null, null, 7); }
+  }
+}
+function haloBreakOff() {
+  H.brokeOff = true; if (H.docked) H.docked = false; altiBeep(4);
+  const base = H.mates[0], away = Math.atan2(-(H.pos.x - base.pos.x), -(H.pos.z - base.pos.z));   // yaw that points away from HAWK
+  H.mates.forEach((m, i) => { m.trackYaw = away + (i ? -1 : 1) * 2.1; m.trackT = 0; });
+  const f = H.dockedT; haloScore('Formation', f > 0 ? Math.round(10 + Math.min(15, f * 0.5)) : 0, f > 0 ? `docked for ${Math.round(f)} s` : 'never made it into the formation');
+  haloJM('HAWK', 'BREAK-OFF! 5,500 ft. Let go, <b>turn your back on us</b> (A or D, about 180°) and <b>TRACK</b> away (hold W). Look left and right before you pull.', 'HAWK waves both arms', 'Turn away, then hold W to track', 9);
+}
+function haloPullPress() {
+  if (H.pullT >= 0) return;
+  if (!H.waved) { H.waved = true; H.waveT = 0.9; showMessage(H.altDZ * FT > 6500 ? 'Waving off already? You\'re at ' + Math.round(H.altDZ * FT).toLocaleString('en-US') + ' ft — HALO opens at 4,000. (Space again = pull)' : 'Wave-off: arms over your head. Now Space again to PULL.', 2.5); return; }
+  H.pullT = 0; H.docked = false; H.pullTurn = Math.abs(H.turn); H.pullTrack = H.trackT;
+}
+let haloForceMalf = null;          // testing: 'twist' | 'streamer' forces that malfunction on the next pull
+// ---------- deployment: pilot chute, bag, line stretch (snatch), opening shock ----------
+function haloDeploy(auto) {
+  const ft = H.altDZ * FT;
+  if (!auto) {
+    haloScore('Pull', ft >= 3500 && ft <= 4600 ? 10 : ft >= 2500 && ft <= 6000 ? 5 : 0, `pulled at ${Math.round(ft).toLocaleString('en-US')} ft (aim 4,000)`);
+    haloScore('Wave-off', H.waved ? 5 : 0, H.waved ? 'waved off before pulling' : 'no wave-off');
+    let sep = 1e9; H.mates.forEach(m => { if (m.phase !== 'cabin') sep = Math.min(sep, Math.hypot(m.pos.x - H.pos.x, m.pos.z - H.pos.z)); });
+    haloScore('Separation', sep >= 50 ? 15 : sep >= 25 ? 8 : 0, `${Math.round(sep)} m from the nearest jumper at pull (want 50+)` + (sep < 25 ? ' — canopy collision risk!' : ''));
+    haloScore('Airspace', H.looked.l && H.looked.r ? 3 : 0, H.looked.l && H.looked.r ? 'looked both ways before pulling' : 'didn\'t look left AND right before pulling');
+    if (!H.score.Formation) haloScore('Formation', 0, 'never made it into the formation');
+    const unstable = (H.pullTurn || 0) > 0.8 || (H.pullTrack || 0) > 1.6 || H.tumble > 0, r = Math.random();
+    H.malf = haloForceMalf || H.forceMalf || (r < 0.015 ? 'streamer' : r < 0.015 + (unstable ? 0.35 : 0.04) ? 'twist' : null);
+    haloForceMalf = null;
+    H.twistWhy = unstable && H.malf === 'twist' ? 'You were still turning or tracking hard when you pulled — that twists the lines. ' : '';
+  } else H.malf = null;
+  H.phase = 'deploy'; H.deployT = 0; H.v0 = -H.vel.y; H.fpPose = 'pull'; H.waveT = 0;
+  playNoise(0.5, 0.25, 1800);                                           // pilot chute out into the wind
+  if (H.canopy) levelGroup.remove(H.canopy.group);
+  H.canopy = buildCanopy(H.reserve); levelGroup.add(H.canopy.group); H.canopy.group.visible = false;
+}
+function deployUpdate(dt) {
+  H.deployT += dt; const t = H.deployT, wind = haloWind(H.altDZ), key = H.reserve ? 'r' : 'm';
+  if (t > 0.6 && !H.said['snatch' + key]) { H.said['snatch' + key] = true; playNoise(0.25, 0.3, 700); H.canopy.group.visible = true; }
+  const k = THREE.MathUtils.clamp((t - 0.6) / 2.0, 0, 1), sm = k * k * (3 - 2 * k), targetW = H.malf === 'streamer' ? 24 : 5;
+  const v = H.v0 + (targetW - H.v0) * sm; H.vel.y = -v;
+  H.vel.x += (wind.x - H.vel.x) * Math.min(1, dt * 2); H.vel.z += (wind.z - H.vel.z) * Math.min(1, dt * 2);
+  H.pos.addScaledVector(H.vel, dt);
+  if (t > 1.1 && t < 1.8) { H.pitchOff = Math.sin((t - 1.1) / 0.7 * Math.PI) * 0.35; H.shakeX = (Math.random() - 0.5) * 0.05; H.shakeY = (Math.random() - 0.5) * 0.05; }   // opening shock
+  if (t > 1.2 && !H.said['shock' + key]) { H.said['shock' + key] = true; playTone(70, 40, 0.5, 0.35, 'sine'); playNoise(0.6, 0.35, 450); }
+  H.fpPose = t > 1.2 ? 'canopy' : 'pull';
+  H.canopy.group.position.set(H.pos.x, H.pos.y + 4.4 * (0.4 + 0.6 * sm), H.pos.z); H.canopy.group.rotation.set(0, H.yaw, 0);
+  H.canopy.group.scale.set(0.25 + 0.75 * sm, 0.5 + 0.5 * sm, 0.4 + 0.6 * sm);
+  haloAudioSet(0.1 + 0.4 * Math.min(1, v / 60), 0.3, 0.15 * sm, 0, 300 + 500 * Math.min(1, v / 60));
+  if (t > 2.7) {
+    H.phase = 'canopy'; H.V = H.malf === 'streamer' ? 3 : 9; H.W = targetW; H.pitchOff = 0; H.brake = 0; H.tl = H.tr = 0; H.canopyT = 0; H.roll = 0;
+    if (H.malf === 'twist') { H.twist = 2 + Math.floor(Math.random() * 2); H.kickLast = ''; haloJM('DOC', 'LINE TWISTS! Your lines are twisted above your head and you\'re spinning. ' + H.twistWhy + 'Pull the risers apart and <b>kick</b> your way out.', null, 'Tap A, D, A, D… to kick out', 9); }
+    else if (H.malf === 'streamer') haloJM('DOC', 'MALFUNCTION — your main is a streamer, it won\'t inflate! You\'re still falling far too fast.', null, 'X = cut it away, then Space = RESERVE. NOW.', 12);
+    else haloJM('DOC', H.reserve ? 'Reserve is out and flying. Smaller canopy: faster, harder to land — flare well.' : 'Good canopy? <b>Canopy check:</b> square, flying straight? Try a little left (A), a little right (D), a little brake (S). Then follow the yellow ◆ on your GPS board to the LZ.', null, 'Look up (trackpad) — that\'s your canopy', 12);
+  }
+}
+function haloCutaway() {
+  if (H.cut || !H.canopy || H.phase !== 'canopy') return;
+  if (!H.malf && H.twist <= 0 && !confirmCut()) return;
+  H.cut = true; playNoise(0.3, 0.25, 1200); H.fpPose = 'cut';
+  H.cutCanopy = { g: H.canopy.group, vx: H.vel.x }; H.canopy = null;
+  H.phase = 'freefall'; H.pullT = -1; H.vel.y = -Math.max(15, H.W); H.twist = 0; H.malf = null; H.waved = true; H.tumble = 0; H.roll = 0;
+  haloJM('DOC', 'Cut away! Your main is gone. <b>Reserve, NOW!</b>', null, 'Space = pull the reserve', 6);
+}
+let cutWarnAt = 0;
+function confirmCut() { const now = performance.now(); if (now - cutWarnAt < 2500) return true; cutWarnAt = now; showMessage('Your main is GOOD. Press X again only if you really want to cut it away.', 2.5); return false; }
+function haloReserve() {
+  if (H.reserve) return;
+  if (H.phase === 'canopy' && !H.cut) {
+    if (!H.malf && H.twist <= 0) return;
+    H.entangle = true; H.reserve = true; H.malf = null; H.twist = 0; H.W = Math.max(H.W, 7);   // two canopies fighting each other
+    haloScore('Emergency', 0, 'reserve out with the main still attached (entanglement)');
+    showMessage('Reserve out with the main still attached — they\'re fighting each other! Cut away FIRST next time (X).', 4); return;
+  }
+  if (H.phase !== 'freefall') return;
+  H.reserve = true; haloScore('Emergency', 5, 'cut away + reserve, by the book');
+  H.waved = true; H.deployT = 0; haloDeploy(true);
+}
+function haloTwistCleared() { playNoise(0.3, 0.12, 600); H.roll = 0; showMessage('TWISTS CLEARED! Now the canopy check: A, D, a touch of S.', 3); haloScore('Twists', 3, 'kicked out of line twists'); }
+// ---------- canopy flight + the flare ----------
+// Brakes b: 0 = full drive (hands up), 1 = both toggles all the way down. Full drive ≈ 23 mph forward, 14 ft/s down.
+// A flare turns the speed you have into lift, so for a second you almost stop going down. Start it too high and the
+// speed is gone before the ground arrives (you stall and drop); too late and you're still fast when you hit.
+// With these numbers the stand-up window is ~11-15 ft (worked out in a simulation before it went in the game).
+const CANOPY = { vFull: 10.5, wFull: 4.2, tauV: 1.3, tauW: 0.6, lift: 1.0, ramp: 1.4, release: 2.2, stallV: 5, stallSink: 2.5 };
+function canopyTarget(b, V) {
+  const Vss = CANOPY.vFull * (1 - 0.72 * Math.pow(b, 1.3));
+  let Wss = b < 0.7 ? CANOPY.wFull - 2.2 * b : 2.66 - (b - 0.7) * 2;
+  if (b >= 0.7 && V < CANOPY.stallV) Wss += (CANOPY.stallV - V) * CANOPY.stallSink;   // out of speed with the toggles buried = stall
+  return { Vss, Wss };
+}
+function canopyUpdate(dt) {
+  H.canopyT += dt;
+  const wind = haloWind(H.altDZ), twisted = H.twist > 0, strm = H.malf === 'streamer';
+  const base = H.half ? 0.5 : 0;
+  if (keys.KeyS && !twisted && !strm) H.brake = Math.min(1, H.brake + CANOPY.ramp * dt);    // S: both toggles go down, deeper the longer you hold
+  else H.brake += (base - H.brake) * Math.min(1, dt * (H.brake > base ? CANOPY.release : 1.5));   // let go: hands back up
+  H.tl += ((keys.KeyA && !twisted ? 1 : 0) - H.tl) * Math.min(1, dt * 4); H.tr += ((keys.KeyD && !twisted ? 1 : 0) - H.tr) * Math.min(1, dt * 4);
+  const left = Math.max(H.brake, H.tl * 0.8), right = Math.max(H.brake, H.tr * 0.8), b = (left + right) / 2, diff = right - left;
+  let { Vss, Wss } = canopyTarget(b, H.V);
+  if (keys.KeyR && !twisted) { Vss *= 0.92; Wss *= 0.85; }               // rear risers: flatter glide, no stall
+  Wss += 3.2 * Math.abs(diff) * (1 - b);                                   // a turn dives the canopy
+  if (H.reserve) { Vss *= 1.12; Wss *= 1.15; }
+  if (H.entangle) { Vss = 4; Wss = 6.5; }
+  if (twisted) Wss += 1.5;
+  if (strm) { Vss = 3; Wss = 24; }
+  const dV = (Vss - H.V) / CANOPY.tauV; H.V += dV * dt;
+  H.W += ((Wss - H.W) / CANOPY.tauW - CANOPY.lift * Math.max(0, -dV) * b) * dt; if (H.W < -0.5) H.W = -0.5;
+  const yawRate = twisted ? 1.1 : strm ? 1.6 : -1.15 * diff;              // right toggle = right turn
+  H.yaw += yawRate * dt; turnCamera(-yawRate * dt, 0);
+  if (twisted && H.altDZ * FT < 2500 && !H.said.decide) { H.said.decide = true; haloJM('DOC', 'Below 2,500 ft and still twisted — DECISION ALTITUDE. Cut away (X) and go to your reserve (Space)!', null, 'X then Space', 8); }
+  H.vel.set(fwdX(H.yaw) * H.V + wind.x, -H.W, fwdZ(H.yaw) * H.V + wind.z);
+  H.pos.addScaledVector(H.vel, dt);
+  // feel: you swing forward under the canopy in a flare (camera pitches up), bank in turns; wind drops as you slow
+  const swing = THREE.MathUtils.clamp(-dV * 0.06, -0.12, 0.28);
+  H.pitchOff += (swing + 0.03 - H.pitchOff) * Math.min(1, dt * 3);
+  H.roll += ((twisted ? Math.sin(H.T * 2.2) * 0.25 : diff * -0.35) - H.roll) * Math.min(1, dt * 2.5);
+  const air = Math.hypot(H.V, H.W), stalling = b > 0.7 && H.V < CANOPY.stallV;
+  haloAudioSet(0.015 + 0.13 * (air / 11) * (air / 11), 0.35, (0.03 + 0.06 * b + (stalling ? 0.2 : 0)) * (strm ? 3 : 1), 0, 200 + 40 * air);
+  H.fpPose = 'canopy';
+  if (H.canopy) { const c = H.canopy.group; c.position.set(H.pos.x, H.pos.y + 4.4, H.pos.z); c.rotation.set(0.08 + 0.2 * b, H.yaw, -H.roll * 0.6, 'YXZ');
+    c.scale.set(strm ? 0.2 : 1, strm ? 0.5 : 1, strm ? 0.35 : 1); }
+  if (keys.KeyS && H.flareStart === undefined && H.agl * FT < 60) H.flareStart = H.agl * FT;             // the moment you started the flare
+  if (!keys.KeyS && H.brake < base + 0.3 && H.flareStart !== undefined && H.agl * FT > 30) H.flareStart = undefined;
+  // landing-pattern calls (HAWK on the radio) + DOC's flare call, only on your first landing ever
+  const ft = H.agl * FT;
+  if (ft < 1000 && !H.said.p1000) { H.said.p1000 = true; haloJM('HAWK', '1,000 ft. Set up your pattern: fly <b>downwind</b> (east) past the LZ, turn across, then turn <b>into the wind</b> — face WEST, into the windsock\'s mouth — by 300 ft.', null, 'Land INTO the wind. C = half brakes if you want more time.', 10); }
+  if (ft < 300 && !H.said.p300) { H.said.p300 = true; const into = Math.cos(wrapA(H.yaw - UPWIND_YAW)) > 0.7; haloJM('HAWK', '300 ft — FINAL. ' + (into ? 'Good, you\'re into the wind. Wings level, no more turns.' : 'You\'re NOT facing into the wind — turn gently to face WEST!'), null, 'Hands up (or half brakes). Flare at 10–15 ft: hold S.', 8); }
+  if (!haloFlareTipDone && ft < 32 && !H.said.flare1) { H.said.flare1 = true; haloJM('DOC', 'Flare…', null, null, 3); }
+  if (!haloFlareTipDone && ft < 14 && !H.said.flare2) { H.said.flare2 = true; haloJM('DOC', '…NOW! Hold S!', null, null, 3); playTone(1200, 1200, 0.08, 0.15, 'square'); }
+  if (H.agl <= 0.02) haloTouchdown();
+}
+// ---------- landing ----------
+function haloTouchdown() {
+  const L = haloLZ(), gs = Math.hypot(H.vel.x, H.vel.z), w = H.W, dist = Math.hypot(L.x - H.pos.x, L.z - H.pos.z), into = Math.cos(wrapA(H.yaw - UPWIND_YAW));
+  let kind, dmg = 0;
+  if (w <= 1.5 && gs <= 5.2 && H.twist <= 0 && !H.entangle) kind = 'STAND-UP';
+  else if (w <= 3.0 && gs <= 8) kind = 'PLF';
+  else if (w <= 4.8 && gs <= 11) { kind = 'HARD'; dmg = 12 + 4 * Math.max(0, w - 3); }
+  else { kind = 'INJURY'; dmg = Math.min(85, 35 + 9 * Math.max(0, w - 4.8) + 3 * Math.max(0, gs - 11)); }
+  const fs = H.flareStart;
+  const why = kind === 'STAND-UP' ? 'perfect flare, soft stand-up'
+    : kind === 'PLF' ? (fs === undefined ? 'half-flared' : fs > 16 ? 'flared a bit high' : fs < 10 ? 'flared a bit late' : 'flare not deep enough') + ' — parachute landing fall (feet, calf, thigh, hip, back)'
+    : fs === undefined ? 'no flare' + (into < 0 ? ', downwind' : '') : fs > 20 ? 'flared too high (' + Math.round(fs) + ' ft) — ran out of lift and dropped' : fs < 9 ? 'flared too late (' + Math.round(fs) + ' ft) — still fast when you hit' : 'hit hard' + (into < 0 ? ', DOWNWIND' : '');
+  haloScore('Landing', { 'STAND-UP': 20, PLF: 14, HARD: 6, INJURY: 0 }[kind], `${kind}: ${why} (down ${Math.round(w * FT)} ft/s, ${Math.round(gs * MPH)} mph across the ground)`);
+  haloScore('Into wind', into > 0.7 ? 5 : 0, into > 0.7 ? 'landed facing into the wind' : 'landed crosswind / downwind');
+  haloScore('Accuracy', dist <= 15 ? 15 : dist <= 50 ? 10 : dist <= 150 ? 5 : 0, `${Math.round(dist)} m from the LZ centre`);
+  H.landing = { kind, dmg, w, gs, dist, t: 0 };
+  H.phase = 'landed'; H.t = 0; H.pos.y = groundAt(H.pos.x, H.pos.z); H.fpPose = 'none'; H.roll = 0;
+  try { localStorage.setItem('valkyrieFlareTip', '1'); } catch (err) { /* private mode */ }
+  haloFlareTipDone = true;
+  if (!playSample('body_fall', kind === 'STAND-UP' ? 0.35 : 0.9)) playNoise(0.3, 0.3, 400);
+  if (kind === 'INJURY' || kind === 'HARD') playTone(60, 35, 0.4, 0.4, 'sine');
+  showMessage({ 'STAND-UP': 'STAND-UP LANDING! Textbook.', PLF: 'PLF — you rolled it out. Not pretty, not hurt.', HARD: 'HARD LANDING. That hurt (−' + Math.round(dmg) + ' health).', INJURY: 'INJURY — you slammed in (−' + Math.round(dmg) + ' health).' }[kind], 4);
+  if (H.canopy) { H.canopy.lines.visible = false; H.canopyDown = { g: H.canopy.group, t: 0 }; }
+  haloAudioSet(0.02, 0.2, 0, 0);
+}
+function landedUpdate(dt) {
+  const Ld = H.landing; Ld.t += dt; const t = Ld.t, g = groundAt(H.pos.x, H.pos.z);
+  let eye = 1.7, roll = 0, pitch = 0, slide = 0;
+  if (Ld.kind === 'STAND-UP') { slide = Math.max(0, 1 - t / 1.2); eye = 1.7 - Math.sin(Math.min(1, t / 0.6) * Math.PI) * 0.15; }
+  else if (Ld.kind === 'PLF') { const k = Math.min(1, t / 1.4); roll = Math.sin(k * Math.PI) * 1.4; eye = 1.7 - Math.sin(k * Math.PI) * 1.3; slide = Math.max(0, 1 - t / 0.8) * 0.8; }
+  else { eye = 1.7 - 1.35 * Math.min(1, t / 0.25) + Math.max(0, t - 1.4) * 0.9; const back = t < 1.4 ? 1 : Math.max(0, 1 - (t - 1.4)); pitch = -0.4 * Math.min(1, t / 0.2) * back; roll = 0.5 * back; slide = Math.max(0, 1 - t / 0.4);
+    if (!Ld.hurt && t > 0.1) { Ld.hurt = true; hud.damageAlpha = 0.9; damagePlayer(Ld.dmg, H.pos.x - H.vel.x, H.pos.z - H.vel.z); } }
+  H.pos.x += H.vel.x * slide * dt * 0.5; H.pos.z += H.vel.z * slide * dt * 0.5;
+  H.roll = roll; H.pitchOff = pitch; H.eye = Math.min(1.7, eye);
+  if (H.canopyDown) { const c = H.canopyDown; c.t += dt; const k = Math.min(1, c.t / 2.5); c.g.position.y = Math.max(g + 0.3, c.g.position.y - dt * 2.2); c.g.position.x += dt * 3 * (1 - k); c.g.scale.y = 1 - 0.8 * k; c.g.rotation.x = -k * 1.2; }
+  if (t > 2.6 && state === 'playing') haloToGround();
+}
+function haloImpact() {
+  H.phase = 'landed'; H.landing = { kind: 'NO PULL', t: 0 }; haloScore('Pull', 0, 'never opened');
+  playTone(50, 25, 0.6, 0.6, 'sine'); playNoise(0.5, 0.6, 300);
+  showMessage('You never pulled. Freefall into the ground.', 5); player.health = 0; endGame(false);
+}
+function haloScoreTotal() { let s = 0; if (!H) return 0; for (const k in H.score) s += H.score[k].pts; return THREE.MathUtils.clamp(s, 0, 100); }
+function haloScoreHTML() {
+  if (!H) return '';
+  const rows = Object.entries(H.score).map(([k, v]) => `<div>${v.pts > 0 ? '☑' : '☐'} <b>${k}</b> ${v.pts > 0 ? '+' : ''}${v.pts} — ${v.note}</div>`).join('');
+  const tot = haloScoreTotal(), grade = tot >= 90 ? 'A — jumpmaster material' : tot >= 75 ? 'B — solid jump' : tot >= 55 ? 'C — you\'ll live' : 'D — back to the wind tunnel';
+  return rows + `<div style="margin-top:6px"><b>JUMP SCORE ${tot} / 100</b> · ${grade}</div>`;
+}
+function haloToGround() {
+  H.phase = 'ground'; H.landed = true; haloFP.g.visible = false; document.body.classList.remove('haloOn');
+  for (const el of [haloUI.mask, haloUI.jm, haloUI.board, haloUI.legend, haloUI.form, haloUI.agl]) el.style.display = 'none';
+  haloAudioMute();
+  let x = H.pos.x, z = H.pos.z; if (circleHitsWall(x, z, 0.4)) { const s = randomFloorNear(x, z, 4); x = s.x; z = s.z; }
+  const e = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ'); camera.rotation.set(0, e.y, 0);
+  camera.position.set(x, groundAt(x, z) + SETTINGS.eyeHeight, z);
+  player.stance = 'stand'; player.eyeY = SETTINGS.eyeHeight; player.velocity.set(0, 0, 0); player.jumpY = player.jumpV = 0;
+  camera.near = 0.1; camera.far = SETTINGS.viewDistance; camera.updateProjectionMatrix();
+  shotQueued = 0; pressPending = false; mouseDown = false;
+  WEAPONS[3].suppressed = true; updateSuppressorModel(3); if (currentWeapon !== 3) switchWeapon(3); weaponRoot.visible = true;
+  H.mates.forEach((m, i) => {                                            // HAWK and DOC join you on foot
+    if (m.j.root.parent) m.j.root.parent.remove(m.j.root);
+    const a = Math.random() * 6, near = m.landed && Math.hypot(m.pos.x - x, m.pos.z - z) < 120;
+    const mx = near ? m.pos.x : x + Math.cos(a) * (6 + i * 3), mz = near ? m.pos.z : z + Math.sin(a) * (6 + i * 3);
+    const s = circleHitsWall(mx, mz, 0.4) ? randomFloorNear(mx, mz, 4) : { x: mx, z: mz };
+    createTeammate(s.x, s.z, m.name);
+    if (m.canopy) { m.canopy.lines.visible = false; const c = m.canopy.group; c.scale.set(1, 0.2, 1); c.position.set(s.x + 2, groundAt(s.x + 2, s.z) + 0.3, s.z); c.rotation.set(-1.2, 0, 0); }
+  });
+  haloUI.score.innerHTML = '<h3>HALO INSERTION — JUMP SCORECARD</h3>' + haloScoreHTML(); haloUI.score.style.display = 'block';
+  clearTimeout(haloUI.scoreTimer); haloUI.scoreTimer = setTimeout(() => { haloUI.score.style.display = 'none'; }, 10000);
+  radioSay('HAWK', 'On the ground. Chutes stowed. Radar dish first (C4: B to plant, Y to fire), then the flight logs at the HQ, then exfil at the west end of the runway. Follow the ◆. Quiet now.', 9);
+}
+// ---------- HAWK and DOC in the air ----------
+function mateOpen(m) { m.pulled = true; m.phase = 'canopy'; m.openT = 0; m.canopy = buildCanopy(); levelGroup.add(m.canopy.group); m.V = 9; m.W = 5;
+  playNoise(0.4, 0.2 * THREE.MathUtils.clamp(1 - camera.position.distanceTo(m.pos) / 400, 0.05, 1), 700); }
+function updateMatesAir(dt) {
+  const base = H.mates[0];
+  H.mates.forEach((m, i) => {
+    if (m.phase === 'cabin') return;
+    const altDZ = m.pos.y - haloLzH, fac = fallRateFactor(altDZ), wind = haloWind(altDZ), agl = m.pos.y - groundAt(m.pos.x, m.pos.z);
+    let pose = 'box';
+    if (m.phase === 'free') {
+      let vt = 55 * fac, tx = wind.x, tz = wind.z, tau = 3.2, lockToSlot = false;
+      if (!H.brokeOff) {
+        if (i === 0) {          // HAWK = the base: floats while you're above him and drifts towards you, so you can catch up
+          if (H.phase === 'freefall' && H.pos.y - m.pos.y > 6) { vt = 45 * fac; pose = 'dearch'; }
+          if (H.phase === 'freefall' && !H.docked) { const dx = H.pos.x - m.pos.x, dz = H.pos.z - m.pos.z, d = Math.hypot(dx, dz); if (d > 8) { tx += dx / d * Math.min(6, d * 0.1); tz += dz / d * Math.min(6, d * 0.1); } }
+        } else {                // DOC flies to his slot on HAWK's right and takes grips
+          const s = slotPos(base, 1), dx = s.x - m.pos.x, dz = s.z - m.pos.z, dy = s.y - m.pos.y, d = Math.hypot(dx, dz);
+          if (!m.docked && Math.hypot(d, dy) < 0.5 && H.T - m.exitT > 6) m.docked = true;
+          if (m.docked) { m.pos.copy(s); m.vel.copy(base.vel); m.yaw = base.yaw + Math.PI / 2; lockToSlot = true; }
+          else { tx = base.vel.x + THREE.MathUtils.clamp(dx * 0.6, -8, 8); tz = base.vel.z + THREE.MathUtils.clamp(dz * 0.6, -8, 8); tau = 0.8; vt = THREE.MathUtils.clamp(-base.vel.y - dy * 0.9, 40 * fac, 78 * fac); pose = dy < -3 ? 'dive' : dy > 3 ? 'dearch' : 'forward'; m.yaw += wrapA(Math.atan2(-dx, -dz) - m.yaw) * Math.min(1, dt * 2); }
+        }
+      } else {                  // break-off: turn, track away, wave off, pull
+        m.trackT += dt; m.docked = false;
+        m.yaw += wrapA(m.trackYaw - m.yaw) * Math.min(1, dt * 1.5);
+        if (m.trackT > 1) { tx += fwdX(m.yaw) * 18; tz += fwdZ(m.yaw) * 18; vt = 46 * fac; pose = 'track'; tau = 2.5; }
+        if (altDZ < HALO.pullAGL + 60 + i * 50) pose = 'wave';
+        if (altDZ < HALO.pullAGL + i * 50 && !m.pulled) mateOpen(m);
+      }
+      if (m.phase === 'free' && !lockToSlot) {
+        let v = -m.vel.y; v += THREE.MathUtils.clamp(9.81 * (1 - (v / vt) * (v / vt)), -16, 9.81) * dt; m.vel.y = -v;
+        const kk = 1 - Math.exp(-dt / tau); m.vel.x += (tx - m.vel.x) * kk; m.vel.z += (tz - m.vel.z) * kk;
+        m.pos.addScaledVector(m.vel, dt);
+      }
+      if (m.phase === 'free' && agl < 250 && !m.pulled) mateOpen(m);
+      if (m.phase === 'free') { poseJumper(m.j, pose, H.T + i); m.j.root.position.copy(m.pos); m.j.root.rotation.set(0, m.yaw, 0); }
+    } else if (m.phase === 'canopy') {
+      m.openT += dt;
+      const L = haloLZ(), tgt = { x: L.x - 12 + i * 5, z: L.z + (i ? -9 : 9) }, dx = tgt.x - m.pos.x, dz = tgt.z - m.pos.z, d = Math.hypot(dx, dz);
+      let want = Math.atan2(-dx, -dz), brake = 0;
+      if (agl < 80) want = UPWIND_YAW;                                      // final approach: into the wind
+      else if (agl > d / 2.4 + 120) want = m.yaw + 1.2;                     // too high: circle to burn off height
+      const turn = THREE.MathUtils.clamp(wrapA(want - m.yaw), -0.6, 0.6);
+      m.yaw += turn * dt;
+      if (agl < 4.2) brake = Math.min(1, (4.2 - agl) / 2.0);                // their flare
+      const t = canopyTarget(brake, m.V), dV = (t.Vss - m.V) / CANOPY.tauV; m.V += dV * dt;
+      m.W += ((t.Wss + Math.abs(turn) * 2 * (1 - brake) - m.W) / CANOPY.tauW - CANOPY.lift * Math.max(0, -dV) * brake) * dt;
+      const k = Math.min(1, m.openT / 2.5), wnd = haloWind(altDZ);
+      m.vel.set(fwdX(m.yaw) * m.V * k + wnd.x, -THREE.MathUtils.lerp(30, m.W, k), fwdZ(m.yaw) * m.V * k + wnd.z);
+      m.pos.addScaledVector(m.vel, dt);
+      if (agl <= 0) { m.phase = 'landed'; m.landed = true; m.pos.y = groundAt(m.pos.x, m.pos.z); poseJumper(m.j, 'stand'); }
+      else poseJumper(m.j, 'canopy', 0, brake);
+      m.j.root.position.set(m.pos.x, m.pos.y + 0.95, m.pos.z); m.j.root.rotation.set(0, m.yaw, 0);
+      const c = m.canopy.group; c.position.set(m.pos.x, m.pos.y + 0.95 + 4.4 * (0.4 + 0.6 * k), m.pos.z); c.rotation.set(0.08 + 0.2 * brake, m.yaw, -turn * 0.3, 'YXZ'); c.scale.setScalar(0.3 + 0.7 * k);
+    } else if (m.phase === 'landed') {
+      m.j.root.position.set(m.pos.x, groundAt(m.pos.x, m.pos.z) + 0.95, m.pos.z);
+      if (m.canopy) { const c = m.canopy.group; c.position.y = Math.max(groundAt(c.position.x, c.position.z) + 0.3, c.position.y - dt * 2); c.scale.y = Math.max(0.2, c.scale.y - dt * 0.4); m.canopy.lines.visible = false; }
+    }
+    m.j.strobe.visible = nvMode > 0 && ((H.T + i * 0.37) % 1) < 0.08;
+  });
+}
+// ---------- per frame (instead of updatePlayer etc. while the jump is on) ----------
+function updateHalo(dt) {
+  if (!H) return;
+  document.body.classList.add('haloOn');
+  haloAudioStart();
+  const shift = !!(keys.ShiftLeft || keys.ShiftRight);
+  H.ff = shift && (H.phase === 'cabin' ? !H.green && H.step !== 5 && H.step >= 1 : H.phase === 'freefall' ? H.altDZ * FT > 6000 && !H.docked && H.tumble <= 0 : H.phase === 'canopy' ? H.agl * FT > 300 && !H.malf && H.twist <= 0 : false);
+  // take back last frame's camera shake / pitch offset first, so trackpad look is never disturbed
+  const e0 = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ'); e0.x -= H.appliedP; e0.y -= H.appliedY; e0.z = 0; camera.quaternion.setFromEuler(e0); H.appliedP = H.appliedY = 0;
+  const steps = H.ff ? 4 : 1;
+  for (let s = 0; s < steps && haloActive(); s++) haloStep(dt);
+  if (!haloActive()) return;
+  if (H.phase !== 'cabin') {
+    camera.position.copy(H.pos); if (H.phase === 'landed') camera.position.y = groundAt(H.pos.x, H.pos.z) + H.eye;
+    const e = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ');
+    const dp = H.pitchOff + H.shakeY; e.x = THREE.MathUtils.clamp(e.x + dp, -Math.PI / 2 + 0.02, Math.PI / 2 - 0.02); e.y += H.shakeX; e.z = H.roll;
+    camera.quaternion.setFromEuler(e); H.appliedP = dp; H.appliedY = H.shakeX;
+  }
+  const W0 = H.world; W0.stars.position.copy(camera.position); W0.moon.position.copy(camera.position).addScaledVector(W0.moonDir, 8000); W0.moon.lookAt(camera.position);
+  updateFP(dt); updateHaloHUD(dt);
+}
+function haloStep(dt) {
+  H.T += dt; H.t += dt;
+  if (H.phase !== 'cabin') { H.altDZ = H.pos.y - haloLzH; H.agl = H.pos.y - groundAt(H.pos.x, H.pos.z); }
+  else { H.altDZ = H.P0.y - haloLzH; H.agl = H.altDZ; }
+  if (H.phase !== 'deploy') { H.shakeX = H.shakeY = 0; }
+  if (H.phase === 'cabin') cabinUpdate(dt);
+  else if (H.phase === 'freefall') { freefallUpdate(dt); if (H.tumble <= 0) { H.roll *= Math.exp(-dt * 3); H.pitchOff *= Math.exp(-dt * 3); } }
+  else if (H.phase === 'deploy') deployUpdate(dt);
+  else if (H.phase === 'canopy') canopyUpdate(dt);
+  else if (H.phase === 'landed' && H.landing && H.landing.kind !== 'NO PULL') landedUpdate(dt);
+  if (!H) return;
+  updateMatesAir(dt);
+  if (H.phase !== 'cabin' && !H.planeGone) {                              // the aircraft flies on after you've left
+    const g = H.plane.group; g.position.x += HALO.planeSpeed * dt; g.position.y += dt * 2; H.plane.props.forEach(d => (d.rotation.z += dt * 40));
+    if (g.position.distanceTo(camera.position) > 9000) { H.planeGone = true; g.visible = false; }
+  }
+  if (H.cutCanopy) { const c = H.cutCanopy; c.g.position.y -= dt * 9; c.g.position.x += c.vx * dt; c.g.rotation.z += dt * 2; if (c.g.position.y < haloLzH - 50) { levelGroup.remove(c.g); H.cutCanopy = null; } }
+}
+function updateHaloHUD(dt) {
+  const ui = haloUI, ph = H.phase;
+  ui.mask.style.display = ph === 'landed' ? 'none' : 'block';
+  ui.board.style.display = ph === 'cabin' || ph === 'landed' ? 'none' : 'block';
+  ui.legend.style.display = ph === 'landed' ? 'none' : 'block';
+  const leg = ph === 'cabin' ? HALO_LEGEND.cabin : ph === 'freefall' || ph === 'deploy' ? HALO_LEGEND.freefall : H.twist > 0 ? HALO_LEGEND.twist : H.malf ? HALO_LEGEND.malf : HALO_LEGEND.canopy;
+  if (ui.legend.dataset.k !== leg) { ui.legend.dataset.k = leg; ui.legend.innerHTML = leg; }
+  if (performance.now() > ui.jmUntil) ui.jm.style.display = 'none';
+  let form = '';
+  if (ph === 'freefall' && H.tumble > 0) form = 'TUMBLING — hands off the keys, ARCH';
+  else if (ph === 'freefall' && !H.brokeOff && H.mates[0].phase === 'free') {
+    const base = H.mates[0], s = slotPos(base, 2), d = Math.hypot(s.x - H.pos.x, s.z - H.pos.z), dy = H.pos.y - s.y, rel = Math.hypot(H.vel.x - base.vel.x, H.vel.z - base.vel.z), vrel = base.vel.y - H.vel.y;
+    if (H.docked) form = `DOCKED ON HAWK ✓  ${Math.round(H.dockedT)} s in formation\nhold still — no keys — break-off at 5,500 ft`;
+    else form = `SLOT ${d < 100 ? d.toFixed(1) : Math.round(d)} m  ·  ${Math.abs(dy) < 0.5 ? 'LEVEL ✓' : (dy > 0 ? '▲ HIGH ' : '▼ LOW ') + Math.abs(dy).toFixed(Math.abs(dy) < 10 ? 1 : 0) + ' m'}  ·  closing ${rel.toFixed(1)} m/s\n`
+      + (Math.abs(dy) > 0.8 ? (dy > 0 ? 'E = arms in, fall faster' : 'S = de-arch, fall slower') : d > 1.3 ? 'face HAWK (green ▼), W = forward' : rel > 1.8 ? 'too fast — let it settle' : 'F = TAKE GRIPS')
+      + (Math.abs(vrel) > 3 ? `\nyou're falling ${vrel > 0 ? 'FASTER' : 'SLOWER'} than him by ${Math.round(Math.abs(vrel) * MPH)} mph` : '');
+  } else if (ph === 'freefall' && H.brokeOff && !H.cut) {
+    let sep = 1e9; H.mates.forEach(m => (sep = Math.min(sep, Math.hypot(m.pos.x - H.pos.x, m.pos.z - H.pos.z))));
+    form = `SEPARATION ${Math.round(sep)} m  ${sep >= 50 ? '✓ clear' : '— keep tracking (hold W)'}\n${H.looked.l && H.looked.r ? 'airspace checked ✓' : 'check your airspace: look left AND right (trackpad)'}`;
+  }
+  if (H.ff) form = (form ? form + '\n' : '') + '⏩ ×4 time';
+  ui.form.style.display = form ? 'block' : 'none'; if (ui.form.textContent !== form) ui.form.textContent = form;
+  const aglFt = H.agl * FT;                       // the altimeter is useless near the ground; you judge it by eye — this is your eye
+  if (ph === 'canopy' && aglFt < 100) { ui.agl.style.display = 'block'; ui.agl.innerHTML = `${Math.max(0, Math.round(aglFt))} ft<small>${aglFt <= 15 && aglFt >= 10 ? 'FLARE ZONE — hold S' : aglFt > 15 ? 'ground coming up… wait for it' : 'feet and knees together'}</small>`; }
+  else ui.agl.style.display = 'none';
+  drawHaloBoard();
+}
+function drawHaloBoard() {
+  const now = performance.now(); if (now - haloUI.boardAt < 100 || H.phase === 'cabin') return; haloUI.boardAt = now;
+  const c = haloUI.board.getContext('2d'), W = 460, Hh = 150, L = haloLZ();
+  c.clearRect(0, 0, W, Hh);
+  c.fillStyle = 'rgba(38,42,30,0.92)'; c.fillRect(2, 2, W - 4, Hh - 4); c.strokeStyle = 'rgba(160,170,120,0.6)'; c.lineWidth = 2; c.strokeRect(2, 2, W - 4, Hh - 4);
+  c.fillStyle = '#555'; for (const [x, y] of [[9, 9], [W - 9, 9], [9, Hh - 9], [W - 9, Hh - 9]]) { c.beginPath(); c.arc(x, y, 3, 0, 7); c.fill(); }
+  const scr = (x, y, w, h) => { c.fillStyle = '#0b1a0d'; c.fillRect(x, y, w, h); c.strokeStyle = '#2d4a30'; c.lineWidth = 1; c.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1); };
+  c.textAlign = 'center';
+  scr(14, 14, 130, 122); c.fillStyle = '#8f8'; c.font = 'bold 12px monospace'; c.fillText('ALTIMETER', 79, 30);   // altimeter
+  const ft = Math.max(0, H.altDZ * FT); c.font = 'bold 28px monospace'; c.fillStyle = ft < 4500 && H.phase === 'freefall' ? '#ff6a4a' : '#bfffbf';
+  c.fillText(Math.round(ft).toLocaleString('en-US'), 79, 64); c.font = '11px monospace'; c.fillStyle = '#8f8'; c.fillText('FT ABOVE LZ', 79, 78);
+  const vs = -H.vel.y; c.font = 'bold 15px monospace';
+  c.fillText(H.phase === 'freefall' || H.phase === 'deploy' ? '↓ ' + Math.round(vs * MPH) + ' mph' : '↓ ' + Math.round(vs * FT) + ' ft/s', 79, 102);
+  c.font = '11px monospace'; c.fillStyle = '#8f8'; c.fillText(H.phase === 'canopy' ? 'O2 mask down' : 'O2 BAILOUT ' + Math.max(0, Math.round(100 - H.T / 18)) + '%', 79, 124);
+  const cx = 230, cy = 76, R = 56; scr(160, 14, 140, 122);                                          // compass
+  const head = wrapA(-H.yaw);
+  c.save(); c.translate(cx, cy); c.strokeStyle = '#6f6'; c.beginPath(); c.arc(0, 0, R - 8, 0, 7); c.stroke();
+  c.save(); c.rotate(-head); c.font = 'bold 12px monospace';
+  ['N', 'E', 'S', 'W'].forEach((t, i) => { const a = i * Math.PI / 2; c.fillStyle = i ? '#bfb' : '#ff7a7a'; c.fillText(t, Math.sin(a) * (R - 19), -Math.cos(a) * (R - 19) + 4); });
+  const brg = Math.atan2(L.x - H.pos.x, -(L.z - H.pos.z));                                         // bearing to the LZ, clockwise from north
+  c.save(); c.rotate(brg); c.fillStyle = '#ffd24a'; c.beginPath(); c.moveTo(0, -R + 6); c.lineTo(-6, -R + 18); c.lineTo(6, -R + 18); c.fill(); c.restore();
+  const wd = haloWind(H.altDZ), wbrg = Math.atan2(wd.x, -wd.z);
+  c.save(); c.rotate(wbrg); c.strokeStyle = '#6cf'; c.lineWidth = 2; c.beginPath(); c.moveTo(0, 16); c.lineTo(0, -16); c.lineTo(-5, -9); c.moveTo(0, -16); c.lineTo(5, -9); c.stroke(); c.restore();
+  c.restore(); c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.moveTo(0, -R + 2); c.lineTo(0, -R + 12); c.stroke(); c.restore();
+  c.fillStyle = '#bfb'; c.font = 'bold 12px monospace'; c.fillText('HDG ' + String(Math.round(((head * 180 / Math.PI) + 360) % 360)).padStart(3, '0') + '°', cx, 132);
+  c.fillStyle = '#7bf'; c.font = '10px monospace'; c.fillText('wind ' + Math.round(Math.hypot(wd.x, wd.z) * MPH) + ' mph →', cx, 26);
+  scr(316, 14, 130, 122); c.fillStyle = '#8f8'; c.font = 'bold 12px monospace'; c.fillText('GPS · LZ ◆', 381, 30);   // GPS
+  const d = Math.hypot(L.x - H.pos.x, L.z - H.pos.z); c.font = 'bold 22px monospace'; c.fillStyle = '#ffe28a';
+  c.fillText(d >= 1000 ? (d / 1000).toFixed(2) + ' km' : Math.round(d) + ' m', 381, 58);
+  c.font = '12px monospace'; c.fillStyle = '#bfb'; c.fillText('BRG ' + String(Math.round(((brg * 180 / Math.PI) + 360) % 360)).padStart(3, '0') + '°', 381, 76);
+  if (H.phase === 'canopy') {
+    const gs = Math.hypot(H.vel.x, H.vel.z), toward = (H.vel.x * (L.x - H.pos.x) + H.vel.z * (L.z - H.pos.z)) / Math.max(1, d);
+    const reach = Math.max(1, H.agl) / Math.max(0.5, H.W) * Math.max(0, toward), st = d > reach * 1.05 && d > 40 ? 'SHORT — fly straight in' : reach > d * 1.8 + 150 ? 'HIGH — S-turn / circle' : 'ON GLIDE';
+    c.fillStyle = st === 'ON GLIDE' ? '#8f8' : '#fc6'; c.font = 'bold 11px monospace'; c.fillText(st, 381, 96);
+    c.fillStyle = '#bfb'; c.font = '12px monospace'; c.fillText('brakes ' + Math.round(H.brake * 100) + '%' + (H.half ? ' (½)' : ''), 381, 114);
+    c.fillText(Math.round(H.V * MPH) + ' mph · gnd ' + Math.round(gs * MPH), 381, 130);
+  } else { c.fillStyle = '#bfb'; c.fillText('pull 4,000 ft', 381, 100); c.fillText(H.brokeOff ? 'TRACK AWAY' : 'brk-off 5,500', 381, 118); }
+}
+// ---------- the ground phase: objectives ----------
+function haloObjectives() {
+  const dish = materiel.find(m => m.type === 'dish'), heli = materiel.find(m => m.type === 'heli'), logs = intelItems[0];
+  return [
+    { text: 'HALO in and land at the LZ', done: !!(H && H.landed) },
+    { text: 'Blow the radar dish (C4: B plant, Y fire)', done: !!dish && dish.destroyed },
+    { text: 'Grab the flight logs at the HQ', done: !!logs && logs.collected },
+    { text: 'BONUS: destroy the helicopter', done: !!heli && heli.destroyed, bonus: true },
+  ];
+}
+function haloObjective() {
+  if (!H || !H.landed) { const L = haloLZ(); return { x: L.x, z: L.z, label: 'LZ' }; }
+  const dish = materiel.find(m => m.type === 'dish' && !m.destroyed); if (dish) return { x: dish.x, z: dish.z, label: 'RADAR DISH' };
+  const logs = intelItems.find(i => !i.collected); if (logs) return { x: logs.group.position.x, z: logs.group.position.z, label: 'FLIGHT LOGS' };
+  return exitZone ? { x: exitZone.x, z: exitZone.z, label: 'EXFIL' } : null;
+}
+
+// #####################################################################
 // ##  SECTION 14: GAME LOOP (runs ~60 times a second)                ##
 // #####################################################################
 const clock = new THREE.Clock();
@@ -6676,6 +7614,13 @@ function gameLoop() {
   }
   if (state === 'playing') {
     debugInfo.updates++;
+    if (haloActive()) {                          // v0.6.27: in the aircraft / in the air (SECTION 26)
+      safe('edgeTurn', () => edgeTurn(dt));
+      safe('halo', () => updateHalo(dt));
+      safe('sunFollow', () => updateWorldSun());
+      safe('hud', () => updateHUD(dt));
+      safe('hudLayout', () => layoutHud());
+    } else {
     // Each part in its own safety net: one crash can't freeze the guards, bullets, HUD...
     safe('edgeTurn', () => edgeTurn(dt));
     safe('sunFollow', () => updateWorldSun());
@@ -6695,7 +7640,9 @@ function gameLoop() {
     safe('compass', () => drawCompass());
     safe('hudLayout', () => layoutHud());   // v0.6.22: no HUD box covers another
     safe('breachHint', () => breachDoorHint());
+    }
   }
+  if (!(state === 'playing' && haloActive()) && HA.on) { haloAudioMute(); if (document.body.classList.contains('haloOn')) document.body.classList.remove('haloOn'); }
   if (killcam.active) { safe('render', () => { updateFigureLOD(); renderer.clear(); renderer.render(scene, camera); }); return; }
   safe('materiel', () => updateMateriel(dt));
   safe('effects', () => updateEffects(dt));
@@ -7506,6 +8453,7 @@ function radioPressed() {
     return;
   }
   if (currentMission === 2) { windCall(); return; }
+  if (currentMission === 4) { if (haloActive()) haloRepeat(); else { const o = currentObjective(); radioSay('HAWK', o ? 'Next: ' + o.label.toLowerCase() + ', ' + fmtDist(dist2D(o.x, o.z, camera.position.x, camera.position.z)) + '. Follow the ◆. Quiet.' : 'Exfil, Wraith. Go.', 5); } return; }
   if (navInfo && elapsed - navInfo.lastHint > 8) giveHint(); else radioSay('HAWK', 'Just told you, Wraith. Follow the ◆.', 3);
 }
 function updateTraining(dt) {
@@ -7705,7 +8653,7 @@ const arrowTextureGo = makeCanvasTexture(128, (ctx, s) => {
 });
 const arrowMaterialGo = new THREE.MeshStandardMaterial({ map: arrowTextureGo, transparent: true, depthWrite: false, roughness: 0.8, emissive: 0x332200, polygonOffset: true, polygonOffsetFactor: -2 });
 // Weapons you actually carry: Mission 2 = the two sniper rifles; elsewhere the 870 is a training/Black File extra.
-function weaponOwned(i) { return currentMission === 2 || currentMission === 3 ? i < 8 : true; }
+function weaponOwned(i) { return currentMission === 2 || currentMission === 3 ? i < 8 : currentMission === 4 ? i !== 6 && i !== 7 : true; }   // HALO: no big sniper rifles in the jump kit
 function cycleWeapon(dir) { for (let k = 1; k <= WEAPONS.length; k++) { const n = (currentWeapon + dir * k + WEAPONS.length * 2) % WEAPONS.length; if (weaponOwned(n)) { switchWeapon(n); return; } } }
 
 // #####################################################################
@@ -7744,7 +8692,7 @@ const demoMats = {
 };
 const fireLight = new THREE.PointLight(0xff7a30, 0, 30, 1.6); scene.add(fireLight);   // one shared light for burning wrecks (adding lights at runtime would stutter)
 function later(sec, fn) { demoTimers.push({ at: elapsed + sec, fn, m: currentMission }); }
-function equipFor(m) { return m === 0 ? Infinity : m === 1 ? SETTINGS.c4BlackFile : 0; }
+function equipFor(m) { return m === 0 ? Infinity : m === 1 ? SETTINGS.c4BlackFile : m === 4 ? 3 : 0; }
 function resetDemo() {
   charges = []; demoTimers = []; demoFires = []; equip.c4 = equip.max = equipFor(currentMission);
   Object.assign(demoScore, { pts: 0, close: 0, chain: 0, blasts: 0 }); shake.amp = 0; shake.x = shake.y = 0; fireLight.intensity = 0;
@@ -7840,6 +8788,8 @@ function demoBlast(center, radius, o = {}) {
     const reach = t.hard ? (onIt ? 99 : o.small ? -1 : 0.6) : radius * (o.small ? 0.75 : 0.85);
     if (onIt || dd < reach) { t.pending = true; const chained = !o.charge || (!!o.charge.target && !onIt); later(onIt ? 0 : 0.18 + Math.max(0, dd) * 0.05, () => destroyTarget(t, center, chained)); }
   }
+  // v0.6.27: outdoor materiel (radar dish, helicopter, trucks...) caught in a C4 blast is destroyed
+  if (o.charge && typeof materiel !== 'undefined') for (const m of materiel) if (!m.destroyed && dist2D(m.x, m.z, center.x, center.z) < radius * 0.9 + 3) later(0.15, () => destroyMateriel(m, true));
   // Other charges close by go off too (sympathetic detonation)
   for (const c of charges) if (!c.done && c.pos.distanceTo(center) < radius * 0.6) later(0.08, () => detonate(c));
 }
@@ -7907,7 +8857,7 @@ function plantCharge(timed) {
     target = hit.object.userData.demoTarget || null;
   } else {
     const f = camera.getWorldDirection(new THREE.Vector3()); f.y = 0; f.normalize();
-    pos = new THREE.Vector3(camera.position.x + f.x * 0.8, 0.03, camera.position.z + f.z * 0.8); normal = new THREE.Vector3(0, 1, 0);
+    pos = new THREE.Vector3(camera.position.x + f.x * 0.8, 0, camera.position.z + f.z * 0.8); pos.y = groundAt(pos.x, pos.z) + 0.03; normal = new THREE.Vector3(0, 1, 0);
   }
   if (!target) { let bd = 1e9; for (const t of demoTargets) { if (t.destroyed) continue; const dd = dist2D(t.x, t.z, pos.x, pos.z) - t.r; if (dd < 1.4 && dd < bd) { bd = dd; target = t; } } }
   // v0.6.3: on a door or a marked wall you use a (small) DOOR CHARGE if you have one
@@ -7916,7 +8866,7 @@ function plantCharge(timed) {
   const g = new THREE.Group(); g.position.copy(pos).addScaledVector(normal, 0.035); g.lookAt(g.position.clone().add(normal));
   const led = buildChargeModel(g, isDoor, timed);   // v0.6.25: real-looking M112 C4 / linear door charge
   levelGroup.add(g);
-  const R = isDoor ? SETTINGS.doorChargeRadius : SETTINGS.c4Radius, ring = new THREE.Group(); ring.position.set(pos.x, 0.04, pos.z);
+  const R = isDoor ? SETTINGS.doorChargeRadius : SETTINGS.c4Radius, ring = new THREE.Group(); ring.position.set(pos.x, groundAt(pos.x, pos.z) + 0.04, pos.z);
   const r1 = new THREE.Mesh(new THREE.RingGeometry(R - 0.18, R, 56), demoMats.ring); r1.rotation.x = -Math.PI / 2; ring.add(r1);
   const r2 = new THREE.Mesh(new THREE.RingGeometry(R * 1.5 - 0.1, R * 1.5, 56), demoMats.ringOuter); r2.rotation.x = -Math.PI / 2; ring.add(r2);
   levelGroup.add(ring);
@@ -8883,7 +9833,7 @@ if (!debugInfo.on) document.getElementById('debugHud').style.display = 'none';
 window.__game = {
   THREE, SOUNDS, sfxBuf: () => sfxBuf, renderer, setGraphics, worldSun: () => worldSun, gfx: () => SETTINGS.graphicsQuality, blastFX, demoBlast, explosionAt, DEMO_AT, demoTargets: () => demoTargets, materiel: () => materiel, reloadPose, knifeModel, reloadMag, fx: () => effects.length, startReload, weaponState: () => weaponState,
   endMission: won => endGame(won),
-  progress: () => ({ dev: DEV, unlockedIdx, unlocked: [0, 1, 2, 3].filter(isUnlocked) }),
+  progress: () => ({ dev: DEV, unlockedIdx, unlocked: [0, 1, 2, 3, 4].filter(isUnlocked) }),
   sig: () => SIG, fr: () => FR, orderCover, hjobAhead, coverOn, hawk, SIGAT, FRAT, cutJammer,
   SETTINGS, CALIBERS, WEAPONS, player, camera, startMission, switchWeapon,
   enemies: () => enemies, state: () => state, weaponState: () => weaponState, renderFrame: () => { updateFigureLOD(); renderer.render(scene, camera); }, figureLOD: () => enemies.filter(e => e.fig && e.fig.lod).length, glFinish: () => renderer.getContext().finish(), debugInfo, VERSION, aimOffset: () => aimOffset, lastShotInfo: () => lastShotInfo, lean, safeUnlock, endGame,
@@ -8918,6 +9868,8 @@ window.__game = {
   gateSideText, layoutHud: () => { hudLayoutAt = 0; layoutHud(); }, exitLockedText, exitZone: () => exitZone, showMessage, showQuip, radioSay,
   radioPressed, trainingOverview, teleportTo, curStep, trainGates: () => trainGates, obstacles: () => obstacles, chooseMission, currentWeapon: () => currentWeapon, aiming: () => aiming,
   aimAt: (x, y, z) => { const d = new THREE.Vector3(x, y, z).sub(camera.position); camera.rotation.set(Math.asin(THREE.MathUtils.clamp(d.y / d.length(), -1, 1)), Math.atan2(-d.x, -d.z), 0, 'YXZ'); },
+  // v0.6.27 HALO hooks
+  halo: () => H, haloStep, haloKey, haloActive, haloLZ, haloObjectives, haloScoreTotal, haloScoreHTML, HALO, keys, setMalf: m => (haloForceMalf = m), canopyTarget,
   onPlayerShotNoise, nvMode: () => nvMode, lastShot: () => ({ lastShotSpot, repeatShots }), setZoom, weapon: () => WEAPONS[currentWeapon], zoomStep: () => zoomStep,
 };
 </script>
