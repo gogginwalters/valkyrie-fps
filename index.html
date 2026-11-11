@@ -229,6 +229,7 @@
       <label id="m2Card"><input type="radio" name="mission" value="2"><b>MISSION 02 — COLD HORIZON</b><br>Outdoor long-range sniper op. Ridge nest, 100–1,600 m.</label>
       <label id="m4Card"><input type="radio" name="mission" value="4"><b>MISSION 03 — HALO INSERTION</b><br>Night HALO jump from 25,000 ft with HAWK and DOC, then a quiet raid.</label>
       <label id="m5Card"><input type="radio" name="mission" value="5"><b>MISSION 04 — THE DAM</b><br>Alpine arch dam. Checkpoint, crest, control room, powerhouse. Leave by bungee.</label>
+      <label id="m6Card"><input type="radio" name="mission" value="6"><b>MISSION 05 — THE CONDUCTOR'S TRAIN</b><br>Drop onto an armoured train in the Alps. Car by car to the vault and the cab.</label>
     </div>
     <button class="startBtn" id="startBtn">▶ CLICK OR TAP TO BEGIN MISSION</button>
     <div id="briefText"></div>
@@ -407,12 +408,12 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 // ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
 // ##  part failed and why.                                           ##
 // #####################################################################
-const VERSION = 'v0.6.29';
+const VERSION = 'v0.6.30';
 // v0.6.6 MISSION UNLOCKS. Order: TRAINING (0) -> BLACK FILE (1) -> SNIPER LESSON (3) -> COLD HORIZON (2).
 // A new player has only TRAINING; winning a mission unlocks the next one (saved as valkyrieUnlocked =
 // how far along that list you've got, 0-3). Developer mode (?dev=1, remembered; ?dev=0 clears it)
 // unlocks everything and turns the skips back on.
-const MISSION_ORDER = [0, 1, 3, 2, 4, 5];   // v0.6.29: 5 = THE DAM (after HALO)   // v0.6.27: 4 = HALO INSERTION (after Cold Horizon)
+const MISSION_ORDER = [0, 1, 3, 2, 4, 5, 6];   // v0.6.30: 6 = THE CONDUCTOR'S TRAIN   // v0.6.29: 5 = THE DAM (after HALO)   // v0.6.27: 4 = HALO INSERTION (after Cold Horizon)
 let DEV = false, unlockedIdx = 0;
 try {
   const dv = [...location.search.matchAll(/[?&]dev=([01])/gi)].pop();
@@ -663,6 +664,8 @@ const MISSION_OVERRIDES = {
   3: { teammates: 0, sunElevation: 38, enemyDamage: 0, ammoDropChance: 0, maskingEnabled: false },   // v0.6 sniper lesson: bright daytime range, nobody shoots back
   // v0.6.27 HALO: night raid on the airfield from Cold Horizon. Guards see less in the dark; HAWK and DOC join you on landing.
   // v0.6.29 THE DAM: daylight, fast close fights inside; HAWK and DOC on the radio only
+  // v0.6.30 THE TRAIN: close quarters, car by car
+  6: { enemySightRange: 70, enemyHearingRange: 110, enemyAttackRange: 55, enemyAccuracy: 0.3, silencedAlertRadius: 14, alertShoutRadius: 30, searchDuration: 25, killWitnessRange: 40, bodySightRange: 30, teammates: 0 },
   5: { enemySightRange: 230, enemyHearingRange: 320, enemyAttackRange: 200, enemyAccuracy: 0.32, silencedAlertRadius: 22, alertShoutRadius: 35, searchDuration: 30, killWitnessRange: 70, bodySightRange: 55, teammates: 0 },
   4: { enemySightRange: 150, enemyHearingRange: 260, enemyAttackRange: 220, enemyAccuracy: 0.3, silencedAlertRadius: 25,
        alertShoutRadius: 40, searchDuration: 40, killWitnessRange: 80, bodySightRange: 60, shotErrorBase: 8, enemyFieldOfView: 110, teammates: 0 },
@@ -808,6 +811,13 @@ const KNIFE_QUIPS = [
 //   8. Depot demolition — plant charges on a fuel/ammo depot, exfil before the blast.
 //   9. Final showdown  — corner The Conductor (and maybe unmask The Patron).
 const BRIEFINGS = {
+  6: `<p><b>Wraith,</b> the Dam gave us his timetable. Today THE CONDUCTOR rides his own armoured train over the Arlberg line — tunnels, snow, and the Trisanna viaduct, 85 m above the river. Somewhere aboard is his <b>ledger</b>: who pays him, and who he pays. We think it's <b>THE PATRON</b>.</p>
+    <ul><li><b>Board:</b> drop from a road bridge onto the flatcar (automatic).</li>
+    <li><b>Sleeper car:</b> find the <b>vault combination</b>. <b>Cargo car:</b> open the vault, take the <b>ledger</b>.</li>
+    <li><b>Locomotive:</b> confront THE CONDUCTOR. Kill him, or let him run to his boss. Your call.</li>
+    <li><b>Exfil:</b> front platform of the locomotive — <b>jump</b> into the river when you're over a <b>viaduct</b>. HAWK picks you up.</li>
+    <li><b>Optional:</b> <b>Space</b> at the rear coupling drops the troop car. <b>Space</b> at a ladder = the <b>roof</b> (guards inside can't see you) — but <b>CROUCH (C) in tunnels</b> or lose your head.</li></ul>
+    <p style="color:#9a9">HAWK and DOC on the radio (<b>O</b> = hint). Follow the yellow ◆. Knife <b>V</b>, garrote <b>H</b>.</p>`,
   5: `<p><b>Wraith,</b> the flight logs from the airfield point to a hydro dam in the Swiss Alps — a 220 m concrete arch across a granite gorge. Valkyrie runs it for a man we only know as <b>THE CONDUCTOR</b>. His <b>rail schedule</b> is on a computer in the dam's control room. We want it — it tells us which train he rides.</p>
     <ul><li><b>Access road:</b> get past the <b>checkpoint</b> (or through it). There's a <b>guard tower</b> on the west abutment.</li>
     <li><b>Crest walkway:</b> cross the dam to the <b>control room</b> at the east end and download the schedule (walk up to the terminal).</li>
@@ -1440,6 +1450,7 @@ function findPath(sc, sr, tc, tr, maxNodes = 8000) {
 function buildLevel() { buildLevel_(); safe('graphics', () => applyGraphics()); safe('tex', () => pbrAfterBuild()); }
 function buildLevel_() {
   DAM.on = false; DAM.jump = null;   // v0.6.29
+  RAIL.on = false; RAIL.seq = null; RAIL.roof = false;   // v0.6.30
   if (levelGroup) { scene.remove(levelGroup); levelGroup.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
   worldSun = null;
   levelGroup = new THREE.Group(); scene.add(levelGroup);
@@ -1721,7 +1732,7 @@ function pbr(mat, set, o = {}) {
       #ifdef USE_INSTANCING
         pbrP = instanceMatrix * pbrP;
       #endif
-      vPbrW = (modelMatrix * pbrP).xyz;`);
+      vPbrW = ${o.local ? 'pbrP.xyz' : '(modelMatrix * pbrP).xyz'};`);
     sh.fragmentShader = PBR_GLSL + sh.fragmentShader.replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
       if (pbrReady > 0.5) {
         vec3 pbrNW = normalize((vec4(normal, 0.0) * viewMatrix).xyz), pbrWt = pbrW3(pbrNW), pbrP1 = vPbrW * pbrScale;
@@ -1753,7 +1764,7 @@ function pbr(mat, set, o = {}) {
       }`);
   };
   mat.defines = Object.assign(mat.defines || {}, S2 ? { PBR2: '' } : {}, o.blend ? { PBR_BLEND: '' } : {}, SETTINGS.graphicsQuality !== 'low' ? { PBR_NOR: '' } : {});
-  mat.customProgramCacheKey = () => 'pbr628b';
+  mat.customProgramCacheKey = () => 'pbr628b' + (o.local ? 'L' : '');
   mat.needsUpdate = true; };
   mat.userData.pbrInstall = install;
   if (S.ready.value) install();   // otherwise it switches on when the textures arrive (no slow first frame)
@@ -2173,7 +2184,7 @@ function updatePlayer(dt) {
   obstacleMover = true;                                      // training hurdles only block YOU
   const ledgeX = camera.position.x, ledgeZ = camera.position.z, ledgeG = DAM.on ? groundAt(ledgeX, ledgeZ) : 0;
   moveWithCollision(camera.position, player.velocity.x * dt, player.velocity.z * dt, SETTINGS.playerRadius);
-  if (DAM.on && groundAt(camera.position.x, camera.position.z) < ledgeG - 2.5) { camera.position.x = ledgeX; camera.position.z = ledgeZ; player.velocity.set(0, 0, 0); }   // v0.6.29: no walking off the dam
+  if ((DAM.on && groundAt(camera.position.x, camera.position.z) < ledgeG - 2.5) || (RAIL.on && railBlocked(camera.position.x, camera.position.z))) { camera.position.x = ledgeX; camera.position.z = ledgeZ; player.velocity.set(0, 0, 0); }   // v0.6.29: no walking off the dam
   obstacleMover = false;
   updateJump(dt);
 
@@ -2182,7 +2193,7 @@ function updatePlayer(dt) {
   player.bobTime += dt * moving * 1.8;
   const eyeTarget = player.stance === 'prone' ? SETTINGS.proneEyeHeight : player.stance === 'crouch' ? SETTINGS.crouchEyeHeight : SETTINGS.eyeHeight;
   player.eyeY += (eyeTarget - player.eyeY) * Math.min(1, dt * 8);       // smoothly duck / get up
-  camera.position.y = groundAt(camera.position.x, camera.position.z) + player.eyeY + player.jumpY + Math.sin(player.bobTime) * SETTINGS.headBob * Math.min(moving / 5, 1);
+  camera.position.y = groundAt(camera.position.x, camera.position.z) + (RAIL.on && RAIL.roof ? RAIL.roofH : 0) + player.eyeY + player.jumpY + Math.sin(player.bobTime) * SETTINGS.headBob * Math.min(moving / 5, 1);
   applyLean(dt);
 }
 
@@ -3592,7 +3603,7 @@ function updateEnemy(e, dt) {
 
   const px = camera.position.x, pz = camera.position.z;
   const dx = px - pos.x, dz = pz - pos.z, dist = Math.max(Math.hypot(dx, dz), 0.001);
-  const canSee = dist < guardSightRange() && hasLineOfSight(pos.x, pos.z, px, pz);
+  const canSee = dist < guardSightRange() && hasLineOfSight(pos.x, pos.z, px, pz) && !(RAIL.on && (RAIL.roof || RAIL.seq));   // v0.6.30: not through a train roof
   let move = { x: 0, z: 0 }, speed = SETTINGS.enemySpeed;
 
   // ---- 1. DETECTION METER: seeing you fills it; full = COMBAT ----
@@ -4381,6 +4392,7 @@ function createPickup(x, z, type) {
 // v0.6.22: why the exit is still shut, and what to do (all levels).
 function exitLockedText() {
   if (currentMission === 0 || currentMission === 3) { const n = TRAIN ? TRAIN.done.filter(d => !d).length : 0; return `GRADUATION LOCKED — ${n} station${n === 1 ? '' : 's'} still to do. Follow the yellow ◆ to the next one.`; }
+  if (currentMission === 6) { const left = railObjectives().filter(o => !o.done && !o.bonus).length; return `EXFIL LOCKED — ${left} objective${left === 1 ? '' : 's'} left (top left). Follow the yellow ◆.`; }
   if (currentMission === 5) { const left = damObjectives().filter(o => !o.done && !o.bonus).length; return `BUNGEE LOCKED — ${left} objective${left === 1 ? '' : 's'} left (top left). Follow the yellow ◆.`; }
   if (currentMission === 4) { const left = haloObjectives().filter(o => !o.done && !o.bonus).length; return `EXFIL NOT READY — ${left} objective${left === 1 ? '' : 's'} left (top left). Follow the yellow ◆.`; }
   if (currentMission === 2) { const left = sniperObjectives().filter(o => !o.done && !o.bonus).length; return `LZ NOT READY — ${left} objective${left === 1 ? '' : 's'} left (see the list, top left). Follow the yellow ◆.`; }
@@ -4436,7 +4448,7 @@ function updateObjectives(dt, time) {
     }
     exitZone.beamMat.opacity = 0.12 + Math.sin(time * 4) * 0.05;
     const exD = Math.hypot(exitZone.x - px, exitZone.z - pz);
-    if (exD < exitZone.radius && exitZone.unlocked) { if (currentMission === 5) damStartJump(); else endGame(true); }
+    if (exD < exitZone.radius && exitZone.unlocked) { if (currentMission === 6) railTryJump(); else if (currentMission === 5) damStartJump(); else endGame(true); }
     else if (!exitZone.unlocked && exD < (heightField ? 30 : CELL * 2) && time - exitZone.warned > 4) { exitZone.warned = time; showMessage(exitLockedText(), 3.5); }   // v0.6.22: says why, from a few steps away
     if (exitZone.statusSign && exitZone.statusOpen !== exitZone.unlocked) setExitStatusSign(exitZone.unlocked);
   }
@@ -4564,6 +4576,9 @@ function updateHUD(dt) {
   else if (currentMission === 2) {
     for (const o of sniperObjectives()) html += `<div class="${o.done ? 'done' : ''}">${o.done ? '☑' : '☐'} ${o.text}</div>`;
     html += `<div class="${ready ? '' : 'locked'}">${ready ? '☐ Exfil to the LZ behind the ridge' : '🔒 Exfil LZ (finish the list first)'}</div>`;
+  } else if (currentMission === 6) {
+    for (const o of railObjectives()) html += `<div class="${o.done ? 'done' : ''}">${o.done ? '☑' : '☐'} ${o.text}</div>`;
+    html += `<div class="${ready ? '' : 'locked'}">${ready ? '☐ Exfil: front platform — JUMP over a viaduct' : '🔒 Exfil (finish the list first)'}</div>`;
   } else if (currentMission === 5) {
     for (const o of damObjectives()) html += `<div class="${o.done ? 'done' : ''}">${o.done ? '☑' : '☐'} ${o.text}</div>`;
     html += `<div class="${ready ? '' : 'locked'}">${ready ? '☐ Exfil: BUNGEE platform, middle of the crest' : '🔒 Exfil (finish the list first)'}</div>`;
@@ -4886,6 +4901,8 @@ function updateTouchLayer() {
 // #####################################################################
 let currentMission = 1;                 // 1 = Black File (indoor), 2 = Cold Horizon (sniper)
 const M2_WORLD = { size: 4000, center: { x: 2000, z: 2000 }, waterLevel: -3 };
+// v0.6.30 THE CONDUCTOR'S TRAIN state (SECTION 28). The train stands still; the Alps roll past.
+const RAIL = { on: false, seq: null, roof: false, deck: 1.3, roofH: 3.66, speed: 22, r0: 500, c0: 470, cars: [], tiles: [], said: {} };
 // v0.6.29 THE DAM state (the mission itself is SECTION 27)
 const DAM = { HC: 222, R: 140, T: 7, TH: 0.72, O: null, on: false, jump: null, lift: { armed: true, at: 0 }, said: {}, checkpointDone: false,
   PH: { c0: 494, r0: 502 }, CR: { c0: 525, r0: 497 }, start: { x: -560, z: 6 }, checkpointX: -400 };
@@ -4956,6 +4973,7 @@ function smooth(a, b, x) { const t = Math.min(1, Math.max(0, (x - a) / (b - a)))
 // v0.6.27: on the HALO mission a meadow north-west of the compound is levelled out as the LZ.
 function terrainHeight(x, z) {
   if (currentMission === 5) return damTerrain(x, z);
+  if (currentMission === 6) return 0;
   let h = terrainHeight0(x, z);
   if (currentMission === 4) { const L = haloLZ(), hl = terrainHeight0(L.x, L.z), f = smooth(150, 80, Math.hypot(x - L.x, z - L.z)); h += (hl - h) * f; }
   return h;
@@ -4982,7 +5000,8 @@ function terrainHeight0(x, z) {
 // Height field: terrain heights stored on a grid so we can look them up fast.
 let heightField = null;
 function groundAt(x, z) {
-  if (DAM.on) { const o = damGround(x, z); if (o !== null) return o; }   // v0.6.29: crest walkway + powerhouse floor
+  if (DAM.on) { const o = damGround(x, z); if (o !== null) return o; }
+  if (RAIL.on) { const o = railGround(x, z); if (o !== null) return o; }   // v0.6.30: the train deck   // v0.6.29: crest walkway + powerhouse floor
   return groundAt0(x, z);
 }
 function groundAt0(x, z) {
@@ -5030,7 +5049,8 @@ const asphaltTexture = makeCanvasTexture(256, (ctx, s) => {
 // ---- Build the whole outdoor mission ----
 let sniperLights = [], sniperLamps = [], sniperWater = null, materiel = [], sniperState = null;
 function buildSniperMission() {
-  DAM.on = false;
+  DAM.on = false; RAIL.on = false;
+  if (currentMission === 6) return buildRailMission();   // v0.6.30 (SECTION 28)
   if (currentMission === 5) return buildDamMission();   // v0.6.29 (SECTION 27)
   const Q = SETTINGS.graphicsQuality === 'high';
   const C = M2_WORLD.center, size = M2_WORLD.size;
@@ -5597,6 +5617,7 @@ function objectivesComplete() {
   if (currentMission === 2) return sniperObjectives().every(o => o.done || o.bonus);
   if (currentMission === 4) return haloObjectives().every(o => o.done || o.bonus);
   if (currentMission === 5) return damObjectives().every(o => o.done || o.bonus);
+  if (currentMission === 6) return railObjectives().every(o => o.done || o.bonus);
   return intelItems.every(i => i.collected);
 }
 // Distance written nicely: "1,243 m"
@@ -6382,6 +6403,7 @@ function currentObjective() {
   if (currentMission === 3) return lessonObjective();
   if (currentMission === 4) return haloObjective();
   if (currentMission === 5) return damObjective();
+  if (currentMission === 6) return railObjective();
   if (currentMission === 1) {
     const left = intelItems.filter(i => !i.collected);
     if (left.length) {
@@ -6645,7 +6667,7 @@ function applyMission(m) {
   SETTINGS.graphicsQuality = $('optQuality').value;
   if (m === 3) SETTINGS.nightOps = false;                              // the lesson is always in daylight
   if (m === 4) SETTINGS.nightOps = true;
-  if (m === 5) SETTINGS.nightOps = false;                              // v0.6.29: the dam is a daylight job                               // v0.6.27: HALO is always a night jump
+  if (m >= 5) SETTINGS.nightOps = false;                              // v0.6.29: the dam is a daylight job                               // v0.6.27: HALO is always a night jump
   if (m !== 4 && typeof haloOff === 'function') haloOff();
   const outdoors = m >= 2, high = SETTINGS.graphicsQuality === 'high';
   if (!GFX_LEVELS[SETTINGS.graphicsQuality]) SETTINGS.graphicsQuality = autoGfx();
@@ -6655,16 +6677,16 @@ function applyMission(m) {
   document.querySelectorAll('.equiponly').forEach(el => (el.style.display = m === 0 || m === 1 || m >= 4 ? 'flex' : 'none'));   // v0.6.2 demolition kit + waypoint
   document.querySelectorAll('.trainonly').forEach(el => (el.style.display = (m === 0 || (m === 3 && el.id === 'tSkip')) && (el.id !== 'tSkip' || DEV) ? 'flex' : 'none'));   // v0.6.6: SKIP button only in dev mode
   $('trainBox').style.display = m === 0 || m === 3 ? 'block' : 'none';
-  for (const k of [0, 1, 2, 3, 4, 5]) $('m' + k + 'Card').classList.toggle('sel', missionPicked && m === k);
+  for (const k of [0, 1, 2, 3, 4, 5, 6]) $('m' + k + 'Card').classList.toggle('sel', missionPicked && m === k);
   $('briefText').innerHTML = BRIEFINGS[m];
 }
 // v0.4.6 (iPad fix): the chosen mission lives in a variable, not only in the radio button,
 // because on some iPads tapping the mission card never ticked its radio (always Mission 1).
 let chosenMission = 1, missionPicked = true;   // v0.6.5: false = plain link for a returning player: pick a card first
-const MISSION_NAMES = { 0: 'CAMP HALYARD', 1: 'BLACK FILE', 2: 'COLD HORIZON', 3: 'SNIPER LESSON', 4: 'HALO INSERTION', 5: 'THE DAM' };
+const MISSION_NAMES = { 0: 'CAMP HALYARD', 1: 'BLACK FILE', 2: 'COLD HORIZON', 3: 'SNIPER LESSON', 4: 'HALO INSERTION', 5: 'THE DAM', 6: 'THE CONDUCTOR\'S TRAIN' };
 function selectedMission() { return chosenMission; }
 function chooseMission(m, rebuild = true) {
-  m = m === 2 || m === 0 || m === 3 || m === 4 || m === 5 ? m : 1;
+  m = m === 2 || m === 0 || m === 3 || m === 4 || m === 5 || m === 6 ? m : 1;
   if (!isUnlocked(m)) { showLockNote(lockReason(m)); noteInput('locked mission ' + m); showPicked(); return; }   // v0.6.6
   const changed = m !== chosenMission;
   chosenMission = m; missionPicked = true;
@@ -6673,10 +6695,10 @@ function chooseMission(m, rebuild = true) {
     applyMission(m); buildLevel(); resetPlayer(); resetWeapons(); resetMasking(); missionStartPose();
   }
 }
-const MISSION_TITLES = { 0: 'Training', 1: 'Black File', 2: 'Cold Horizon', 3: 'the Sniper Lesson', 4: 'HALO Insertion', 5: 'The Dam' };
+const MISSION_TITLES = { 0: 'Training', 1: 'Black File', 2: 'Cold Horizon', 3: 'the Sniper Lesson', 4: 'HALO Insertion', 5: 'The Dam', 6: 'The Conductor\'s Train' };
 const lockReason = m => 'Locked — beat ' + MISSION_TITLES[MISSION_ORDER[MISSION_ORDER.indexOf(m) - 1]] + ' first';
 function showLocks() {
-  for (const k of [0, 1, 2, 3, 4, 5]) {
+  for (const k of [0, 1, 2, 3, 4, 5, 6]) {
     const card = $('m' + k + 'Card'), locked = !isUnlocked(k);
     card.classList.toggle('locked', locked); card.setAttribute('aria-disabled', locked ? 'true' : 'false');
     const r = card.querySelector('input'); if (r) r.disabled = locked;
@@ -6692,9 +6714,9 @@ function showLockNote(txt) { $('lockNote').textContent = txt; clearTimeout(lockN
 function showPicked() {
   const m = chosenMission, p = missionPicked;
   document.querySelectorAll('input[name="mission"]').forEach(r => (r.checked = p && +r.value === m));
-  for (const k of [0, 1, 2, 3, 4, 5]) $('m' + k + 'Card').classList.toggle('sel', p && m === k);
+  for (const k of [0, 1, 2, 3, 4, 5, 6]) $('m' + k + 'Card').classList.toggle('sel', p && m === k);
   $('startBtn').textContent = p ? '▶ START: ' + MISSION_NAMES[m] : '▲ PICK A MISSION ABOVE, THEN START';
-  const headlines = { 0: 'CAMP HALYARD TRAINING', 1: 'OPERATION: BLACK FILE', 2: 'OPERATION: COLD HORIZON', 3: 'SNIPER LESSON', 4: 'OPERATION: HALO INSERTION', 5: 'OPERATION: THE DAM' };
+  const headlines = { 0: 'CAMP HALYARD TRAINING', 1: 'OPERATION: BLACK FILE', 2: 'OPERATION: COLD HORIZON', 3: 'SNIPER LESSON', 4: 'OPERATION: HALO INSERTION', 5: 'OPERATION: THE DAM', 6: 'OPERATION: THE CONDUCTOR\'S TRAIN' };
   const h1 = document.querySelector('#startScreen h1');
   if (h1 && p) h1.textContent = headlines[m] || headlines[1];
   document.title = (p ? (headlines[m] || 'VALKYRIE') : 'VALKYRIE') + ' — ' + VERSION;
@@ -6729,7 +6751,7 @@ const endOpen = () => (state === 'won' || state === 'lost') && $('endScreen').st
 function missionStartPose() {
   zeroRange = 100; scopeState.breath = SETTINGS.holdBreathTime; scopeState.gasp = 0;
   resetWind();
-  if (currentMission === 5) { player.stance = 'stand'; player.eyeY = SETTINGS.eyeHeight; switchWeapon(3); switchTimer = 0; return; }   // v0.6.29
+  if (currentMission >= 5) { player.stance = 'stand'; player.eyeY = SETTINGS.eyeHeight; switchWeapon(3); switchTimer = 0; if (currentMission === 6) railIntro(); return; }   // v0.6.29
   if (currentMission === 4) { player.stance = 'stand'; switchWeapon(3); switchTimer = 0; safe('halo', () => haloBegin()); return; }   // v0.6.27: starts in the aircraft
   if (currentMission === 2 || currentMission === 3) {
     player.stance = 'prone'; player.eyeY = SETTINGS.proneEyeHeight;
@@ -6769,6 +6791,7 @@ function startMission() {
   safe('start:training', () => { garrote.active = false; garrote.anim = 0; if (currentMission === 0 || currentMission === 3) resetTraining(); });
   showMessage(currentMission === 0 ? 'Welcome to CAMP HALYARD. Read CHIEF\'s box at the top. Follow the yellow ◆ and the floor rings.'
     : currentMission === 3 ? 'SNIPER LESSON. Read GRAVEL\'s box at the top — he\'ll walk you through every shot.'
+    : currentMission === 6 ? 'THE CONDUCTOR\'S TRAIN. Wait for the drop… then follow the yellow ◆. O = radio for a hint.'
     : currentMission === 5 ? 'THE DAM. Follow the yellow ◆: checkpoint first. O = radio for a hint.'
     : currentMission === 4 ? 'HALO INSERTION. Listen to the JUMPMASTER (red box at the top). Keys for each step are listed on the right.'
     : currentMission === 2 ? 'Operation COLD HORIZON. Lase (F), dial ([ ] or ↑ ↓), breathe (Shift), send it.' : 'Mission start. Find the intel. Your squad (green ▼ HAWK, DOC) follows you — guards are deeper in. (V = knife, hold H = garrote)', 3.5);
@@ -6792,14 +6815,16 @@ function endGame(won) {
   safeUnlock();
   const secs = Math.round((performance.now() - player.startTime) / 1000);
   const acc = player.shotsFired ? Math.round(player.shotsHit / player.shotsFired * 100) : 0;
-  $('endTitle').textContent = won && currentMission === 5 ? 'MISSION COMPLETE — THE DAM' : won && currentMission === 4 ? 'MISSION COMPLETE — HALO INSERTION' : won ? (currentMission === 0 ? 'TRAINING COMPLETE' : currentMission === 3 ? 'QUALIFIED — SNIPER LESSON COMPLETE' : 'MISSION COMPLETE') : 'MISSION FAILED';
+  $('endTitle').textContent = won && currentMission === 6 ? 'MISSION COMPLETE — THE CONDUCTOR\'S TRAIN' : won && currentMission === 5 ? 'MISSION COMPLETE — THE DAM' : won && currentMission === 4 ? 'MISSION COMPLETE — HALO INSERTION' : won ? (currentMission === 0 ? 'TRAINING COMPLETE' : currentMission === 3 ? 'QUALIFIED — SNIPER LESSON COMPLETE' : 'MISSION COMPLETE') : 'MISSION FAILED';
   $('endTitle').style.color = won ? '#7f7' : '#f66';
-  $('endSubtitle').textContent = currentMission === 5 ? (won ? 'HAWK: "220 metres on a rubber band. The Conductor\'s train is next — and you\'re buying the tickets."' : 'DOC: "The dam won. Dams usually do."') : currentMission === 4 ? (won ? 'HAWK: "In by parachute, out by helicopter. They never knew we were there."' : (H && H.phase !== 'ground' ? 'DOC: "That\'s why we practise in the wind tunnel, Wraith."' : 'Wraith down on the airfield. HAWK and DOC carry you out.')) : won ? (currentMission === 0 ? 'CHIEF: "Congratulations, Wraith. You are now marginally less likely to die. Black File is waiting."' : currentMission === 3 ? 'GRAVEL: "Measure, dial, breathe, squeeze, stay. Now do it when they shoot back."' : currentMission === 2 ? 'Exfil complete. The Conductor just lost an airfield.' : 'Extraction successful. Good work, Agent.')
+  $('endSubtitle').textContent = currentMission === 6 ? (won ? (RAIL.conductor && RAIL.conductor.state === 'dead' ? 'HAWK: "The Conductor\'s dead and his ledger is ours. Every line points to one house: THE PATRON\'s estate."' : 'HAWK: "He ran. Good — he\'ll run home to THE PATRON, and we\'ll follow the ledger and the footprints."') : 'DOC: "Trains: 1. Wraith: 0. Mind the gap next time."') : currentMission === 5 ? (won ? 'HAWK: "220 metres on a rubber band. The Conductor\'s train is next — and you\'re buying the tickets."' : 'DOC: "The dam won. Dams usually do."') : currentMission === 4 ? (won ? 'HAWK: "In by parachute, out by helicopter. They never knew we were there."' : (H && H.phase !== 'ground' ? 'DOC: "That\'s why we practise in the wind tunnel, Wraith."' : 'Wraith down on the airfield. HAWK and DOC carry you out.')) : won ? (currentMission === 0 ? 'CHIEF: "Congratulations, Wraith. You are now marginally less likely to die. Black File is waiting."' : currentMission === 3 ? 'GRAVEL: "Measure, dial, breathe, squeeze, stay. Now do it when they shoot back."' : currentMission === 2 ? 'Exfil complete. The Conductor just lost an airfield.' : 'Extraction successful. Good work, Agent.')
     : (currentMission === 2 ? 'Wraith down. Gravel is going to be insufferable about this.' : 'Agent down. The intel is lost.');
   if (won) unlockAfterWin(currentMission);                            // v0.6.6: winning opens the next mission
   if (won && currentMission === 0) { try { localStorage.setItem('valkyrieTrainingDone', '1'); } catch (err) {} }
   if (won && currentMission === 3) { try { localStorage.setItem('valkyrieSniperLessonDone', '1'); } catch (err) {} }
-  const objLine = currentMission === 5
+  const objLine = currentMission === 6
+    ? railObjectives().map(o => (o.done ? '☑ ' : '☐ ') + o.text).join('<br>') + (RAIL.decoupled ? `<br>Left behind with the troop car: ${RAIL.troopGuards.filter(e => e.leftBehind).length}` : '')
+    : currentMission === 5
     ? damObjectives().map(o => (o.done ? '☑ ' : '☐ ') + o.text).join('<br>')
     : currentMission === 4
     ? haloObjectives().map(o => (o.done ? '☑ ' : '☐ ') + o.text).join('<br>') + '<div style="margin-top:8px;text-align:left;font-size:13px">' + haloScoreHTML() + '</div>'
@@ -6815,7 +6840,7 @@ function endGame(won) {
     : `Intel recovered: ${intelItems.filter(i => i.collected).length} / ${intelItems.length}`;
   $('endStats').innerHTML = `Time: ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}<br>
     ${currentMission === 3 ? 'Plates hit: ' + player.shotsHit : 'Guards neutralised: ' + player.kills + ' / ' + enemies.length}<br>Accuracy: ${acc}% &nbsp; Headshots: ${player.headshots}<br>${objLine}`;
-  $('restartBtn').textContent = won && currentMission === 0 ? '▶ CONTINUE: MISSION 01 — BLACK FILE (Enter)' : won && currentMission === 3 ? '▶ CONTINUE: MISSION 02 — COLD HORIZON (Enter)' : won && currentMission === 2 ? '▶ CONTINUE: MISSION 03 — HALO INSERTION (Enter)' : won && currentMission === 4 ? '▶ CONTINUE: MISSION 04 — THE DAM (Enter)' : '↻ CLICK / TAP TO RESTART MISSION (Enter)';
+  $('restartBtn').textContent = won && currentMission === 0 ? '▶ CONTINUE: MISSION 01 — BLACK FILE (Enter)' : won && currentMission === 3 ? '▶ CONTINUE: MISSION 02 — COLD HORIZON (Enter)' : won && currentMission === 2 ? '▶ CONTINUE: MISSION 03 — HALO INSERTION (Enter)' : won && currentMission === 4 ? '▶ CONTINUE: MISSION 04 — THE DAM (Enter)' : won && currentMission === 5 ? '▶ CONTINUE: MISSION 05 — THE CONDUCTOR\'S TRAIN (Enter)' : '↻ CLICK / TAP TO RESTART MISSION (Enter)';
   $('endScreen').style.display = 'flex';
   safe('end:sound', () => (won ? SOUNDS.win() : SOUNDS.lose()));
 }
@@ -6831,7 +6856,7 @@ document.querySelectorAll('.gfxSel').forEach(el => el.addEventListener('change',
 document.querySelectorAll('input[name="mission"]').forEach(r => r.addEventListener('change', () => { if (r.checked && startOpen()) chooseMission(+r.value); }));
 // Tapping / clicking anywhere on a mission card picks it (pointer, touch AND click, whichever arrives).
 // v0.6.5: a genuine tap or click only, and only while the start screen is up (see onTap).
-for (const [id, m] of [['m0Card', 0], ['m1Card', 1], ['m3Card', 3], ['m2Card', 2], ['m4Card', 4], ['m5Card', 5]])
+for (const [id, m] of [['m0Card', 0], ['m1Card', 1], ['m3Card', 3], ['m2Card', 2], ['m4Card', 4], ['m5Card', 5], ['m6Card', 6]])
   onTap($(id), how => { noteInput('mission card ' + m + ' (' + how + ')'); chooseMission(m); }, { when: startOpen });
 // A link can pick the mission: ...?mission=2  or  ...#m2
 {
@@ -6841,9 +6866,9 @@ for (const [id, m] of [['m0Card', 0], ['m1Card', 1], ['m3Card', 3], ['m2Card', 2
   const params = new URLSearchParams(location.search);
   const q = (params.get('mission') || '').toLowerCase();
   const h = (location.hash || '').toLowerCase();
-  const fromName = { '0': 0, training: 0, train: 0, halyard: 0, camphalyard: 0, '1': 1, black: 1, blackfile: 1, mission1: 1, '2': 2, cold: 2, horizon: 2, mission2: 2, '3': 3, sniper: 3, lesson: 3, '4': 4, halo: 4, jump: 4, insertion: 4, mission3: 4, '5': 5, dam: 5, mission4: 5, conductor: 5 };
+  const fromName = { '0': 0, training: 0, train: 0, halyard: 0, camphalyard: 0, '1': 1, black: 1, blackfile: 1, mission1: 1, '2': 2, cold: 2, horizon: 2, mission2: 2, '3': 3, sniper: 3, lesson: 3, '4': 4, halo: 4, jump: 4, insertion: 4, mission3: 4, '5': 5, dam: 5, mission4: 5, '6': 6, train: 6, conductor: 6, mission5: 6 };
   const want = Object.prototype.hasOwnProperty.call(fromName, q) ? fromName[q]
-    : (h === '#dam' || h === '#m5' ? 5 : h === '#halo' || h === '#m4' ? 4 : h === '#m3' || h === '#sniper' || h === '#lesson' ? 3 : h === '#m2' || h === '#mission2' || h === '#horizon' ? 2 : h === '#m1' || h === '#mission1' || h === '#blackfile' ? 1
+    : (h === '#train' || h === '#m6' ? 6 : h === '#dam' || h === '#m5' ? 5 : h === '#halo' || h === '#m4' ? 4 : h === '#m3' || h === '#sniper' || h === '#lesson' ? 3 : h === '#m2' || h === '#mission2' || h === '#horizon' ? 2 : h === '#m1' || h === '#mission1' || h === '#blackfile' ? 1
     : h === '#m0' || h === '#training' || h === '#halyard' ? 0 : -1);
   // v0.6.6: no mission in the link = the furthest mission you've earned, ticked, on the picker.
   // A link to a LOCKED mission falls back to the furthest one you've earned, with a short note.
@@ -6860,7 +6885,8 @@ function continueOrRestart() {
   if (state === 'won' && currentMission === 0) { chooseMission(1, false); lastStartAt = -1e9; }
   if (state === 'won' && currentMission === 3) { chooseMission(2, false); lastStartAt = -1e9; }
   else if (state === 'won' && currentMission === 2) { chooseMission(4, false); lastStartAt = -1e9; }
-  else if (state === 'won' && currentMission === 4) { chooseMission(5, false); lastStartAt = -1e9; }   // v0.6.29   // v0.6.27
+  else if (state === 'won' && currentMission === 4) { chooseMission(5, false); lastStartAt = -1e9; }   // v0.6.29
+  else if (state === 'won' && currentMission === 5) { chooseMission(6, false); lastStartAt = -1e9; }   // v0.6.30   // v0.6.27
   startMission();
 }
 // v0.6.5: Skip training needs a genuine tap AND a second tap to confirm (it sits below the briefing now).
@@ -8093,6 +8119,455 @@ function updateDamJump(dt) {
 }
 
 // #####################################################################
+// ##  SECTION 28: THE CONDUCTOR'S TRAIN (v0.6.30)                    ##
+// #####################################################################
+// The train stands still in the world and the SCENERY rolls past it (200 m "tiles" that loop:
+// snowy valley, tunnels, viaducts). Inside, the cars are one long corridor of 4 m squares.
+const RAIL_CARS = [
+  { id: 'troop', len: 6, kind: 'box', name: 'TRUPPENWAGEN · TROOPS', col: 0x3f4a38, set: 'corrugated' },
+  { id: 'flatA', len: 5, kind: 'flat', name: 'FLACHWAGEN' },
+  { id: 'flatB', len: 5, kind: 'flat', name: 'FLACHWAGEN' },
+  { id: 'armor', len: 6, kind: 'box', name: 'PANZERWAGEN · ARMOURED', col: 0x464b4e, set: 'metal', slits: true },
+  { id: 'sleep', len: 7, kind: 'box', name: 'SCHLAFWAGEN · SLEEPER', col: 0x5e1a1f, set: 'metal', win: true },
+  { id: 'dine', len: 6, kind: 'box', name: 'SPEISEWAGEN · DINING', col: 0x5e1a1f, set: 'metal', win: true },
+  { id: 'cargo', len: 6, kind: 'box', name: 'GEPÄCKWAGEN · TRESOR', col: 0x4d4234, set: 'corrugated' },
+  { id: 'loco', len: 6, kind: 'loco', name: 'LOKOMOTIVE', col: 0x22262a, set: 'metal' },
+];
+const RAIL_TILE = 200;
+function railCell(c) { return { x: c * CELL + CELL / 2, z: RAIL.r0 * CELL + CELL / 2 }; }
+function railCar(id) { return RAIL.cars.find(c => c.id === id); }
+function railAt(id, i) { const c = railCar(id); return railCell(c.c + i); }
+function railLayout() {
+  let c = RAIL.c0; RAIL.cars = [];
+  RAIL_CARS.forEach((d, i) => { RAIL.cars.push({ ...d, c, x0: c * CELL, x1: (c + d.len) * CELL }); c += d.len + (i < RAIL_CARS.length - 1 ? 1 : 0); });
+  RAIL.cEnd = c; RAIL.x0 = RAIL.c0 * CELL; RAIL.x1 = c * CELL; RAIL.zc = RAIL.r0 * CELL + CELL / 2;
+  const t = railCar('troop'), sl = railCar('sleep'), cg = railCar('cargo'), lo = railCar('loco'), fb = railCar('flatB');
+  RAIL.K = railCell(t.c + t.len);                       // coupling between the troop car and the first flatcar
+  const ar = railCar('armor'); RAIL.ladders = [{ f: railCell(fb.c + fb.len), r: railCell(ar.c) }, { f: railCell(sl.c + sl.len), r: railCell(sl.c + sl.len) }];
+  RAIL.code = railCell(sl.c + 4); RAIL.V = railCell(cg.c + 4); RAIL.Vc = cg.c + 4; RAIL.I = railCell(cg.c + 5);
+  RAIL.cab = railCell(lo.c + 4); RAIL.X = railCell(lo.c + 5); RAIL.land = railAt('flatA', 2);
+}
+function railGround(x, z) {
+  if (Math.abs(z - RAIL.zc) < 2.3 && x >= RAIL.x0 - 0.5 && x <= RAIL.x1 + 0.5) return RAIL.deck;
+  return null;
+}
+function railCarAt(x) { return RAIL.cars.find(c => x >= c.x0 && x < c.x1) || null; }
+function railRoofed(x) {
+  if (x < RAIL.x0 || x > RAIL.x1) return false;
+  const c = railCarAt(x);
+  if (!c) { const a = railCarAt(x - CELL), b = railCarAt(x + CELL); return !!a && !!b && a.kind !== 'flat' && b.kind !== 'flat'; }   // gangway: both sides need a roof
+  return c.kind !== 'flat' && !(c.kind === 'loco' && x > c.x1 - CELL);
+}
+function railBlocked(x, z) { return RAIL.roof && (!railRoofed(x) || (RAIL.decoupled && x < RAIL.K.x + 2)); }
+// ---- the scenery profile (heights only depend on z, plus loops every 200 m, so tiles join up) ----
+function railH(x, z) {
+  const az = Math.abs(z), s = z > 0 ? 1 : -1;
+  if (az < 4.3) return -0.05;
+  let h = Math.pow(az - 4.3, 1.25) * 0.2 + Math.max(0, az - 220) * 0.45 + Math.max(0, az - 600) * 0.5;
+  h += Math.min(1, az / 80) * (6 * Math.sin(2 * Math.PI * x / RAIL_TILE + az * 0.03 * s) + 9 * Math.sin(4 * Math.PI * x / RAIL_TILE + az * 0.011 + s));
+  return h;
+}
+function railGridGeo(xs, zs, hf) {
+  const P = [], idx = [], nx = xs.length, nz = zs.length;
+  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) P.push(xs[i], hf(xs[i], zs[j]), zs[j]);
+  for (let j = 0; j < nz - 1; j++) for (let i = 0; i < nx - 1; i++) { const a = j * nx + i, b = a + 1, c = a + nx, d = c + 1; idx.push(a, c, b, b, c, d); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setIndex(idx); g.computeVertexNormals();
+  const n = g.attributes.normal, col = new Float32Array(P.length), c = new THREE.Color();
+  for (let k = 0; k < P.length / 3; k++) {
+    const y = P[k * 3 + 1], sl = 1 - n.getY(k), az = Math.abs(P[k * 3 + 2]);
+    c.setRGB(0.92, 0.94, 0.97);                                                        // snow
+    if (sl > 0.32) c.lerp(new THREE.Color(0.40, 0.40, 0.41), smooth(0.32, 0.5, sl));     // rock on steep bits
+    if (y < -40) c.lerp(new THREE.Color(0.36, 0.42, 0.30), smooth(-40, -70, y) * 0.7);   // valley floor
+    if (az < 7) c.setRGB(0.42, 0.40, 0.37);                                            // trackbed
+    col.set([c.r, c.g, c.b], k * 3);
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3)); return g;
+}
+function railBuildShared(Q) {
+  const xs = []; for (let x = 0; x <= RAIL_TILE; x += Q ? 5 : 10) xs.push(x);
+  const zh = [4.3, 6, 10, 16, 24, 35, 50, 70, 95, 130, 180, 240, 320, 420, 560, 720, 950];
+  const zs = [...zh.map(v => -v).reverse(), ...zh];
+  const taper = (x, a, b) => (a ? smooth(0, 45, x) : 1) * (b ? smooth(RAIL_TILE, RAIL_TILE - 45, x) : 1);
+  const valley = (x, z, f) => { const az = Math.abs(z), g = railH(x, z); if (az > 330) return g; const v = -85 + Math.pow(az / 330, 1.6) * (g + 85); const k = f * smooth(330, 250, az); return g + (v - g) * k; };
+  const hump = x => (x < 8 || x > RAIL_TILE - 8) ? 0 : 8 + 55 * Math.pow(Math.sin(Math.PI * (x - 8) / (RAIL_TILE - 16)), 0.7);
+  const S = { geo: {} };
+  S.geo.ground = railGridGeo(xs, zs, railH);
+  S.geo.tunnel = railGridGeo(xs, zs, (x, z) => Math.abs(z) < 4.3 ? -0.05 : railH(x, z) + hump(x) * smooth(400, 60, Math.abs(z)));
+  for (const [v, a, b] of [['single', 1, 1], ['start', 1, 0], ['mid', 0, 0], ['end', 0, 1]]) S.geo['bridge_' + v] = railGridGeo(xs, zs, (x, z) => valley(x, z, taper(x, a, b)));
+  S.pierH = { single: [], start: [], mid: [], end: [] };
+  for (const [v, a, b] of [['single', 1, 1], ['start', 1, 0], ['mid', 0, 0], ['end', 0, 1]]) for (let x = 10; x < RAIL_TILE; x += 20) { const h = valley(x, 0, taper(x, a, b)); if (h < -2) S.pierH[v].push([x, h]); }
+  S.groundM = pbr(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }), 'snow', { mode: 'detail', scale: 6, strength: 0.8, set2: 'rock', thr2: 0.8, blend: true, local: true });
+  S.ballastM = pbr(new THREE.MeshStandardMaterial({ color: 0x7a746c, roughness: 1 }), 'gravel', { scale: 1.5, local: true });
+  S.sleeperM = pbr(new THREE.MeshStandardMaterial({ color: 0x5a4636, roughness: 0.95 }), 'wood', { mode: 'detail', scale: 1, local: true });
+  S.railM = new THREE.MeshStandardMaterial({ color: 0x8a8d90, roughness: 0.35, metalness: 0.9 });
+  S.stoneM = pbr(new THREE.MeshStandardMaterial({ color: 0x9c968a, roughness: 0.9 }), 'block', { mode: 'detail', scale: 3, local: true });
+  S.rockM = pbr(new THREE.MeshStandardMaterial({ color: 0x6c6a66, roughness: 1 }), 'rock', { mode: 'detail', scale: 4, local: true });
+  S.concreteM = pbr(new THREE.MeshStandardMaterial({ color: 0xa8a69e, roughness: 0.85 }), 'concrete', { mode: 'detail', scale: 3, local: true });
+  S.riverM = new THREE.MeshStandardMaterial({ color: 0x3f7f86, roughness: 0.15, metalness: 0.5 });
+  S.trunkG = new THREE.CylinderGeometry(0.25, 0.35, 3, 6).translate(0, 1.5, 0);
+  S.crownG = new THREE.ConeGeometry(2.3, 7.5, 7).translate(0, 6.2, 0);
+  S.capG = new THREE.ConeGeometry(1.2, 2.6, 7).translate(0, 9.3, 0);
+  S.trunkM = new THREE.MeshStandardMaterial({ color: 0x4a3626, roughness: 1 });
+  S.crownM = new THREE.MeshStandardMaterial({ color: 0x24382a, roughness: 0.95 });
+  S.capM = new THREE.MeshStandardMaterial({ color: 0xeef2f6, roughness: 0.9 });
+  S.sleeperG = new THREE.BoxGeometry(0.26, 0.16, 2.6); S.nSleep = Math.floor(RAIL_TILE / 0.7);
+  return S;
+}
+function railTrees(S, n, zMin, zMax, hf, seed) {
+  const rand = makeRandom(seed), dummy = new THREE.Object3D(), out = [];
+  const tr = new THREE.InstancedMesh(S.trunkG, S.trunkM, n), cr = new THREE.InstancedMesh(S.crownG, S.crownM, n), cp = new THREE.InstancedMesh(S.capG, S.capM, n);
+  let k = 0;
+  for (let t = 0; t < n * 4 && k < n; t++) {
+    const x = rand() * RAIL_TILE, z = (rand() < 0.5 ? -1 : 1) * (zMin + rand() * (zMax - zMin)), h = hf(x, z);
+    if (Math.abs(railH(x + 3, z) - railH(x, z)) > 4) continue;
+    const s = 0.6 + rand() * 0.8; dummy.position.set(x, h - 0.3, z); dummy.rotation.set(0, rand() * 6, 0); dummy.scale.set(s, s * (0.85 + rand() * 0.4), s); dummy.updateMatrix();
+    tr.setMatrixAt(k, dummy.matrix); cr.setMatrixAt(k, dummy.matrix); cp.setMatrixAt(k, dummy.matrix); k++;
+  }
+  tr.count = cr.count = cp.count = k; cr.castShadow = true; out.push(tr, cr, cp); return out;
+}
+function railMakeTile(S, i, Q) {
+  const g = new THREE.Group(); g.position.set(RAIL.tx0 + i * RAIL_TILE, 0, RAIL.zc); levelGroup.add(g);
+  const track = new THREE.Group(); g.add(track);
+  const bal = new THREE.Mesh(new THREE.BoxGeometry(RAIL_TILE, 0.3, 4.2), S.ballastM); bal.position.set(RAIL_TILE / 2, 0, 0); bal.receiveShadow = true; track.add(bal);
+  const sl = new THREE.InstancedMesh(S.sleeperG, S.sleeperM, S.nSleep), dm = new THREE.Object3D();
+  for (let k = 0; k < S.nSleep; k++) { dm.position.set(k * 0.7 + 0.35, 0.22, 0); dm.updateMatrix(); sl.setMatrixAt(k, dm.matrix); }
+  sl.receiveShadow = true; track.add(sl);
+  for (const z of [-0.72, 0.72]) { const r = new THREE.Mesh(new THREE.BoxGeometry(RAIL_TILE, 0.16, 0.08), S.railM); r.position.set(RAIL_TILE / 2, 0.38, z); track.add(r); }
+  const T = { g, var: new THREE.Group(), near: railTrees(S, Q ? 150 : 60, 9, 260, railH, 300 + i), far: railTrees(S, Q ? 110 : 45, 330, 760, railH, 700 + i) };
+  g.add(T.var); T.near.forEach(m => g.add(m)); T.far.forEach(m => g.add(m));
+  return T;
+}
+function railRouteType(k) {
+  const m = (k + 3) % 14;
+  return m === 0 || m === 7 ? ['tunnel', ''] : m === 4 ? ['bridge', 'single'] : ['ground', ''];
+}
+function railSetTile(T, type, variant) {
+  const S = RAIL.S; T.type = type; T.variant = variant; T.warned = false; T.horn = false;
+  for (const c of [...T.var.children]) T.var.remove(c);
+  const key = type === 'bridge' ? 'bridge_' + variant : type;
+  const ground = new THREE.Mesh(S.geo[key], S.groundM); ground.receiveShadow = true; ground.castShadow = type === 'tunnel'; T.var.add(ground);
+  T.near.forEach(m => m.visible = type === 'ground');
+  if (type === 'bridge') {
+    for (const [x, h] of S.pierH[variant]) { const H = -0.7 - h, p = new THREE.Mesh(new THREE.BoxGeometry(3.4, H, 6), S.stoneM); p.position.set(x, h + H / 2, 0); p.castShadow = true; T.var.add(p);
+      const cap = new THREE.Mesh(new THREE.BoxGeometry(4.2, 1.2, 6.8), S.stoneM); cap.position.set(x, -1.3, 0); T.var.add(cap); }
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(RAIL_TILE, 1.6, 5.4), S.stoneM); deck.position.set(RAIL_TILE / 2, -0.8, 0); deck.castShadow = deck.receiveShadow = true; T.var.add(deck);
+    for (const z of [-2.75, 2.75]) { const w = new THREE.Mesh(new THREE.BoxGeometry(RAIL_TILE, 0.9, 0.35), S.stoneM); w.position.set(RAIL_TILE / 2, 0.45, z); T.var.add(w); }
+    const river = new THREE.Mesh(new THREE.PlaneGeometry(RAIL_TILE, 120), S.riverM); river.rotation.x = -Math.PI / 2; river.position.set(RAIL_TILE / 2, -83.5, 0); T.var.add(river);
+  }
+  if (type === 'tunnel') {
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(RAIL_TILE - 16, 3, 12), S.rockM); slab.position.set(RAIL_TILE / 2, 6.6 + 1.5, 0); slab.castShadow = true; T.var.add(slab);
+    for (const z of [-4.6, 4.6]) { const w = new THREE.Mesh(new THREE.BoxGeometry(RAIL_TILE - 16, 7, 1.2), S.rockM); w.position.set(RAIL_TILE / 2, 3.4, z); w.castShadow = true; T.var.add(w); }
+    for (const x of [8, RAIL_TILE - 8]) {                                     // concrete portals
+      const lint = new THREE.Mesh(new THREE.BoxGeometry(1.6, 5, 16), S.concreteM); lint.position.set(x, 9.1, 0); T.var.add(lint);
+      for (const z of [-6, 6]) { const p = new THREE.Mesh(new THREE.BoxGeometry(1.6, 7, 4), S.concreteM); p.position.set(x, 3.4, z); T.var.add(p); }
+    }
+    const sign = makeSign(T.k % 2 ? 'ARLBERG-TUNNEL' : 'TUNNEL · 1.2 km', 4.4, 0.9, '#242a30', '#f0f0e0', false); sign.position.set(RAIL_TILE - 7.1, 9.2, 0); sign.rotation.y = -Math.PI / 2; T.var.add(sign);
+  }
+}
+function railSpawnNext(T) {
+  const k = RAIL.nextK++; T.k = k;
+  const q = RAIL.queue.length ? RAIL.queue.shift() : railRouteType(k);
+  railSetTile(T, q[0], q[1]);
+}
+function railForceViaduct() {
+  const camX = camera.position.x, ahead = RAIL.tiles.filter(T => T.g.position.x > camX + 520).sort((a, b) => a.g.position.x - b.g.position.x);
+  const plan = [['bridge', 'start'], ['bridge', 'mid'], ['bridge', 'mid'], ['bridge', 'end']];
+  RAIL.queue = [];
+  ahead.forEach((T, i) => { const p = plan[i] || ['ground', '']; railSetTile(T, p[0], p[1]); });
+  for (let i = ahead.length; i < plan.length; i++) RAIL.queue.push(plan[i]);
+  if (RAIL.queue.length === 0) RAIL.queue.push(['ground', '']);
+}
+// ---- the train itself ----
+function railBuildTrain(Q) {
+  const zc = RAIL.zc, D = RAIL.deck, Hc = 3.4, frame = new THREE.MeshStandardMaterial({ color: 0x1d1f22, roughness: 0.6, metalness: 0.7 });
+  const floorM = pbr(new THREE.MeshStandardMaterial({ color: 0x6a5a48, roughness: 0.8 }), 'wood', { mode: 'detail', scale: 2 });
+  const glass = new THREE.MeshStandardMaterial({ color: 0x9ab4c4, roughness: 0.05, metalness: 0.3, transparent: true, opacity: 0.22, depthWrite: false });
+  const add = (geo, mat, x, y, z, solidWall) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; (RAIL.troopG && RAIL.building === 'troop' ? RAIL.troopG : levelGroup).add(m); if (solidWall) wallMeshes.push(m); return m; };
+  const wheels = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.42, 0.42, 0.14, 14).rotateX(Math.PI / 2), frame, 8 * RAIL.cars.length), dm = new THREE.Object3D(); let wi = 0;
+  const sign = (t, x, y, z, rot, w = 3.2) => { const s = makeSign(t, w, w * 0.2, '#1d232a', '#f2ecd8', false); s.position.set(x, y, z); s.rotation.y = rot; (RAIL.building === 'troop' ? RAIL.troopG : levelGroup).add(s); return s; };
+  const lamps = [];
+  RAIL.troopG = new THREE.Group(); levelGroup.add(RAIL.troopG);
+  RAIL.cars.forEach((car, ci) => {
+    RAIL.building = car.id;
+    const L = car.x1 - car.x0, xc = (car.x0 + car.x1) / 2, body = car.col !== undefined ? pbr(new THREE.MeshStandardMaterial({ color: car.col, roughness: 0.55, metalness: 0.45 }), car.set, { mode: 'detail', scale: 2, strength: 0.8 }) : null;
+    add(new THREE.BoxGeometry(L - 0.4, 0.5, 3.4), frame, xc, D - 0.3, zc);                       // underframe
+    for (const bx of [car.x0 + 3, car.x1 - 3]) { add(new THREE.BoxGeometry(2.6, 0.5, 2.2), frame, bx, 0.95, zc);
+      for (const ox of [-0.9, 0.9]) for (const oz of [-0.78, 0.78]) { if (car.id === 'troop') { add(wheels.geometry, frame, bx + ox, 0.82, zc + oz); continue; } dm.position.set(bx + ox, 0.82, zc + oz); dm.updateMatrix(); wheels.setMatrixAt(wi++, dm.matrix); } }
+    const fl = new THREE.Mesh(new THREE.PlaneGeometry(L, 4), car.kind === 'flat' ? floorM : floorM); fl.rotation.x = -Math.PI / 2; fl.position.set(xc, D + 0.02, zc); fl.receiveShadow = true; fl.userData.isFloor = true; (car.id === 'troop' ? RAIL.troopG : levelGroup).add(fl);
+    if (car.kind === 'flat') {
+      for (const z of [-1.95, 1.95]) add(new THREE.BoxGeometry(L, 0.5, 0.12), frame, xc, D + 0.25, zc + z);
+      for (let k = 0; k < 3; k++) { const cx = car.x0 + 3 + k * 6.5, side = k % 2 ? -1.35 : 1.35; add(new THREE.BoxGeometry(1.2, 1.1, 1.1), floorM, cx, D + 0.55, zc + side); add(new THREE.BoxGeometry(1.0, 0.8, 0.9), floorM, cx + 1.4, D + 0.4, zc + side * 0.95); }
+      sign(car.name, car.x0 + 0.2, D + 1.0, zc + 1.6, -Math.PI / 2, 2.4);
+      return;
+    }
+    const top = car.kind === 'loco' ? car.x1 - CELL : car.x1, Lb = top - car.x0, xb = (car.x0 + top) / 2;
+    // side walls (windows on the passenger cars)
+    for (const s of [-1, 1]) {
+      const z = zc + s * 2.06;
+      if (car.win) {
+        add(new THREE.BoxGeometry(Lb, 1.0, 0.12), body, xb, D + 0.5, z, true); add(new THREE.BoxGeometry(Lb, 1.25, 0.12), body, xb, D + 2.78, z, true);
+        for (let x = car.x0 + 0.3; x < top; x += 2.4) add(new THREE.BoxGeometry(0.5, 1.2, 0.12), body, x + 0.25, D + 1.6, z);
+        const gl = new THREE.Mesh(new THREE.PlaneGeometry(Lb, 1.2), glass); gl.position.set(xb, D + 1.6, z); levelGroup.add(gl);
+      } else add(new THREE.BoxGeometry(Lb, Hc, 0.12), body, xb, D + Hc / 2, z, true);
+      if (car.slits) for (let x = car.x0 + 2; x < top - 1; x += 4) add(new THREE.BoxGeometry(0.9, 0.12, 0.04), frame, x, D + 1.8, z + s * 0.08);
+      add(new THREE.BoxGeometry(Lb, 0.18, 0.05), new THREE.MeshStandardMaterial({ color: 0xb08a3a, roughness: 0.4, metalness: 0.8 }), xb, D + 1.05, z + s * 0.07);   // brass stripe
+    }
+    // end walls with doorways (1.6 m wide, 2.4 m high)
+    for (const x of [car.x0, top]) {
+      for (const s of [-1, 1]) add(new THREE.BoxGeometry(0.14, Hc, 1.2), body, x, D + Hc / 2, zc + s * 1.4, true);
+      add(new THREE.BoxGeometry(0.14, Hc - 2.4, 1.6), body, x, D + 2.4 + (Hc - 2.4) / 2, zc, true);
+    }
+    const roof = add(new THREE.BoxGeometry(Lb + 0.3, 0.24, 4.4), body, xb, D + Hc + 0.12, zc, true);
+    for (let x = car.x0 + 3; x < top - 1; x += 6) { const l = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.1, 0.3), lampMaterial); l.position.set(x, D + Hc - 0.06, zc); (car.id === 'troop' ? RAIL.troopG : levelGroup).add(l); }
+    if (['armor', 'sleep', 'dine', 'cargo'].includes(car.id)) lamps.push([xb, D + Hc - 0.5, zc]);
+    sign(car.name, car.x0 - 0.09, D + 2.9, zc, -Math.PI / 2, 2.8);
+    // what's inside
+    if (car.id === 'troop') for (const s of [-1, 1]) add(new THREE.BoxGeometry(Lb - 2, 0.45, 0.6), floorM, xb, D + 0.45, zc + s * 1.6);
+    if (car.id === 'armor') for (let k = 0; k < 4; k++) add(new THREE.BoxGeometry(0.9, 0.7, 0.6), frame, car.x0 + 3 + k * 5.5, D + 0.35, zc + (k % 2 ? 1.6 : -1.6));
+    if (car.id === 'sleep') { const wood = pbr(new THREE.MeshStandardMaterial({ color: 0x6b4a30, roughness: 0.6 }), 'wood', { mode: 'detail', scale: 1.5 });
+      for (let x = car.x0 + 1.5; x < top - 1; x += 3.4) add(new THREE.BoxGeometry(1.1, 2.2, 0.06), wood, x, D + 1.1, zc + 1.97);
+      add(new THREE.BoxGeometry(1.2, 0.8, 0.7), wood, RAIL.code.x, D + 0.4, zc + 1.5); }
+    if (car.id === 'dine') { const cloth = new THREE.MeshStandardMaterial({ color: 0xf2eee4, roughness: 0.8 });
+      for (let k = 0; k < 5; k++) { const x = car.x0 + 2.2 + k * 4.6, s = k % 2 ? 1 : -1; add(new THREE.BoxGeometry(1.4, 0.78, 0.8), cloth, x, D + 0.39, zc + s * 1.55);
+        const lp = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), lampMaterial); lp.position.set(x, D + 0.9, zc + s * 1.75); levelGroup.add(lp); } }
+    if (car.id === 'cargo') {
+      for (let k = 0; k < 3; k++) add(new THREE.BoxGeometry(1.3, 1.6, 1.0), floorM, car.x0 + 2 + k * 4.5, D + 0.8, zc + (k % 2 ? 1.45 : -1.45));
+      const vx = RAIL.V.x - 2;                                                  // the vault: steel door across the car
+      const steel = pbr(new THREE.MeshStandardMaterial({ color: 0x70767a, roughness: 0.3, metalness: 0.9 }), 'metal', { mode: 'detail', scale: 1 });
+      for (const s of [-1, 1]) add(new THREE.BoxGeometry(0.5, Hc, 0.4), steel, vx, D + Hc / 2, zc + s * 1.85);
+      const piv = new THREE.Group(); piv.position.set(vx, D, zc - 1.65); levelGroup.add(piv);
+      const door = new THREE.Mesh(new THREE.BoxGeometry(0.35, Hc - 0.1, 3.3), steel); door.position.set(0, (Hc - 0.1) / 2, 1.65); door.castShadow = true; piv.add(door); wallMeshes.push(door);
+      const wh = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.06, 8, 20), frame); wh.position.set(-0.22, 1.6, 1.65); wh.rotation.y = Math.PI / 2; piv.add(wh);
+      RAIL.vaultDoor = piv; sign('TRESOR · VAULT', vx - 0.2, D + 2.95, zc, -Math.PI / 2, 2.0);
+    }
+    if (car.id === 'loco') {
+      for (const s of [-1, 1]) add(new THREE.BoxGeometry(Lb - 6, 1.1, 0.5), frame, xb - 2, D + 1.6, zc + s * 1.7);
+      add(new THREE.BoxGeometry(0.6, 1.1, 3.0), frame, top - 0.5, D + 0.55, zc);
+      const g = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.35, 1.6), new THREE.MeshBasicMaterial({ color: 0x6fd08a })); g.position.set(top - 0.82, D + 1.25, zc); levelGroup.add(g);
+      for (const s of [-1, 1]) add(new THREE.BoxGeometry(CELL, 0.9, 0.08), frame, top + CELL / 2, D + 0.45, zc + s * 1.95);
+      const hl = new THREE.Mesh(new THREE.CircleGeometry(0.35, 16), new THREE.MeshBasicMaterial({ color: 0xfff4c8 })); hl.position.set(car.x1 + 0.02, D + 0.6, zc); hl.rotation.y = Math.PI / 2; levelGroup.add(hl);
+      sign('▲ JUMP HERE ON THE VIADUCT', car.x1 - 0.6, D + 1.6, zc + 1.88, Math.PI, 2.6);
+    }
+    if (car.id === 'sleep' || car.id === 'dine') sign('VALKYRIE · SONDERZUG 1917', xb, D + 2.95, zc - 2.15, Math.PI, 4.2);
+  });
+  RAIL.building = null;
+  wheels.count = wi; levelGroup.add(wheels);
+  // gangways (bellows) between cars, plus the coupling lever and the ladders
+  for (let i = 0; i < RAIL.cars.length - 1; i++) {
+    const x = RAIL.cars[i].x1 + CELL / 2, bel = new THREE.MeshStandardMaterial({ color: 0x1c1c1c, roughness: 0.95 });
+    const flatish = RAIL.cars[i].kind === 'flat' || RAIL.cars[i + 1].kind === 'flat';
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(CELL, 0.1, 2.0), frame); plate.position.set(x, D - 0.03, zc); levelGroup.add(plate);
+    if (!flatish) { for (const s of [-1, 1]) add(new THREE.BoxGeometry(CELL, 2.6, 0.1), bel, x, D + 1.3, zc + s * 1.0); add(new THREE.BoxGeometry(CELL, 0.12, 2.2), bel, x, D + 2.66, zc); }
+  }
+  sign('KUPPLUNG · COUPLING (Space)', RAIL.K.x + 1.9, D + 1.4, zc - 1.7, -Math.PI / 2, 2.4);
+  const lever = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.0, 0.1), new THREE.MeshStandardMaterial({ color: 0xc02020 })); lever.position.set(RAIL.K.x, D + 0.5, zc + 0.9); levelGroup.add(lever); RAIL.lever = lever;
+  for (const LL of RAIL.ladders) { const p = LL.f, lm = new THREE.MeshStandardMaterial({ color: 0xc0a040, roughness: 0.5, metalness: 0.7 });
+    for (const s of [-0.3, 0.3]) add(new THREE.BoxGeometry(0.06, 3.5, 0.06), lm, p.x + s, D + 1.75, zc - 1.8);
+    for (let y = 0.3; y < 3.4; y += 0.4) add(new THREE.BoxGeometry(0.6, 0.05, 0.05), lm, p.x, D + y, zc - 1.8);
+    sign('LEITER ▲ ROOF (Space)', p.x, D + 2.2, zc - 1.6, 0, 1.8); }
+  for (const p of lamps) { const l = new THREE.PointLight(0xffdcae, 26, 18, 1.5); l.position.set(...p); levelGroup.add(l); }
+}
+function buildRailMission() {
+  const Q = SETTINGS.graphicsQuality === 'high', low = SETTINGS.graphicsQuality === 'low', C = M2_WORLD.center, size = M2_WORLD.size;
+  sniperLights = []; sniperLamps = []; materiel = []; sniperWater = null;
+  sniperState = { leadersTotal: 0, objectivesAnnounced: false, lightsOut: false };
+  Object.assign(RAIL, { on: true, seq: null, roof: false, said: {}, boarded: false, decoupled: false, drift: 0, vaultOpen: false, vaultT: 0, confrontT: 0, escaped: false, queue: [], nextK: 0, msgT: 0, clack: 0, wind: 0, tunnelK: 0, doneSaid: false });
+  railLayout();
+  heightField = { seg: 4, step: size / 4, x0: C.x - size / 2, z0: C.z - size / 2, data: new Float32Array(25) };
+  // sky + low winter sun
+  const sky = new Sky(); sky.scale.setScalar(15000); const su = sky.material.uniforms;
+  su.turbidity.value = 4; su.rayleigh.value = 1.4; su.mieCoefficient.value = 0.004; su.mieDirectionalG.value = 0.85;
+  const sunDir = new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(90 - 24), THREE.MathUtils.degToRad(200));
+  su.sunPosition.value.copy(sunDir); levelGroup.add(sky);
+  const sun = new THREE.DirectionalLight(0xffe8d0, 2.5);
+  sun.position.copy(sunDir).multiplyScalar(900).add(new THREE.Vector3(C.x, 0, RAIL.zc)); sun.target.position.set(C.x, 0, RAIL.zc);
+  sun.castShadow = true; sun.shadow.mapSize.set(Q ? 2048 : 1024, Q ? 2048 : 1024);
+  const sc = sun.shadow.camera; sc.left = -260; sc.right = 260; sc.top = 260; sc.bottom = -260; sc.near = 50; sc.far = 2500;
+  sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.5;
+  levelGroup.add(sun, sun.target); worldSun = sun; worldSun.userData.outdoor = true; RAIL.sunI = 2.5;
+  hemiLight.intensity = 0.7; hemiLight.color.set(0xd0e0ff); hemiLight.groundColor.set(0x8a8a90); ambientLight.intensity = 0.08; RAIL.hemiI = 0.7;
+  scene.background = new THREE.Color(0xb4c6da); scene.fog = new THREE.FogExp2(0xd2dce8, Math.max(SETTINGS.hazeDensity || 0, 0.00085));
+  if (Q) { const pmrem = new THREE.PMREMGenerator(renderer), es = new THREE.Scene(), s2 = new Sky(); s2.scale.setScalar(1000);
+    Object.keys(su).forEach(k => { if (s2.material.uniforms[k]) s2.material.uniforms[k].value = su[k].value; }); es.add(s2); disposeEnv(); scene.environment = pmrem.fromScene(es).texture; pmrem.dispose(); }
+  buildMountains();
+  // scenery tiles
+  RAIL.S = railBuildShared(Q); RAIL.tiles = []; RAIL.tx0 = C.x - 700; RAIL.nTiles = low ? 10 : 12;
+  for (let i = 0; i < RAIL.nTiles; i++) { const T = railMakeTile(RAIL.S, i, Q); RAIL.tiles.push(T); railSpawnNext(T); }
+  // collision grid: only the train is walkable
+  worldCols = worldRows = Math.ceil(size / CELL); solid = new Uint8Array(worldCols * worldRows).fill(1); opaque = new Uint8Array(worldCols * worldRows);
+  worldOffset = { x: C.x - size / 2, z: C.z - size / 2 };
+  for (let c = RAIL.c0; c < RAIL.cEnd; c++) solid[RAIL.r0 * worldCols + c] = 0;
+  solid[RAIL.r0 * worldCols + RAIL.Vc] = 1; opaque[RAIL.r0 * worldCols + RAIL.Vc] = 1;   // vault door shut
+  railBuildTrain(Q);
+  // the road bridge you drop from
+  const br = new THREE.Group(), conc = pbr(new THREE.MeshStandardMaterial({ color: 0xa6a49c, roughness: 0.85 }), 'concrete', { mode: 'detail', scale: 3, local: true });
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(10, 1.2, 90), conc); deck.position.set(0, 13.4, 0); br.add(deck);
+  for (const z of [-12, 12]) { const p = new THREE.Mesh(new THREE.BoxGeometry(3, 13, 4), conc); p.position.set(0, 6.5, z); br.add(p); }
+  for (const x of [-4.8, 4.8]) { const r = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1, 90), conc); r.position.set(x, 14.5, 0); br.add(r); }
+  br.traverse(m => { if (m.isMesh) m.castShadow = true; }); br.position.set(RAIL.land.x + 22 * 5, 0, RAIL.zc); levelGroup.add(br); RAIL.bridge = br;
+  // snow blowing past
+  if (!low) { const n = Q ? 1400 : 700, P = new Float32Array(n * 3); for (let k = 0; k < n * 3; k++) P[k] = (Math.random() - 0.5) * 80;
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3));
+    RAIL.snow = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 0.09, transparent: true, opacity: 0.85, depthWrite: false })); RAIL.snow.frustumCulled = false; levelGroup.add(RAIL.snow); } else RAIL.snow = null;
+  // intel, guards, the Conductor, pickups, exit
+  createIntel(RAIL.code.x, RAIL.code.z + 1.2, 'Vault combination (sleeper compartment 4)');
+  createIntel(RAIL.I.x + 0.6, RAIL.I.z, "THE CONDUCTOR's ledger — payments to THE PATRON");
+  RAIL.troopGuards = [];
+  for (const g of RAIL_GUARDS()) { addSniperGuard(g); const e = enemies[enemies.length - 1]; if (g.troop) RAIL.troopGuards.push(e); }
+  addSniperGuard({ x: RAIL.cab.x - C.x, z: RAIL.cab.z - C.z, type: 'officer' });
+  const con = enemies[enemies.length - 1]; con.label = 'THE CONDUCTOR'; con.health = SETTINGS.enemyHealth * 3; RAIL.conductor = con;
+  sniperState.leadersTotal = enemies.filter(e => e.officer).length;
+  playerStart = { x: RAIL.land.x, z: RAIL.land.z, yaw: -Math.PI / 2 };
+  createPickup(railAt('flatA', 3).x, RAIL.zc - 1, 'ammo'); createPickup(railAt('sleep', 6).x, RAIL.zc - 1, 'health');
+  createPickup(railAt('dine', 0).x, RAIL.zc, 'ammo'); createPickup(railAt('cargo', 0).x, RAIL.zc, 'health'); createPickup(railAt('armor', 0).x, RAIL.zc, 'ammo');
+  createExit(RAIL.X.x, RAIL.X.z); if (exitZone) exitZone.radius = 2.4;   // only the front platform
+  finalizeTargets();
+}
+function RAIL_GUARDS() {
+  const C = M2_WORLD.center, a = (id, i, extra = {}) => { const p = railAt(id, i); return { x: p.x - C.x, z: p.z - C.z + (extra.dz || 0), ...extra }; };
+  const route = (id, i, j) => { const p = railAt(id, i), q = railAt(id, j); return [[p.x - C.x, p.z - C.z], [q.x - C.x, q.z - C.z]]; };
+  return [
+    a('troop', 1, { troop: true, type: 'sentry' }), a('troop', 2, { troop: true }), a('troop', 4, { troop: true, type: 'officer' }), a('troop', 5, { troop: true, route: route('troop', 5, 1) }),
+    a('flatB', 2, { route: route('flatB', 1, 4) }), a('flatB', 4, { type: 'sentry' }),
+    a('armor', 1), a('armor', 2, { type: 'sentry' }), a('armor', 4, { type: 'officer' }), a('armor', 5),
+    a('sleep', 1, { route: route('sleep', 1, 6) }), a('sleep', 3), a('sleep', 5, { type: 'sentry' }),
+    a('dine', 1), a('dine', 2, { route: route('dine', 2, 5) }), a('dine', 4, { type: 'officer' }), a('dine', 5),
+    a('cargo', 1), a('cargo', 3, { type: 'sentry' }),
+    a('loco', 1, { route: route('loco', 0, 3) }),
+  ];
+}
+// ---- objectives / compass ----
+function railObjectives() {
+  const code = intelItems[0], led = intelItems[1], con = RAIL.conductor;
+  return [
+    { text: 'Board the train (bridge drop)', done: RAIL.boarded },
+    { text: 'Find the vault combination (sleeper car)', done: !!code && code.collected },
+    { text: "Open the vault — take THE CONDUCTOR's ledger (cargo car)", done: !!led && led.collected },
+    { text: 'Confront THE CONDUCTOR (locomotive cab)', done: RAIL.confrontT > 0 || (!!con && con.state === 'dead') },
+    { text: 'BONUS: decouple the troop car (coupling at the rear, Space)', done: RAIL.decoupled, bonus: true },
+    { text: 'BONUS: THE CONDUCTOR does not leave the train alive', done: !!con && con.state === 'dead', bonus: true },
+  ];
+}
+function railObjective() {
+  const ob = railObjectives();
+  if (!ob[1].done) return { x: RAIL.code.x, z: RAIL.code.z, label: 'VAULT CODE' };
+  if (!ob[2].done) return RAIL.vaultOpen ? { x: RAIL.I.x, z: RAIL.I.z, label: 'LEDGER' } : { x: RAIL.V.x - 2, z: RAIL.V.z, label: 'VAULT' };
+  if (!ob[3].done) { const c = RAIL.conductor; return { x: c ? c.group.position.x : RAIL.cab.x, z: RAIL.cab.z, label: 'THE CONDUCTOR' }; }
+  return exitZone ? { x: exitZone.x, z: exitZone.z, label: 'FRONT PLATFORM · JUMP' } : null;
+}
+function railTileAt(x) { return RAIL.tiles.find(T => x >= T.g.position.x && x < T.g.position.x + RAIL_TILE) || null; }
+function railInTunnel(x) { const T = railTileAt(x); if (!T || T.type !== 'tunnel') return false; const lx = x - T.g.position.x; return lx > 8 && lx < RAIL_TILE - 8; }
+function railOnBridge(x) { const T = railTileAt(x); if (!T || T.type !== 'bridge') return false; const lx = x - T.g.position.x;
+  return (T.variant === 'mid') || (T.variant === 'start' && lx > 50) || (T.variant === 'end' && lx < RAIL_TILE - 50) || (T.variant === 'single' && lx > 50 && lx < RAIL_TILE - 50); }
+// ---- Space on the train: ladders and the coupling ----
+function railSpace() {
+  if (!RAIL.on || state !== 'playing' || RAIL.seq) return false;
+  const x = camera.position.x, z = camera.position.z;
+  for (const L of RAIL.ladders) { const p = RAIL.roof ? L.r : L.f; if (dist2D(x, z, p.x, p.z) < 2.2 && player.jumpY === 0) {
+    RAIL.roof = !RAIL.roof; playNoise(0.25, 0.08, 700); const q = RAIL.roof ? L.r : L.f; camera.position.x = q.x; camera.position.z = q.z; player.velocity.set(0, 0, 0);
+    showMessage(RAIL.roof ? 'ON THE ROOF — tunnels! CROUCH (C) when HAWK shouts. Space at a ladder to climb down.' : 'Back inside.', 3.5);
+    if (RAIL.roof && !RAIL.said.roof) { RAIL.said.roof = true; radioSay('DOC', 'Roof route. The guards inside can\'t see you up there. Tunnels can, and they don\'t miss.', 6); }
+    return true;
+  } }
+  if (!RAIL.decoupled && !RAIL.roof && dist2D(x, z, RAIL.K.x, RAIL.K.z) < 2.4) {
+    RAIL.decoupled = true; RAIL.drift = 0; RAIL.driftV = 0;
+    for (let c = RAIL.c0; c <= Math.round((RAIL.K.x - CELL / 2) / CELL); c++) solid[RAIL.r0 * worldCols + c] = 1;
+    if (x < RAIL.K.x + 2.5) camera.position.x = RAIL.K.x + 3;
+    if (RAIL.lever) RAIL.lever.rotation.z = 0.8;
+    playTone(220, 90, 0.6, 0.2, 'square'); playNoise(0.8, 0.25, 400);
+    showMessage('COUPLING RELEASED — the troop car is falling behind.', 4);
+    radioSay('HAWK', 'Ha! The whole troop car, waving goodbye. They\'ll be walking home from Tyrol.', 6);
+    for (const e of RAIL.troopGuards) if (e.state !== 'dead' && e.group.position.x < RAIL.K.x) { e.dummy = true; e.leftBehind = true; }
+    return true;
+  }
+  return false;
+}
+// ---- every frame ----
+function updateRailWorld(dt) {
+  const v = RAIL.speed, back = camera.position.x - 900;
+  for (const T of RAIL.tiles) { T.g.position.x -= v * dt; if (T.g.position.x + RAIL_TILE < back) { T.g.position.x += RAIL.nTiles * RAIL_TILE; railSpawnNext(T); } }
+  if (RAIL.bridge) { RAIL.bridge.position.x -= v * dt; if (RAIL.bridge.position.x < camera.position.x - 900) { levelGroup.remove(RAIL.bridge); RAIL.bridge = null; } }
+  if (RAIL.decoupled && RAIL.troopG && RAIL.troopG.visible) {
+    RAIL.driftV = Math.min(v, (RAIL.driftV || 0) + 2.2 * dt); const d = RAIL.driftV * dt; RAIL.drift += d; RAIL.troopG.position.x -= d;
+    for (const e of RAIL.troopGuards) if (e.leftBehind) e.group.position.x -= d;
+    if (RAIL.drift > 600) { RAIL.troopG.visible = false; for (const e of RAIL.troopGuards) if (e.leftBehind) e.group.visible = false; }
+  }
+  if (RAIL.snow) { const p = RAIL.snow.geometry.attributes.position, a = p.array, cx = camera.position.x, cy = camera.position.y, cz = camera.position.z;
+    for (let k = 0; k < a.length; k += 3) { a[k] -= (v + 4) * dt; a[k + 1] -= 1.4 * dt; if (a[k] < -40) a[k] += 80; if (a[k + 1] < -20) a[k + 1] += 40; }
+    p.needsUpdate = true; RAIL.snow.position.set(cx, cy, cz); }
+  // light: dark in the tunnels
+  const tun = railInTunnel(camera.position.x), k = 1 - Math.exp(-dt * 4);
+  hemiLight.intensity += ((tun ? 0.1 : RAIL.hemiI) - hemiLight.intensity) * k;
+  if (worldSun) worldSun.intensity += ((tun ? 0.15 : RAIL.sunI) - worldSun.intensity) * k;
+  RAIL.clack -= dt; if (RAIL.clack <= 0) { RAIL.clack = 1.25; playNoise(0.05, 0.05, 1600); setTimeout(() => { if (RAIL.on) playNoise(0.05, 0.045, 1500); }, 140); }
+}
+function updateRail(dt) {
+  if (currentMission !== 6 || state !== 'playing' || RAIL.seq) return;
+  updateRailWorld(dt);
+  const x = camera.position.x, z = camera.position.z, now = elapsed;
+  // tunnels: warnings, and the roof rule
+  for (const T of RAIL.tiles) if (T.type === 'tunnel') { const d = T.g.position.x + 8 - x;
+    if (d > 0 && d < 150 && !T.warned && RAIL.roof) { T.warned = true; radioSay('HAWK', 'TUNNEL! GET DOWN — C! NOW!', 4); showMessage('▼ TUNNEL AHEAD — CROUCH (C) ▼', 3); playTone(440, 440, 0.9, 0.12, 'square'); }
+    if (d > 0 && d < 260 && !T.horn) { T.horn = true; playTone(330, 310, 1.4, 0.09, 'sawtooth'); playTone(415, 392, 1.4, 0.07, 'sawtooth'); } }
+  if (RAIL.roof && railInTunnel(x) && (player.stance === 'stand' || player.jumpY > 0.3) && player.health > 0) {
+    showMessage('THE TUNNEL TOOK YOUR HEAD CLEAN OFF. On the roof, CROUCH (C) in tunnels.', 6); damagePlayer(9999, x + 5, z);
+  }
+  // the vault
+  if (!RAIL.vaultOpen && dist2D(x, z, RAIL.V.x - 2, RAIL.V.z) < 3.4) {
+    if (intelItems[0] && intelItems[0].collected) { RAIL.vaultOpen = true; RAIL.vaultT = 0; solid[RAIL.r0 * worldCols + RAIL.Vc] = 0; opaque[RAIL.r0 * worldCols + RAIL.Vc] = 0;
+      playTone(120, 80, 1.6, 0.15, 'sawtooth'); showMessage('4 · 7 · 1 · 1 · 0 · 9 — VAULT OPEN', 3); radioSay('DOC', 'Ooh. Somebody\'s birthday? Never use your birthday, kids.', 5); }
+    else if (now - RAIL.msgT > 4) { RAIL.msgT = now; showMessage('VAULT LOCKED — 6-digit combination. Someone in the sleeper car wrote it down.', 3.5); }
+  }
+  if (RAIL.vaultOpen && RAIL.vaultDoor && RAIL.vaultT < 1) { RAIL.vaultT = Math.min(1, RAIL.vaultT + dt / 1.6); RAIL.vaultDoor.rotation.y = -1.45 * smooth(0, 1, RAIL.vaultT); }
+  // story beats
+  if (!RAIL.said.code && intelItems[0] && intelItems[0].collected) { RAIL.said.code = true; radioSay('HAWK', 'A combination, scribbled in a train timetable. Spies these days. Vault\'s in the cargo car, two cars up.', 6); }
+  if (!RAIL.said.led && intelItems[1] && intelItems[1].collected) { RAIL.said.led = true; radioSay('HAWK', 'The ledger! Every franc goes to one name: THE PATRON. Now the cab — the Conductor\'s driving his own train.', 7); }
+  const con = RAIL.conductor;
+  if (con && !RAIL.confrontT && con.state !== 'dead' && dist2D(x, z, con.group.position.x, con.group.position.z) < 10 && hasLineOfSight(x, z, con.group.position.x, con.group.position.z)) {
+    RAIL.confrontT = now; radioSay('CONDUCTOR', 'You\'re late, Mr. Wraith. My trains never are. THE PATRON sends his regards — I\'ll send yours.', 7);
+  }
+  if (con && RAIL.confrontT && !RAIL.escaped && con.state !== 'dead' && now - RAIL.confrontT > 9) {
+    RAIL.escaped = true; con.dummy = true; con.group.visible = false; con.group.position.set(M2_WORLD.center.x - 1800, 0, M2_WORLD.center.z + 1800);
+    playNoise(0.6, 0.2, 500); radioSay('HAWK', 'He jumped from the cab into a snowdrift! Let him run — he\'ll run straight to THE PATRON. We\'ll be watching.', 7);
+  }
+  if (con && con.state === 'dead' && !RAIL.said.dead) { RAIL.said.dead = true; radioSay('DOC', 'The Conductor has reached his final stop. Please mind the gap. And the brains.', 6); }
+  if (!RAIL.doneSaid && objectivesComplete()) { RAIL.doneSaid = true; railForceViaduct(); radioSay('HAWK', 'Trisanna viaduct coming up — 85 metres above the river. Front platform, and JUMP when you\'re over the water. The bird fishes you out.', 8); }
+  if (!RAIL.said.start && RAIL.boarded) { RAIL.said.start = true; radioSay('HAWK', 'You\'re on. Vault combination is in the sleeper — four cars up. Ladder on the second flatcar if you want the roof.', 7); }
+  if (RAIL.roof || railCarAt(x)?.kind === 'flat') { RAIL.wind -= dt; if (RAIL.wind <= 0) { RAIL.wind = 1.1; playNoise(1.2, 0.04, 500); } }
+}
+function railTryJump() {
+  if (RAIL.seq) return;
+  if (!railOnBridge(camera.position.x)) { if (elapsed - RAIL.msgT > 4) { RAIL.msgT = elapsed; showMessage('NOT HERE — that\'s rock under you. Wait for the VIADUCT, then step off.', 3.5); } return; }
+  RAIL.seq = { type: 'jump', t: 0, x: camera.position.x, y: camera.position.y, z: camera.position.z };
+  weaponRoot.visible = false; showMessage('JUMP!', 2); playNoise(3.5, 0.25, 900, 0.6);
+  radioSay('DOC', 'Eighty-five metres. Feet first, arms crossed, and try not to scream on an open channel.', 6);
+}
+function railIntro() {
+  RAIL.seq = { type: 'intro', t: 0 }; weaponRoot.visible = false;
+  showMessage('Road bridge over the Arlberg line. The train passes under you… DROP in 5.', 4.5);
+  radioSay('HAWK', 'There she is — the Conductor\'s private train. Second flatcar behind the armoured car. On my mark.', 6);
+}
+function updateRailSeq(dt) {
+  const S = RAIL.seq; S.t += dt; updateRailWorld(dt);
+  if (S.type === 'intro') {
+    const bx = RAIL.bridge ? RAIL.bridge.position.x : RAIL.land.x, T = 5.0;
+    if (S.t < T) { camera.position.set(bx - 5.3, 14 + 1.7, RAIL.zc + 1.5); camera.rotation.set(-0.62, Math.PI / 2, 0, 'YXZ'); if (S.t > 4 && !S.mark) { S.mark = true; radioSay('HAWK', 'MARK!', 2); } }
+    else { const u = Math.min(1, (S.t - T) / 0.7); camera.position.set(RAIL.land.x, 15.7 - (15.7 - RAIL.deck - player.eyeY) * u * u, RAIL.zc + 1.5 * (1 - u)); camera.rotation.set(-0.45 * (1 - u), Math.PI / 2 - Math.PI * u, 0, 'YXZ');
+      if (u >= 1) { RAIL.seq = null; RAIL.boarded = true; weaponRoot.visible = true; playNoise(0.3, 0.3, 300); playTone(80, 50, 0.3, 0.25, 'sine'); player.velocity.set(0, 0, 0); camera.rotation.set(0, -Math.PI / 2, 0, 'YXZ'); showMessage('ON BOARD. Follow the yellow ◆ to the vault code. O = radio for a hint.', 4); } }
+    return;
+  }
+  if (S.type === 'jump') {
+    const t = S.t, river = -83.5 + 0.6;
+    S.x -= RAIL.speed * dt;                                   // you stay with the bridge; the train rolls on
+    const y = S.y + 1.6 * t - 0.5 * 9.81 * t * t, zz = S.z + Math.min(1, t / 0.7) * 6;
+    if (!S.splash && y <= river) { S.splash = t; playNoise(1.6, 0.45, 600); playTone(60, 30, 0.6, 0.3, 'sine'); showMessage('SPLASH. HAWK\'s helicopter is already overhead.', 3); radioSay('HAWK', 'Got you on thermal. Winch going down. Nice dive — seven out of ten, Doc says four.', 6); }
+    camera.position.set(S.x, S.splash ? river - 0.3 + Math.sin(t * 2) * 0.2 : y, zz);
+    camera.rotation.set(S.splash ? 0.5 : -0.5 - Math.min(0.9, t * 0.35), Math.PI / 2 + 0.6, 0, 'YXZ');
+    if (S.splash && t - S.splash > 3 && state === 'playing') { RAIL.seq = null; endGame(true); }
+  }
+}
+
+// #####################################################################
 // ##  SECTION 14: GAME LOOP (runs ~60 times a second)                ##
 // #####################################################################
 const clock = new THREE.Clock();
@@ -8121,6 +8596,9 @@ function gameLoop() {
     if (DAM.jump) {                              // v0.6.29: the bungee exit
       safe('damJump', () => updateDamJump(dt));
       safe('hud', () => updateHUD(dt));
+    } else if (RAIL.on && RAIL.seq) {            // v0.6.30: bridge drop / viaduct jump
+      safe('railSeq', () => updateRailSeq(dt));
+      safe('hud', () => updateHUD(dt));
     } else if (haloActive()) {                          // v0.6.27: in the aircraft / in the air (SECTION 26)
       safe('edgeTurn', () => edgeTurn(dt));
       safe('halo', () => updateHalo(dt));
@@ -8148,6 +8626,7 @@ function gameLoop() {
     safe('hudLayout', () => layoutHud());   // v0.6.22: no HUD box covers another
     safe('breachHint', () => breachDoorHint());
     safe('dam', () => updateDam(dt));
+    safe('rail', () => updateRail(dt));
     }
   }
   if (!(state === 'playing' && haloActive()) && HA.on) { haloAudioMute(); if (document.body.classList.contains('haloOn')) document.body.classList.remove('haloOn'); }
@@ -8961,7 +9440,7 @@ function radioPressed() {
     return;
   }
   if (currentMission === 2) { windCall(); return; }
-  if (currentMission === 5) { const o = currentObjective(); radioSay(Math.random() < 0.5 ? 'HAWK' : 'DOC', o ? 'Next: ' + o.label.toLowerCase() + ', ' + fmtDist(dist2D(o.x, o.z, camera.position.x, camera.position.z)) + '. Follow the ◆.' : 'Go, Wraith.', 5); return; }
+  if (currentMission >= 5) { const o = currentObjective(); radioSay(Math.random() < 0.5 ? 'HAWK' : 'DOC', o ? 'Next: ' + o.label.toLowerCase() + ', ' + fmtDist(dist2D(o.x, o.z, camera.position.x, camera.position.z)) + '. Follow the ◆.' : 'Go, Wraith.', 5); return; }
   if (currentMission === 4) { if (haloActive()) haloRepeat(); else { const o = currentObjective(); radioSay('HAWK', o ? 'Next: ' + o.label.toLowerCase() + ', ' + fmtDist(dist2D(o.x, o.z, camera.position.x, camera.position.z)) + '. Follow the ◆. Quiet.' : 'Exfil, Wraith. Go.', 5); } return; }
   if (navInfo && elapsed - navInfo.lastHint > 8) giveHint(); else radioSay('HAWK', 'Just told you, Wraith. Follow the ◆.', 3);
 }
@@ -9136,6 +9615,7 @@ SETTINGS.jumpSpeed = 4.6; SETTINGS.jumpGravity = 13; BASE_SETTINGS.jumpSpeed = 4
 player.jumpY = 0; player.jumpV = 0; player.sprinting = false;
 function tryJump() {
   if (state !== 'playing' || garrote.active) return;
+  if (RAIL.on && railSpace()) return;                                          // v0.6.30: ladders + coupling
   if (player.stance !== 'stand') { setStance('stand'); return; }               // first Space stands you up
   if (player.jumpY > 0 || player.jumpV > 0) return;
   player.jumpV = SETTINGS.jumpSpeed; playNoise(0.06, 0.08, 900); trainEvent('jump');
@@ -9162,7 +9642,7 @@ const arrowTextureGo = makeCanvasTexture(128, (ctx, s) => {
 });
 const arrowMaterialGo = new THREE.MeshStandardMaterial({ map: arrowTextureGo, transparent: true, depthWrite: false, roughness: 0.8, emissive: 0x332200, polygonOffset: true, polygonOffsetFactor: -2 });
 // Weapons you actually carry: Mission 2 = the two sniper rifles; elsewhere the 870 is a training/Black File extra.
-function weaponOwned(i) { return currentMission === 2 || currentMission === 3 || currentMission === 5 ? i < 8 : currentMission === 4 ? i !== 6 && i !== 7 : true; }   // HALO: no big sniper rifles in the jump kit
+function weaponOwned(i) { return currentMission === 2 || currentMission === 3 || currentMission >= 5 ? i < 8 : currentMission === 4 ? i !== 6 && i !== 7 : true; }   // HALO: no big sniper rifles in the jump kit
 function cycleWeapon(dir) { for (let k = 1; k <= WEAPONS.length; k++) { const n = (currentWeapon + dir * k + WEAPONS.length * 2) % WEAPONS.length; if (weaponOwned(n)) { switchWeapon(n); return; } } }
 
 // #####################################################################
@@ -9201,7 +9681,7 @@ const demoMats = {
 };
 const fireLight = new THREE.PointLight(0xff7a30, 0, 30, 1.6); scene.add(fireLight);   // one shared light for burning wrecks (adding lights at runtime would stutter)
 function later(sec, fn) { demoTimers.push({ at: elapsed + sec, fn, m: currentMission }); }
-function equipFor(m) { return m === 0 ? Infinity : m === 1 ? SETTINGS.c4BlackFile : m === 4 ? 3 : m === 5 ? 4 : 0; }
+function equipFor(m) { return m === 0 ? Infinity : m === 1 ? SETTINGS.c4BlackFile : m === 4 ? 3 : m >= 5 ? 4 : 0; }
 function resetDemo() {
   charges = []; demoTimers = []; demoFires = []; equip.c4 = equip.max = equipFor(currentMission);
   Object.assign(demoScore, { pts: 0, close: 0, chain: 0, blasts: 0 }); shake.amp = 0; shake.x = shake.y = 0; fireLight.intensity = 0;
@@ -10342,7 +10822,7 @@ if (!debugInfo.on) document.getElementById('debugHud').style.display = 'none';
 window.__game = {
   THREE, SOUNDS, sfxBuf: () => sfxBuf, renderer, setGraphics, worldSun: () => worldSun, gfx: () => SETTINGS.graphicsQuality, blastFX, demoBlast, explosionAt, DEMO_AT, demoTargets: () => demoTargets, materiel: () => materiel, reloadPose, knifeModel, reloadMag, fx: () => effects.length, startReload, weaponState: () => weaponState,
   endMission: won => endGame(won),
-  progress: () => ({ dev: DEV, unlockedIdx, unlocked: [0, 1, 2, 3, 4, 5].filter(isUnlocked) }),
+  progress: () => ({ dev: DEV, unlockedIdx, unlocked: [0, 1, 2, 3, 4, 5, 6].filter(isUnlocked) }),
   sig: () => SIG, fr: () => FR, orderCover, hjobAhead, coverOn, hawk, SIGAT, FRAT, cutJammer,
   SETTINGS, CALIBERS, WEAPONS, player, camera, startMission, switchWeapon,
   enemies: () => enemies, state: () => state, weaponState: () => weaponState, renderFrame: () => { updateFigureLOD(); renderer.render(scene, camera); }, figureLOD: () => enemies.filter(e => e.fig && e.fig.lod).length, glFinish: () => renderer.getContext().finish(), debugInfo, VERSION, aimOffset: () => aimOffset, lastShotInfo: () => lastShotInfo, lean, safeUnlock, endGame,
@@ -10377,6 +10857,8 @@ window.__game = {
   gateSideText, layoutHud: () => { hudLayoutAt = 0; layoutHud(); }, exitLockedText, exitZone: () => exitZone, showMessage, showQuip, radioSay,
   radioPressed, trainingOverview, teleportTo, curStep, trainGates: () => trainGates, obstacles: () => obstacles, chooseMission, currentWeapon: () => currentWeapon, aiming: () => aiming,
   aimAt: (x, y, z) => { const d = new THREE.Vector3(x, y, z).sub(camera.position); camera.rotation.set(Math.asin(THREE.MathUtils.clamp(d.y / d.length(), -1, 1)), Math.atan2(-d.x, -d.z), 0, 'YXZ'); },
+  // v0.6.30 train hooks
+  RAIL, railObjectives, railObjective, railSpace, railTryJump, railOnBridge, railInTunnel, railForceViaduct, railTileAt,
   // v0.6.29 dam hooks
   DAM, damObjectives, damObjective, damOnCrest, damCrestPt, damFind, DAM_PH, DAM_CR, damCell, damStartJump,
   // v0.6.27 HALO hooks
