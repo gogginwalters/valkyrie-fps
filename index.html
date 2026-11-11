@@ -411,7 +411,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 // ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
 // ##  part failed and why.                                           ##
 // #####################################################################
-const VERSION = 'v0.6.33';
+const VERSION = 'v0.6.34';
 // v0.6.6 MISSION UNLOCKS. Order: TRAINING (0) -> BLACK FILE (1) -> SNIPER LESSON (3) -> COLD HORIZON (2).
 // A new player has only TRAINING; winning a mission unlocks the next one (saved as valkyrieUnlocked =
 // how far along that list you've got, 0-3). Developer mode (?dev=1, remembered; ?dev=0 clears it)
@@ -1074,7 +1074,7 @@ function applyGraphics() {
   if (!outdoors && scene.fog && scene.fog.isFog) scene.fog.color.set(night ? 0x020203 : m === 0 ? 0x2c3238 : 0x0d0f13);
   // hemisphere/ambient balance + sky/room light
   disposeEnv(); envWanted = '';
-  const useEnv = G.env && !night;
+  const useEnv = G.env && !night && !!ENV_FILE[m];   // v0.6.34: levels without a sky file (dam, train) no longer 404
   if (!outdoors) { hemiLight.intensity = night ? 0.03 : m === 0 ? (useEnv ? 0.45 : 0.8) : (useEnv ? 0.22 : 0.45); ambientLight.intensity = night ? 0.02 : m === 0 ? (useEnv ? 0.12 : 0.35) : (useEnv ? 0.06 : 0.15); }
   if (useEnv) {
     const name = ENV_FILE[m]; envWanted = name;
@@ -1431,11 +1431,13 @@ function isOpaqueAt(x, z) {
 }
 function isWallAt(x, z) { return isWall(Math.floor(x / CELL), Math.floor(z / CELL)); }
 // Does a circle (a person) at x,z with radius r overlap any wall square?
+// v0.6.34: a long box on the train floor becomes a row of small solid circles (props)
+function railSolid(x, z, lx, lz) { const r = Math.min(lx, lz) / 2; const n = Math.max(1, Math.round(lx / r)); for (let i = 0; i < n; i++) props.push({ x: x - lx / 2 + r + (lx - 2 * r) * (n === 1 ? 0.5 : i / (n - 1)), z, r: r * 0.92, rail: true }); }
 function circleHitsWall(x, z, r) {
   for (let c = Math.floor((x - r) / CELL); c <= Math.floor((x + r) / CELL); c++)
     for (let w = Math.floor((z - r) / CELL); w <= Math.floor((z + r) / CELL); w++)
       if (isWall(c, w)) return true;
-  for (const p of props) if (Math.hypot(x - p.x, z - p.z) < r + p.r) return true;   // generator etc.
+  for (const p of props) if (!(p.rail && RAIL.roof) && Math.hypot(x - p.x, z - p.z) < r + p.r) return true;   // generator etc. (v0.6.34: train furniture, not when you're on the roof)
   if (obstacleMover && obstacles.length && obstacleHit(x, z, r)) return true;       // v0.6 training hurdles / bars / nets (player only)
   return false;
 }
@@ -1484,6 +1486,7 @@ function buildLevel_() {
   PORT.on = false; PORT.boat = null;   // v0.6.31
   RIG.on = false; RIG.seq = null;   // v0.6.32
   EST.on = false; EST.seq = null;   // v0.6.33
+  cinematicHud(false);   // v0.6.34
   if (levelGroup) { scene.remove(levelGroup); levelGroup.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
   worldSun = null;
   levelGroup = new THREE.Group(); scene.add(levelGroup);
@@ -3847,6 +3850,7 @@ function onPlayerShotNoise(w) {
   for (const e of enemies) {
     if (e.state === 'dead' || e.state === 'chase') continue;
     const ex = e.group.position.x, ez = e.group.position.z, d = dist2D(ex, ez, px, pz);
+    if (e.dummy && (e.portLevel || e.rigLevel !== undefined || e.estLevel !== undefined)) { if (d <= hearing) e.floorAlert = true; continue; }   // v0.6.34: another floor heard it
     if (canGuardSeePlayer(e)) { alertEnemy(e); continue; }        // saw the muzzle flash
     if (d > hearing || isShotMaskedFor(e)) continue;              // too far away, or masked by a loud noise
     const err = (SETTINGS.shotErrorBase + d * SETTINGS.shotErrorPerMeter) * Math.pow(SETTINGS.repeatShotShrink, repeatShots);
@@ -4451,7 +4455,7 @@ function updateObjectives(dt, time) {
     if (Math.hypot(item.group.position.x - px, item.group.position.z - pz) < 1.2) {
       item.collected = true; item.group.visible = false;
       SOUNDS.pickup();
-      if (intelItems.every(i => i.collected)) showMessage('ALL INTEL SECURED — get to the extraction elevator!', 4);
+      if (intelItems.every(i => i.collected)) showMessage(currentMission === 1 ? 'ALL INTEL SECURED — get to the extraction elevator!' : 'INTEL SECURED: ' + item.name + ' — follow the yellow ◆ for what\'s next.', 4);   // v0.6.34
       else showMessage('Intel acquired: ' + item.name, 2.5);
       noteProgress();
     }
@@ -4583,8 +4587,25 @@ function layoutHud() {
     const top = Math.max(y, H * frac); el.style.top = top + 'px';
     if (+el.style.opacity > 0 && el.textContent) y = top + el.getBoundingClientRect().height + gap;
   }
+  layoutTouchButtons(objR, H, gap);
   const sp = $('spotter'), dg = $('dangerTag');
   if (shown(dg)) dg.style.bottom = (+sp.style.opacity > 0 && sp.textContent ? Math.max(150, H - sp.getBoundingClientRect().top + gap) : 150) + 'px';
+}
+// v0.6.34: guards on another floor who heard your shots are already hunting you when you get there
+function wakeFloorAlerts() { if (state !== 'playing') return; for (const e of enemies) if (e.floorAlert && !e.dummy && e.state !== 'dead') { e.floorAlert = false; alertEnemy(e); } }
+// v0.6.34: cut-scenes hide the objectives list and compass (put back when a level is built)
+function cinematicHud(on) { for (const id of ['objectives', 'compass']) { const el = $(id); if (el) el.style.visibility = on ? 'hidden' : ''; } }
+// v0.6.34: the left-hand touch buttons (C4, timed, flash, cover, waypoint, range...) never sit under the objectives list
+function layoutTouchButtons(objR, H, gap) {
+  const A = ['tC4', 'tTimed', 'tClack', 'tFlash', 'tCover', 'tWay'], B = ['tRange', 'tBreath', 'tElevUp', 'tElevDn'];   // demolition kit / sniper scope kit
+  const vis = el => !!el && getComputedStyle(el).display !== 'none';
+  const minTop = objR ? objR.bottom + gap : 0, both = A.some(id => vis($(id))) && B.some(id => vis($(id)));
+  let base = 1e9, maxB = 0; const els = [];
+  for (const id of [...A, ...B]) { const el = $(id); if (!el) continue; if (el.dataset.top0 === undefined) { const cs = getComputedStyle(el); el.dataset.top0 = parseFloat(cs.top) || 0; el.dataset.left0 = parseFloat(cs.left) || 0; }
+    els.push([el, B.includes(id)]); if (vis(el)) { base = Math.min(base, +el.dataset.top0); maxB = Math.max(maxB, +el.dataset.top0 + 64); } }
+  if (base === 1e9) return;
+  const shift = Math.max(0, minTop - base), fitsBelow = maxB + shift < H - 120, side = !fitsBelow && objR ? objR.right + gap : 0;
+  for (const [el, isB] of els) { el.style.top = (+el.dataset.top0 + (fitsBelow ? shift : 0)) + 'px'; el.style.left = (+el.dataset.left0 + side + (both && isB ? 200 : 0)) + 'px'; }   // both kits shown: scope kit sits beside the C4 kit
 }
 function showMessage(text, seconds) { hud.message.textContent = text; hud.message.style.opacity = 1; hud.messageTimer = seconds; }
 function showQuip(text) { hud.quip.textContent = '"' + text + '"'; hud.quip.style.opacity = 1; hud.quipTimer = 2.5; }
@@ -8400,15 +8421,18 @@ function railBuildTrain(Q) {
     if (['armor', 'sleep', 'dine', 'cargo'].includes(car.id)) lamps.push([xb, D + Hc - 0.5, zc]);
     sign(car.name, car.x0 - 0.09, D + 2.9, zc, -Math.PI / 2, 2.8);
     // what's inside
+    if (car.id === 'troop') for (const s of [-1, 1]) railSolid(xb, zc + s * 1.6, Lb - 2, 0.6);
     if (car.id === 'troop') for (const s of [-1, 1]) add(new THREE.BoxGeometry(Lb - 2, 0.45, 0.6), floorM, xb, D + 0.45, zc + s * 1.6);
+    if (car.id === 'armor') for (let k = 0; k < 4; k++) railSolid(car.x0 + 3 + k * 5.5, zc + (k % 2 ? 1.6 : -1.6), 0.9, 0.6);
     if (car.id === 'armor') for (let k = 0; k < 4; k++) add(new THREE.BoxGeometry(0.9, 0.7, 0.6), frame, car.x0 + 3 + k * 5.5, D + 0.35, zc + (k % 2 ? 1.6 : -1.6));
     if (car.id === 'sleep') { const wood = pbr(new THREE.MeshStandardMaterial({ color: 0x6b4a30, roughness: 0.6 }), 'wood', { mode: 'detail', scale: 1.5 });
       for (let x = car.x0 + 1.5; x < top - 1; x += 3.4) add(new THREE.BoxGeometry(1.1, 2.2, 0.06), wood, x, D + 1.1, zc + 1.97);
       add(new THREE.BoxGeometry(1.2, 0.8, 0.7), wood, RAIL.code.x, D + 0.4, zc + 1.5); }
     if (car.id === 'dine') { const cloth = new THREE.MeshStandardMaterial({ color: 0xf2eee4, roughness: 0.8 });
-      for (let k = 0; k < 5; k++) { const x = car.x0 + 2.2 + k * 4.6, s = k % 2 ? 1 : -1; add(new THREE.BoxGeometry(1.4, 0.78, 0.8), cloth, x, D + 0.39, zc + s * 1.55);
+      for (let k = 0; k < 5; k++) { const x = car.x0 + 2.2 + k * 4.6, s = k % 2 ? 1 : -1; railSolid(x, zc + s * 1.55, 1.4, 0.8); add(new THREE.BoxGeometry(1.4, 0.78, 0.8), cloth, x, D + 0.39, zc + s * 1.55);
         const lp = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), lampMaterial); lp.position.set(x, D + 0.9, zc + s * 1.75); levelGroup.add(lp); } }
     if (car.id === 'cargo') {
+      for (let k = 0; k < 3; k++) railSolid(car.x0 + 2 + k * 4.5, zc + (k % 2 ? 1.45 : -1.45), 1.3, 1.0);
       for (let k = 0; k < 3; k++) add(new THREE.BoxGeometry(1.3, 1.6, 1.0), floorM, car.x0 + 2 + k * 4.5, D + 0.8, zc + (k % 2 ? 1.45 : -1.45));
       const vx = RAIL.V.x - 2;                                                  // the vault: steel door across the car
       const steel = pbr(new THREE.MeshStandardMaterial({ color: 0x70767a, roughness: 0.3, metalness: 0.9 }), 'metal', { mode: 'detail', scale: 1 });
@@ -8542,7 +8566,8 @@ function railSpace() {
   if (!RAIL.on || state !== 'playing' || RAIL.seq) return false;
   const x = camera.position.x, z = camera.position.z;
   for (const L of RAIL.ladders) { const p = RAIL.roof ? L.r : L.f; if (dist2D(x, z, p.x, p.z) < 2.2 && player.jumpY === 0) {
-    RAIL.roof = !RAIL.roof; playNoise(0.25, 0.08, 700); const q = RAIL.roof ? L.r : L.f; camera.position.x = q.x; camera.position.z = q.z; player.velocity.set(0, 0, 0);
+    RAIL.roof = !RAIL.roof; if (!RAIL.vaultOpen) solid[RAIL.r0 * worldCols + RAIL.Vc] = RAIL.roof ? 0 : 1;   // v0.6.34: the vault door isn't on the roof
+    playNoise(0.25, 0.08, 700); const q = RAIL.roof ? L.r : L.f; camera.position.x = q.x; camera.position.z = q.z; player.velocity.set(0, 0, 0);
     showMessage(RAIL.roof ? 'ON THE ROOF — tunnels! CROUCH (C) when HAWK shouts. Space at a ladder to climb down.' : 'Back inside.', 3.5);
     if (RAIL.roof && !RAIL.said.roof) { RAIL.said.roof = true; radioSay('DOC', 'Roof route. The guards inside can\'t see you up there. Tunnels can, and they don\'t miss.', 6); }
     return true;
@@ -8988,6 +9013,7 @@ function updatePort(dt) {
   portTeam(dt);
 }
 function portStartBoat() {
+  cinematicHud(true);   // v0.6.34
   if (PORT.boat) return;
   const b = PORT.boatMesh.position; PORT.boat = { t: 0, x: b.x, z: b.z, boom: 0 };
   weaponRoot.visible = false; showMessage('IN THE RHIB — GO GO GO!', 2.5); playNoise(4, 0.2, 300);
@@ -9170,7 +9196,7 @@ function rigObjectives() {
     { text: `C4 on the wellhead, both separators and the gas compressor (${down} / ${ch.length || 4})`, done: ch.length > 0 && down === ch.length },
     { text: 'Steal the Villa Aurora security plans (OIM office, drill floor)', done: !!plans && plans.collected },
     { text: 'BONUS: Paymaster Lund, the money man', done: !!RIG.paymaster && RIG.paymaster.state === 'dead', bonus: true },
-    { text: 'BONUS: reach the process deck without raising the alarm', done: !!RIG.said.deck1 && !RIG.silentFail, bonus: true },
+    { text: 'BONUS: reach the process deck without being spotted', done: !!RIG.said.deck1 && !RIG.silentFail, bonus: true },
   ];
 }
 function rigRoute(tx, tz, TL, label) {
@@ -9189,7 +9215,7 @@ function updateRig(dt) {
   if (currentMission !== 8 || state !== 'playing' || RIG.seq) return;
   const x = camera.position.x, z = camera.position.z, st = rigStairAt(x, z);
   if (st) { const want = st.p > 0.5 ? st.s.L + 1 : st.s.L; if (want !== RIG.level) rigSetLevel(want); }
-  if (!RIG.said.deck1 && enemies.some(e => e.state === 'chase')) RIG.silentFail = true;
+  if (!RIG.said.deck1 && enemies.some(e => e.state === 'chase' && !e.dummy && e.rigLevel === RIG.level)) RIG.silentFail = true;   // v0.6.34: C4 heard on another deck doesn't count
   rigAmbience(dt);
   const ob = rigObjectives();
   if (ob[1].done && !RIG.said.charges) { RIG.said.charges = true; radioSay('DOC', 'All four charges set. When this rig goes up they\'ll see it from Aberdeen. Plans next, then the helideck.', 6); }
@@ -9243,7 +9269,7 @@ function updateRigSeq(dt) {
 }
 function rigStartHeli() {
   if (RIG.seq || RIG.level !== 3) return;
-  RIG.seq = { type: 'heli', t: 0, boom: 0, p0: camera.position.clone() }; weaponRoot.visible = false;
+  RIG.seq = { type: 'heli', t: 0, boom: 0, p0: camera.position.clone() }; weaponRoot.visible = false; cinematicHud(true);
   showMessage('ABOARD THE HELICOPTER — LIFT, LIFT, LIFT!', 2.5); playNoise(3, 0.25, 150);
   radioSay('HAWK', 'Got him! Pull up! Doc — the button, if you would.', 4);
 }
@@ -9257,7 +9283,7 @@ function rigStartHeli() {
 // level has its own wall grid and the game swaps grids halfway up a stair (no teleporting).
 const EST_MAPS = [
   ["xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxx################xxxxxxxxxx", "xxxxxxxxxxxxxx#WW.WW.WW.....##xxxxxxxxxx", "xxxxxxxxxxxxxx#...........#S##xxxxxxxxxx", "xxxxxxxxxxxxxx#WW.WW.WW...#S##xxxxxxxxxx", "xxxxxxxxxxxxxx#...........####xxxxxxxxxx", "xxxxxxxxxxxxxx#...........####xxxxxxxxxx", "xxxxxxxxxxxxxx######V#########xxxxxxxxxx", "xxxxxxxxxxxxxx#....T.........#xxxxxxxxxx", "xxxxxxxxxxxxxx#..............#xxxxxxxxxx", "xxxxxxxxxxxxxx################xxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"],
-  ["xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "x.C..C..C..C....................C..C...x", "x.............################.........x", "x..#####......#....#.....#.r.#.........x", "x..#...#......#....#.r...#rSr#.........x", "x..#...#......#.....rSr..#rSr#.........x", "x..##.##......#....#rSr......#.........x", "x.............#....#.........#.........x", "x.............#..D.#....#....#......O..x", "x.............#.........#..K.#.........x", "x.............#....#....#....#.........x", "x.............#######..####.##.........x", "x......................................x", "x.....BB.BBBBBBBBBBBB..BBBBBBBBBB.BBBB.x", "x......................................x", "x.HHHHHHH.HHHHHHH..........FF..........x", "x.H.H.....H.....H..C....C..FF..........x", "x.H.HHH.HHH..HH.H......................x", "x.H...H.......H.H.BBB..BBBBB.BBBBBBBBB.x", "x.HHH...HHHHHHH.H..C....C..............x", "x.H.H.H.H...H...H......................x", "x.H.H.HHH...H.H.H......................x", "x.H.H.....H...H.H..C....C..............x", "x.H.HHHHHHHHHHH.H..........###..###....x", "x.H.H.........H.H..........#......#....x", "x.H.H.H..HHHHHH.H..C....C..#..www.#....x", "x.H...H....................#..www.#....x", "x.HHHHHHHHHHHHHHH..........#..www.#....x", "xBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB...Bx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"],
+  ["xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "x.C..C..C..C....................C..C...x", "x.............################.........x", "x..#####......#....#.....#.r.#.........x", "x..#...#......#....#.r...#rSr#.........x", "x..#...#......#.....rSr..#rSr#.........x", "x..##.##......#....#rSr......#.........x", "x.............#....#.........#.........x", "x.............#..D.#....#....#......O..x", "x.............#.........#..K.#.........x", "x.............#....#....#....#.........x", "x.............#######..####.##.........x", "x......................................x", "x.....BB.BBBBBBBBBBBB..BBBBBBBBBB.BBBB.x", "xH.....................................x", "xHHHHHHHH.HHHHHHH..........FF..........x", "xHH.H.....H.....H..C....C..FF..........x", "xHH.HHH.HHH..HH.H......................x", "xHH...H.......H.H.BBB..BBBBB.BBBBBBBBB.x", "xHHHH...HHHHHHH.H..C....C..............x", "xHH.H.H.H...H...H......................x", "xHH.H.HHH...H.H.H......................x", "xHH.H.....H...H.H..C....C..............x", "xHH.HHHHHHHHHHH.H..........###..###....x", "xHH.H.........H.H..........#......#....x", "xHH.H.H..HHHHHH.H..C....C..#..www.#....x", "xHH...H....................#..www.#....x", "xHHHHHHHHHHHHHHHH..........#..www.#....x", "xBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB...Bx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"],
   ["xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxx################xxxxxxxxxx", "xxxxxxxxxxxxxx#L.L.L#........#xxxxxxxxxx", "xxxxxxxxxxxxxx#.....#........#xxxxxxxxxx", "xxxxxxxxxxxxxx#L.L..#Sr...####xxxxxxxxxx", "xxxxxxxxxxxxxx#.....#Sr...#..#xxxxxxxxxx", "xxxxxxxxxxxxxx#L.L..#r....#..#xxxxxxxxxx", "xxxxxxxxxxxxxx#..............#xxxxxxxxxx", "xxxxxxxxxxxxxx#L.L..#.....#..#xxxxxxxxxx", "xxxxxxxxxxxxxx#.D...#.....#.D#xxxxxxxxxx", "xxxxxxxxxxxxxx################xxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]
 ];
 const EST_STAIRS = [{ c: 27, r: 4, dc: 0, dr: 1, L: 0 }, { c: 21, r: 6, dc: 0, dr: -1, L: 1 }];
@@ -9337,7 +9363,7 @@ function buildEstateMission() {
   }
   EST.level = 1; { const p = estCell(36, 8); createEnemy(p.x, p.z, { baseY: 9, static: true, label: 'Sniper (belvedere)', headgear: 'balaclava', uniform: 0x1e2620 }); const e = enemies[enemies.length - 1]; e.estLevel = 1; e.baseY = 9; EST.sniper = e; }
   // THE PATRON + three armoured bodyguards wait in the boathouse (they appear when he bolts from the panic room)
-  for (const [c, r, boss] of [[31, 24, true], [29, 24], [33, 24], [30, 22]]) {
+  for (const [c, r, boss] of [[28, 24, true], [29, 25], [33, 24], [30, 22]]) {
     const p = estCell(c, r); createEnemy(p.x, p.z, boss ? { officer: true, label: 'THE PATRON', uniform: 0xe8e2d4, headgear: 'cap' } : { label: 'Armoured bodyguard', uniform: 0x141414, headgear: 'helmet' });
     const e = enemies[enemies.length - 1]; Object.assign(e, { estLevel: 1, estHold: true, health: boss ? 900 : 350 }); if (boss) { EST.patron = e; e.static = true; } else EST.guards.push(e);
   }
@@ -9495,6 +9521,12 @@ function updateEstate(dt) {
     showMessage('THE PANIC ROOM IS EMPTY — HE\'S IN THE TUNNEL TO THE BOATHOUSE!', 5); radioSay('DOC', 'Panic room\'s empty and the champagne\'s still cold. He went through the tunnel — BOATHOUSE, Wraith, before that speedboat leaves!', 8); }
   if (EST.fleeing && EST.patron.state !== 'dead') { EST.fleeT -= dt; if (EST.fleeT <= 0) { estStartEscape(); return; } }
   if (ob[5].done && !EST.said.boss) { EST.said.boss = true; EST.fleeing = false; radioSay('HAWK', 'THE PATRON is down. Retired, effective immediately. Jetty — I\'ll bring the boat round.', 7); showMessage('THE PATRON IS DEAD — GET TO THE JETTY', 4); }
+  // v0.6.34: in the fight THE PATRON makes a run for the speedboat; reach it and the engine starts (12 s)
+  { const Pt = EST.patron; if (EST.fleeing && Pt && Pt.state !== 'dead' && !Pt.dummy) { const pp = Pt.group.position, d = dist2D(pp.x, pp.z, x, z);
+      if (!EST.run && (d < 26 || Pt.health < 900)) { EST.run = true; radioSay('HAWK', 'He\'s running for the speedboat! DROP HIM!', 4); }
+      if (EST.run && !EST.atBoat) { const tg = estCell(31, 24), dx = tg.x - pp.x, dz = tg.z - pp.z, l = Math.hypot(dx, dz), sp = 1.9 * dt;
+        if (l <= sp + 0.05) { EST.atBoat = true; EST.fleeT = Math.min(EST.fleeT, 12); showMessage('HE\'S AT THE SPEEDBOAT — ENGINE STARTING. 12 SECONDS!', 4); playNoise(2, 0.2, 140); }
+        else { pp.x += dx / l * sp; pp.z += dz / l * sp; Pt.yaw = Pt.baseYaw = Pt.targetYaw = Math.atan2(dx, dz); Pt.group.rotation.y = Pt.yaw; } } } }
   if (EST.speedboat) EST.speedboat.position.y = -0.3 + Math.sin(elapsed * 1.3) * 0.05;
 }
 function estAmbience(dt) {
@@ -9521,7 +9553,14 @@ function updateEstateSeq(dt) {
     EST.boat.position.set(bx, -0.6, bz); EST.boat.rotation.set(0, Math.PI, 0); camera.position.set(bx, 2 + u * 6, bz + 3); camera.lookAt(estCell(21, 7).x, 6, estCell(21, 7).z);
     if (t > 1.5 && S.boom < 6 && t > 1.5 + S.boom * 1.1) { const c = estCell(15 + S.boom * 3, 3 + (S.boom % 3) * 3), p = new THREE.Vector3(c.x, 6 + Math.random() * 4, c.z);
       spawnParticles(p, 0xffa040, 50, 14, 0.5); spawnParticles(p, 0x302820, 30, 7, 0.7); const l = new THREE.PointLight(0xff8030, 5000, 300, 1.4); l.position.copy(p); levelGroup.add(l); setTimeout(() => levelGroup.remove(l), 900);
-      playNoise(2.2, 0.45, 180); playTone(48, 22, 1.5, 0.3, 'sine'); S.boom++; }
+      playNoise(2.2, 0.45, 180); playTone(48, 22, 1.5, 0.3, 'sine'); S.boom++;
+      // v0.6.34: big visible fireballs + fires that keep burning on the roof
+      const fb = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), new THREE.MeshBasicMaterial({ color: 0xffb050, transparent: true, opacity: 0.95, fog: false, depthWrite: false })); fb.position.copy(p); levelGroup.add(fb); S.balls.push({ m: fb, t: 0 });
+      const fire = new THREE.Mesh(new THREE.ConeGeometry(2.6, 8, 8), new THREE.MeshBasicMaterial({ color: 0xff6a20, transparent: true, opacity: 0.85, fog: false, depthWrite: false })); fire.position.set(p.x, 13, p.z); levelGroup.add(fire); S.fires.push(fire);
+      if (!S.glow) { S.glow = new THREE.PointLight(0xff7a30, 0, 260, 1.2); S.glow.position.set(estCell(21, 7).x, 14, estCell(21, 7).z); levelGroup.add(S.glow); } }
+    for (const b of S.balls) { b.t += dt; b.m.scale.setScalar(2 + b.t * 16); b.m.material.opacity = Math.max(0, 0.95 - b.t * 1.0); b.m.visible = b.t < 1; }
+    for (const f of S.fires) { const k = 1 + Math.sin(elapsed * 13 + f.position.x) * 0.15; f.scale.set(k, 1 + Math.sin(elapsed * 9 + f.position.z) * 0.2, k); }
+    if (S.glow) S.glow.intensity = Math.min(9000, S.fires.length * 1800) * (0.85 + Math.random() * 0.2);
     if (t > 2 && !S.m1) { S.m1 = true; radioSay('DOC', 'Villa Aurora. Eleven bedrooms, nine bathrooms, one very expensive bonfire.', 5); }
     if (t > 6.5 && !S.m2) { S.m2 = true; radioSay('HAWK', 'The ledger goes to every paper in Europe in the morning. His friends are going to have a very bad breakfast.', 6); }
     if (t > 11 && !S.m3) { S.m3 = true; showMessage('VALKYRIE — CAMPAIGN COMPLETE', 4); }
@@ -9535,7 +9574,7 @@ function updateEstateSeq(dt) {
 }
 function estStartFinale() {
   if (EST.seq || EST.level !== 1) return;
-  EST.seq = { type: 'finale', t: 0, boom: 0 }; weaponRoot.visible = false; for (const m of teammates) m.group.visible = false;
+  EST.seq = { type: 'finale', t: 0, boom: 0, balls: [], fires: [] }; weaponRoot.visible = false; cinematicHud(true); for (const m of teammates) m.group.visible = false;
   showMessage('ABOARD — HIT IT, HAWK!', 2.5); playNoise(2, 0.2, 220);
 }
 function estStartEscape() { EST.escaped = true; EST.seq = { type: 'escape', t: 0 }; weaponRoot.visible = false; showMessage('THE SPEEDBOAT IS AWAY — THE PATRON ESCAPED', 4); playNoise(3, 0.3, 300);
@@ -9613,6 +9652,7 @@ function gameLoop() {
     safe('port', () => updatePort(dt));
     safe('rig', () => updateRig(dt));
     safe('estate', () => updateEstate(dt));
+    safe('floorAlert', wakeFloorAlerts);
     }
   }
   if (!(state === 'playing' && haloActive()) && HA.on) { haloAudioMute(); if (document.body.classList.contains('haloOn')) document.body.classList.remove('haloOn'); }
@@ -10461,7 +10501,7 @@ function updateTraining(dt) {
 // v0.6.21: bump into a locked station door -> say why it's shut and what opens it.
 let lockedDoorAt = -1e9;
 function lockedDoorHint() {
-  if (currentMission !== 0 || elapsed - lockedDoorAt < 4 || hud.messageTimer > 0.6) return;
+  if (currentMission !== 0 || elapsed - lockedDoorAt < 4 || (hud.messageTimer > 0.6 && /LOCKED|MAGLOCK|EXIT/.test(hud.message.textContent))) return;   // v0.6.34
   const s = curStation();
   for (const [ch, g] of Object.entries(trainGates)) {
     if (g.open) continue;
@@ -11843,6 +11883,8 @@ window.__game = {
   gateSideText, layoutHud: () => { hudLayoutAt = 0; layoutHud(); }, exitLockedText, exitZone: () => exitZone, showMessage, showQuip, radioSay,
   radioPressed, trainingOverview, teleportTo, curStep, trainGates: () => trainGates, obstacles: () => obstacles, chooseMission, currentWeapon: () => currentWeapon, aiming: () => aiming,
   aimAt: (x, y, z) => { const d = new THREE.Vector3(x, y, z).sub(camera.position); camera.rotation.set(Math.asin(THREE.MathUtils.clamp(d.y / d.length(), -1, 1)), Math.atan2(-d.x, -d.z), 0, 'YXZ'); },
+  // v0.6.34 hooks
+  props: () => props, circleHitsWall, wakeFloorAlerts,
   // v0.6.33 estate hooks
   EST, EST_MAPS, EST_STAIRS, estObjectives, estObjective, estSetLevel, estCell, estStairAt, estStartFinale,
   // v0.6.32 rig hooks
