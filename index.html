@@ -232,6 +232,7 @@
       <label id="m6Card"><input type="radio" name="mission" value="6"><b>MISSION 05 — THE CONDUCTOR'S TRAIN</b><br>Drop onto an armoured train in the Alps. Car by car to the vault and the cab.</label>
       <label id="m7Card"><input type="radio" name="mission" value="7"><b>MISSION 06 — PORT RAID</b><br>Night raid on a cargo ship in Rotterdam with HAWK and DOC at your side.</label>
       <label id="m8Card"><input type="radio" name="mission" value="8"><b>MISSION 07 — OIL RIG</b><br>North Sea platform at night. Climb the leg, fight up four decks, blow it, fly out.</label>
+      <label id="m9Card"><input type="radio" name="mission" value="9"><b>MISSION 08 — VILLA AURORA (FINALE)</b><br>Lake Como at night. THE PATRON's estate: gardens, maze, villa, vault. End it.</label>
     </div>
     <button class="startBtn" id="startBtn">▶ CLICK OR TAP TO BEGIN MISSION</button>
     <div id="briefText"></div>
@@ -410,12 +411,12 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 // ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
 // ##  part failed and why.                                           ##
 // #####################################################################
-const VERSION = 'v0.6.32';
+const VERSION = 'v0.6.33';
 // v0.6.6 MISSION UNLOCKS. Order: TRAINING (0) -> BLACK FILE (1) -> SNIPER LESSON (3) -> COLD HORIZON (2).
 // A new player has only TRAINING; winning a mission unlocks the next one (saved as valkyrieUnlocked =
 // how far along that list you've got, 0-3). Developer mode (?dev=1, remembered; ?dev=0 clears it)
 // unlocks everything and turns the skips back on.
-const MISSION_ORDER = [0, 1, 3, 2, 4, 5, 6, 7, 8];   // v0.6.32: 8 = THE OIL RIG   // v0.6.31: 7 = PORT RAID   // v0.6.30: 6 = THE CONDUCTOR'S TRAIN   // v0.6.29: 5 = THE DAM (after HALO)   // v0.6.27: 4 = HALO INSERTION (after Cold Horizon)
+const MISSION_ORDER = [0, 1, 3, 2, 4, 5, 6, 7, 8, 9];   // v0.6.33: 9 = VILLA AURORA (finale)   // v0.6.32: 8 = THE OIL RIG   // v0.6.31: 7 = PORT RAID   // v0.6.30: 6 = THE CONDUCTOR'S TRAIN   // v0.6.29: 5 = THE DAM (after HALO)   // v0.6.27: 4 = HALO INSERTION (after Cold Horizon)
 let DEV = false, unlockedIdx = 0;
 try {
   const dv = [...location.search.matchAll(/[?&]dev=([01])/gi)].pop();
@@ -668,6 +669,8 @@ const MISSION_OVERRIDES = {
   // v0.6.29 THE DAM: daylight, fast close fights inside; HAWK and DOC on the radio only
   // v0.6.30 THE TRAIN: close quarters, car by car
   // v0.6.31 PORT RAID: night, short sight lines in the stacks; HAWK + DOC are on screen (made by the mission itself)
+  // v0.6.33 VILLA AURORA: night gardens, villa interiors
+  9: { enemySightRange: 48, enemyHearingRange: 60, enemyAttackRange: 38, enemyAccuracy: 0.28, silencedAlertRadius: 12, alertShoutRadius: 26, searchDuration: 30, killWitnessRange: 30, bodySightRange: 22, teammates: 0 },
   // v0.6.32 OIL RIG: night, decks of pipes and tanks
   8: { enemySightRange: 45, enemyHearingRange: 70, enemyAttackRange: 38, enemyAccuracy: 0.28, silencedAlertRadius: 12, alertShoutRadius: 26, searchDuration: 30, killWitnessRange: 30, bodySightRange: 22, teammates: 0 },
   7: { enemySightRange: 45, enemyHearingRange: 80, enemyAttackRange: 40, enemyAccuracy: 0.28, silencedAlertRadius: 12, alertShoutRadius: 30, searchDuration: 30, killWitnessRange: 35, bodySightRange: 25, teammates: 0 },
@@ -817,6 +820,13 @@ const KNIFE_QUIPS = [
 //   8. Depot demolition — plant charges on a fuel/ammo depot, exfil before the blast.
 //   9. Final showdown  — corner The Conductor (and maybe unmask The Patron).
 const BRIEFINGS = {
+  9: `<p><b>Wraith,</b> this is it. The security plans from the rig open the door to <b>Villa Aurora</b>, THE PATRON's estate on <b>Lake Como</b>. He is home tonight.</p>
+    <ul><li><b>Approach:</b> by boat across the lake to the boathouse jetty (automatic). HAWK and DOC come ashore with you.</li>
+    <li><b>Cut the power + CCTV:</b> C4 on the transformer in the service hut (north-west). The gardens go dark.</li>
+    <li><b>Sniper</b> in the belvedere tower (east). The <b>hedge maze</b> (west) is the quiet way through.</li>
+    <li><b>The villa — real stairs:</b> upper floor library has his <b>black ledger</b>; the wine cellar has the <b>vault</b> (C4).</li>
+    <li><b>THE PATRON</b> and three <b>armoured bodyguards</b>. Aim for the head. If he reaches his speedboat, he's gone.</li></ul>
+    <p style="color:#9a9"><b>B</b> plant C4, <b>Y</b> fire. <b>N</b> night vision. <b>O</b> radio hint. Follow the yellow ◆ — it shows the stairs when the target is on another floor.</p>`,
   8: `<p><b>Wraith,</b> Voss talked. THE PATRON moves his guns and his money through <b>Nordkapp Alpha</b>, a production platform in the Norwegian North Sea. The OIM's office holds the <b>security plans for Villa Aurora</b>.</p>
     <ul><li><b>Approach:</b> RHIB through a force-7 sea, then the ladder up the south-west leg (automatic).</li>
     <li><b>Four decks, real stairs:</b> cellar deck (20 m) → process deck (28 m, pipes and tanks) → drill floor (36 m, derrick + accommodation) → helideck (44 m).</li>
@@ -1473,6 +1483,7 @@ function buildLevel_() {
   RAIL.on = false; RAIL.seq = null; RAIL.roof = false;   // v0.6.30
   PORT.on = false; PORT.boat = null;   // v0.6.31
   RIG.on = false; RIG.seq = null;   // v0.6.32
+  EST.on = false; EST.seq = null;   // v0.6.33
   if (levelGroup) { scene.remove(levelGroup); levelGroup.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
   worldSun = null;
   levelGroup = new THREE.Group(); scene.add(levelGroup);
@@ -4414,6 +4425,7 @@ function createPickup(x, z, type) {
 // v0.6.22: why the exit is still shut, and what to do (all levels).
 function exitLockedText() {
   if (currentMission === 0 || currentMission === 3) { const n = TRAIN ? TRAIN.done.filter(d => !d).length : 0; return `GRADUATION LOCKED — ${n} station${n === 1 ? '' : 's'} still to do. Follow the yellow ◆ to the next one.`; }
+  if (currentMission === 9) { const left = estObjectives().filter(o => !o.done && !o.bonus).length; return `THE BOAT WAITS — ${left} objective${left === 1 ? '' : 's'} left (top left). Follow the yellow ◆.`; }
   if (currentMission === 8) { const left = rigObjectives().filter(o => !o.done && !o.bonus).length; return `NO HELICOPTER YET — ${left} objective${left === 1 ? '' : 's'} left (top left). Follow the yellow ◆.`; }
   if (currentMission === 7) { const left = portObjectives().filter(o => !o.done && !o.bonus).length; return `RHIB LOCKED — ${left} objective${left === 1 ? '' : 's'} left (top left). Follow the yellow ◆.`; }
   if (currentMission === 6) { const left = railObjectives().filter(o => !o.done && !o.bonus).length; return `EXFIL LOCKED — ${left} objective${left === 1 ? '' : 's'} left (top left). Follow the yellow ◆.`; }
@@ -4472,7 +4484,7 @@ function updateObjectives(dt, time) {
     }
     exitZone.beamMat.opacity = 0.12 + Math.sin(time * 4) * 0.05;
     const exD = Math.hypot(exitZone.x - px, exitZone.z - pz);
-    if (exD < exitZone.radius && exitZone.unlocked) { if (currentMission === 8) rigStartHeli(); else if (currentMission === 7) portStartBoat(); else if (currentMission === 6) railTryJump(); else if (currentMission === 5) damStartJump(); else endGame(true); }
+    if (exD < exitZone.radius && exitZone.unlocked) { if (currentMission === 9) estStartFinale(); else if (currentMission === 8) rigStartHeli(); else if (currentMission === 7) portStartBoat(); else if (currentMission === 6) railTryJump(); else if (currentMission === 5) damStartJump(); else endGame(true); }
     else if (!exitZone.unlocked && exD < (heightField ? 30 : CELL * 2) && time - exitZone.warned > 4) { exitZone.warned = time; showMessage(exitLockedText(), 3.5); }   // v0.6.22: says why, from a few steps away
     if (exitZone.statusSign && exitZone.statusOpen !== exitZone.unlocked) setExitStatusSign(exitZone.unlocked);
   }
@@ -4600,6 +4612,10 @@ function updateHUD(dt) {
   else if (currentMission === 2) {
     for (const o of sniperObjectives()) html += `<div class="${o.done ? 'done' : ''}">${o.done ? '☑' : '☐'} ${o.text}</div>`;
     html += `<div class="${ready ? '' : 'locked'}">${ready ? '☐ Exfil to the LZ behind the ridge' : '🔒 Exfil LZ (finish the list first)'}</div>`;
+  } else if (currentMission === 9) {
+    html += `<div style="color:#ffd860">◼ ${EST_NAMES[EST.level]}</div>`;
+    for (const o of estObjectives()) html += `<div class="${o.done ? 'done' : ''}">${o.done ? '☑' : '☐'} ${o.text}</div>`;
+    html += `<div class="${ready ? '' : 'locked'}">${ready ? '☐ Exfil: HAWK\'s boat at the JETTY' : '🔒 Exfil (finish the list first)'}</div>`;
   } else if (currentMission === 8) {
     html += `<div style="color:#ffd860">◼ ${RIG_NAMES[RIG.level]} · ${RIG.Y[RIG.level]} m</div>`;
     for (const o of rigObjectives()) html += `<div class="${o.done ? 'done' : ''}">${o.done ? '☑' : '☐'} ${o.text}</div>`;
@@ -4932,6 +4948,8 @@ function updateTouchLayer() {
 // #####################################################################
 let currentMission = 1;                 // 1 = Black File (indoor), 2 = Cold Horizon (sniper)
 const M2_WORLD = { size: 4000, center: { x: 2000, z: 2000 }, waterLevel: -3 };
+// v0.6.33 VILLA AURORA state (SECTION 31): 40 x 30 squares; cellar -4.5, grounds 0, upper floor 4.5 m
+const EST = { on: false, level: 1, seq: null, c0: 480, r0: 485, Y: [-4.5, 0, 4.5], grids: [], said: {}, guards: [], lamps: [] };
 // v0.6.32 OIL RIG state (SECTION 30): 16 x 12 squares, decks at 20 / 28 / 36 / 44 m
 const RIG = { on: false, level: 0, seq: null, c0: 492, r0: 494, Y: [20, 28, 36, 44], grids: [], said: {} };
 // v0.6.31 PORT RAID state (SECTION 29): yard + quay + ship (deck 10 m, bridge 22 m, holds 1.2 m)
@@ -5039,6 +5057,7 @@ function groundAt(x, z) {
   if (DAM.on) { const o = damGround(x, z); if (o !== null) return o; }
   if (RAIL.on) { const o = railGround(x, z); if (o !== null) return o; }
   if (PORT.on) { const o = portGround(x, z); if (o !== null) return o; }
+  if (EST.on) { const o = estGround(x, z); if (o !== null) return o; }   // v0.6.33: villa floors + stairs
   if (RIG.on) { const o = rigGround(x, z); if (o !== null) return o; }   // v0.6.32: rig decks + stairs   // v0.6.31: ship deck / bridge / holds   // v0.6.30: the train deck   // v0.6.29: crest walkway + powerhouse floor
   return groundAt0(x, z);
 }
@@ -5087,7 +5106,8 @@ const asphaltTexture = makeCanvasTexture(256, (ctx, s) => {
 // ---- Build the whole outdoor mission ----
 let sniperLights = [], sniperLamps = [], sniperWater = null, materiel = [], sniperState = null;
 function buildSniperMission() {
-  DAM.on = false; RAIL.on = false; PORT.on = false; RIG.on = false;
+  DAM.on = false; RAIL.on = false; PORT.on = false; RIG.on = false; EST.on = false;
+  if (currentMission === 9) return buildEstateMission();   // v0.6.33 (SECTION 31)
   if (currentMission === 8) return buildRigMission();   // v0.6.32 (SECTION 30)
   if (currentMission === 7) return buildPortMission();   // v0.6.31 (SECTION 29)
   if (currentMission === 6) return buildRailMission();   // v0.6.30 (SECTION 28)
@@ -5660,6 +5680,7 @@ function objectivesComplete() {
   if (currentMission === 6) return railObjectives().every(o => o.done || o.bonus);
   if (currentMission === 7) return portObjectives().every(o => o.done || o.bonus);
   if (currentMission === 8) return rigObjectives().every(o => o.done || o.bonus);
+  if (currentMission === 9) return estObjectives().every(o => o.done || o.bonus);
   return intelItems.every(i => i.collected);
 }
 // Distance written nicely: "1,243 m"
@@ -6448,6 +6469,7 @@ function currentObjective() {
   if (currentMission === 6) return railObjective();
   if (currentMission === 7) return portObjective();
   if (currentMission === 8) return rigObjective();
+  if (currentMission === 9) return estObjective();
   if (currentMission === 1) {
     const left = intelItems.filter(i => !i.collected);
     if (left.length) {
@@ -6711,7 +6733,7 @@ function applyMission(m) {
   SETTINGS.graphicsQuality = $('optQuality').value;
   if (m === 3) SETTINGS.nightOps = false;                              // the lesson is always in daylight
   if (m === 4) SETTINGS.nightOps = true;
-  if (m >= 5) SETTINGS.nightOps = m === 7 || m === 8;   // v0.6.31: the port raid is at night                              // v0.6.29: the dam is a daylight job                               // v0.6.27: HALO is always a night jump
+  if (m >= 5) SETTINGS.nightOps = m === 7 || m === 8 || m === 9;   // v0.6.31: the port raid is at night                              // v0.6.29: the dam is a daylight job                               // v0.6.27: HALO is always a night jump
   if (m !== 4 && typeof haloOff === 'function') haloOff();
   const outdoors = m >= 2, high = SETTINGS.graphicsQuality === 'high';
   if (!GFX_LEVELS[SETTINGS.graphicsQuality]) SETTINGS.graphicsQuality = autoGfx();
@@ -6721,16 +6743,16 @@ function applyMission(m) {
   document.querySelectorAll('.equiponly').forEach(el => (el.style.display = m === 0 || m === 1 || m >= 4 ? 'flex' : 'none'));   // v0.6.2 demolition kit + waypoint
   document.querySelectorAll('.trainonly').forEach(el => (el.style.display = (m === 0 || (m === 3 && el.id === 'tSkip')) && (el.id !== 'tSkip' || DEV) ? 'flex' : 'none'));   // v0.6.6: SKIP button only in dev mode
   $('trainBox').style.display = m === 0 || m === 3 ? 'block' : 'none';
-  for (const k of [0, 1, 2, 3, 4, 5, 6, 7, 8]) $('m' + k + 'Card').classList.toggle('sel', missionPicked && m === k);
+  for (const k of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]) $('m' + k + 'Card').classList.toggle('sel', missionPicked && m === k);
   $('briefText').innerHTML = BRIEFINGS[m];
 }
 // v0.4.6 (iPad fix): the chosen mission lives in a variable, not only in the radio button,
 // because on some iPads tapping the mission card never ticked its radio (always Mission 1).
 let chosenMission = 1, missionPicked = true;   // v0.6.5: false = plain link for a returning player: pick a card first
-const MISSION_NAMES = { 0: 'CAMP HALYARD', 1: 'BLACK FILE', 2: 'COLD HORIZON', 3: 'SNIPER LESSON', 4: 'HALO INSERTION', 5: 'THE DAM', 6: 'THE CONDUCTOR\'S TRAIN', 7: 'PORT RAID', 8: 'OIL RIG' };
+const MISSION_NAMES = { 0: 'CAMP HALYARD', 1: 'BLACK FILE', 2: 'COLD HORIZON', 3: 'SNIPER LESSON', 4: 'HALO INSERTION', 5: 'THE DAM', 6: 'THE CONDUCTOR\'S TRAIN', 7: 'PORT RAID', 8: 'OIL RIG', 9: 'VILLA AURORA' };
 function selectedMission() { return chosenMission; }
 function chooseMission(m, rebuild = true) {
-  m = m === 2 || m === 0 || m === 3 || m === 4 || m === 5 || m === 6 || m === 7 || m === 8 ? m : 1;
+  m = m === 2 || m === 0 || m === 3 || m === 4 || m === 5 || m === 6 || m === 7 || m === 8 || m === 9 ? m : 1;
   if (!isUnlocked(m)) { showLockNote(lockReason(m)); noteInput('locked mission ' + m); showPicked(); return; }   // v0.6.6
   const changed = m !== chosenMission;
   chosenMission = m; missionPicked = true;
@@ -6739,10 +6761,10 @@ function chooseMission(m, rebuild = true) {
     applyMission(m); buildLevel(); resetPlayer(); resetWeapons(); resetMasking(); missionStartPose();
   }
 }
-const MISSION_TITLES = { 0: 'Training', 1: 'Black File', 2: 'Cold Horizon', 3: 'the Sniper Lesson', 4: 'HALO Insertion', 5: 'The Dam', 6: 'The Conductor\'s Train', 7: 'the Port Raid', 8: 'the Oil Rig' };
+const MISSION_TITLES = { 0: 'Training', 1: 'Black File', 2: 'Cold Horizon', 3: 'the Sniper Lesson', 4: 'HALO Insertion', 5: 'The Dam', 6: 'The Conductor\'s Train', 7: 'the Port Raid', 8: 'the Oil Rig', 9: 'Villa Aurora' };
 const lockReason = m => 'Locked — beat ' + MISSION_TITLES[MISSION_ORDER[MISSION_ORDER.indexOf(m) - 1]] + ' first';
 function showLocks() {
-  for (const k of [0, 1, 2, 3, 4, 5, 6, 7, 8]) {
+  for (const k of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]) {
     const card = $('m' + k + 'Card'), locked = !isUnlocked(k);
     card.classList.toggle('locked', locked); card.setAttribute('aria-disabled', locked ? 'true' : 'false');
     const r = card.querySelector('input'); if (r) r.disabled = locked;
@@ -6758,9 +6780,9 @@ function showLockNote(txt) { $('lockNote').textContent = txt; clearTimeout(lockN
 function showPicked() {
   const m = chosenMission, p = missionPicked;
   document.querySelectorAll('input[name="mission"]').forEach(r => (r.checked = p && +r.value === m));
-  for (const k of [0, 1, 2, 3, 4, 5, 6, 7, 8]) $('m' + k + 'Card').classList.toggle('sel', p && m === k);
+  for (const k of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]) $('m' + k + 'Card').classList.toggle('sel', p && m === k);
   $('startBtn').textContent = p ? '▶ START: ' + MISSION_NAMES[m] : '▲ PICK A MISSION ABOVE, THEN START';
-  const headlines = { 0: 'CAMP HALYARD TRAINING', 1: 'OPERATION: BLACK FILE', 2: 'OPERATION: COLD HORIZON', 3: 'SNIPER LESSON', 4: 'OPERATION: HALO INSERTION', 5: 'OPERATION: THE DAM', 6: 'OPERATION: THE CONDUCTOR\'S TRAIN', 7: 'OPERATION: PORT RAID', 8: 'OPERATION: OIL RIG' };
+  const headlines = { 0: 'CAMP HALYARD TRAINING', 1: 'OPERATION: BLACK FILE', 2: 'OPERATION: COLD HORIZON', 3: 'SNIPER LESSON', 4: 'OPERATION: HALO INSERTION', 5: 'OPERATION: THE DAM', 6: 'OPERATION: THE CONDUCTOR\'S TRAIN', 7: 'OPERATION: PORT RAID', 8: 'OPERATION: OIL RIG', 9: 'OPERATION: VILLA AURORA' };
   const h1 = document.querySelector('#startScreen h1');
   if (h1 && p) h1.textContent = headlines[m] || headlines[1];
   document.title = (p ? (headlines[m] || 'VALKYRIE') : 'VALKYRIE') + ' — ' + VERSION;
@@ -6795,7 +6817,7 @@ const endOpen = () => (state === 'won' || state === 'lost') && $('endScreen').st
 function missionStartPose() {
   zeroRange = 100; scopeState.breath = SETTINGS.holdBreathTime; scopeState.gasp = 0;
   resetWind();
-  if (currentMission >= 5) { player.stance = 'stand'; player.eyeY = SETTINGS.eyeHeight; switchWeapon(3); switchTimer = 0; if (currentMission === 6) railIntro(); if (currentMission === 8) rigIntro(); return; }   // v0.6.29
+  if (currentMission >= 5) { player.stance = 'stand'; player.eyeY = SETTINGS.eyeHeight; switchWeapon(3); switchTimer = 0; if (currentMission === 6) railIntro(); if (currentMission === 8) rigIntro(); if (currentMission === 9) estIntro(); return; }   // v0.6.29
   if (currentMission === 4) { player.stance = 'stand'; switchWeapon(3); switchTimer = 0; safe('halo', () => haloBegin()); return; }   // v0.6.27: starts in the aircraft
   if (currentMission === 2 || currentMission === 3) {
     player.stance = 'prone'; player.eyeY = SETTINGS.proneEyeHeight;
@@ -6835,6 +6857,7 @@ function startMission() {
   safe('start:training', () => { garrote.active = false; garrote.anim = 0; if (currentMission === 0 || currentMission === 3) resetTraining(); });
   showMessage(currentMission === 0 ? 'Welcome to CAMP HALYARD. Read CHIEF\'s box at the top. Follow the yellow ◆ and the floor rings.'
     : currentMission === 3 ? 'SNIPER LESSON. Read GRAVEL\'s box at the top — he\'ll walk you through every shot.'
+    : currentMission === 9 ? 'VILLA AURORA. Across the lake…'
     : currentMission === 8 ? 'OIL RIG. Hold on — the boat is going in…'
     : currentMission === 7 ? 'PORT RAID. HAWK and DOC are with you. Follow the yellow ◆ through the stacks. N = night vision, O = hint.'
     : currentMission === 6 ? 'THE CONDUCTOR\'S TRAIN. Wait for the drop… then follow the yellow ◆. O = radio for a hint.'
@@ -6861,14 +6884,16 @@ function endGame(won) {
   safeUnlock();
   const secs = Math.round((performance.now() - player.startTime) / 1000);
   const acc = player.shotsFired ? Math.round(player.shotsHit / player.shotsFired * 100) : 0;
-  $('endTitle').textContent = won && currentMission === 8 ? 'MISSION COMPLETE — OIL RIG' : won && currentMission === 7 ? 'MISSION COMPLETE — PORT RAID' : won && currentMission === 6 ? 'MISSION COMPLETE — THE CONDUCTOR\'S TRAIN' : won && currentMission === 5 ? 'MISSION COMPLETE — THE DAM' : won && currentMission === 4 ? 'MISSION COMPLETE — HALO INSERTION' : won ? (currentMission === 0 ? 'TRAINING COMPLETE' : currentMission === 3 ? 'QUALIFIED — SNIPER LESSON COMPLETE' : 'MISSION COMPLETE') : 'MISSION FAILED';
+  $('endTitle').textContent = won && currentMission === 9 ? 'CAMPAIGN COMPLETE — VALKYRIE' : !won && currentMission === 9 && EST.escaped ? 'THE PATRON ESCAPED' : won && currentMission === 8 ? 'MISSION COMPLETE — OIL RIG' : won && currentMission === 7 ? 'MISSION COMPLETE — PORT RAID' : won && currentMission === 6 ? 'MISSION COMPLETE — THE CONDUCTOR\'S TRAIN' : won && currentMission === 5 ? 'MISSION COMPLETE — THE DAM' : won && currentMission === 4 ? 'MISSION COMPLETE — HALO INSERTION' : won ? (currentMission === 0 ? 'TRAINING COMPLETE' : currentMission === 3 ? 'QUALIFIED — SNIPER LESSON COMPLETE' : 'MISSION COMPLETE') : 'MISSION FAILED';
   $('endTitle').style.color = won ? '#7f7' : '#f66';
-  $('endSubtitle').textContent = currentMission === 8 ? (won ? 'HAWK: "His bank\'s on fire, his guns are at the bottom of the North Sea, and we have his floor plans. Villa Aurora, here we come."' : 'DOC: "Cause of death: North Sea. It\'s a very common one out here."') : currentMission === 7 ? (won ? 'HAWK: "The Nordstern\'s on the bottom of the Maas and we have an address: Villa Aurora, Lake Como. Time to visit THE PATRON."' : 'DOC: "Rotterdam: the largest port in Europe. Also, apparently, your final resting place."') : currentMission === 6 ? (won ? (RAIL.conductor && RAIL.conductor.state === 'dead' ? 'HAWK: "The Conductor\'s dead and his ledger is ours. Every line points to one house: THE PATRON\'s estate."' : 'HAWK: "He ran. Good — he\'ll run home to THE PATRON, and we\'ll follow the ledger and the footprints."') : 'DOC: "Trains: 1. Wraith: 0. Mind the gap next time."') : currentMission === 5 ? (won ? 'HAWK: "220 metres on a rubber band. The Conductor\'s train is next — and you\'re buying the tickets."' : 'DOC: "The dam won. Dams usually do."') : currentMission === 4 ? (won ? 'HAWK: "In by parachute, out by helicopter. They never knew we were there."' : (H && H.phase !== 'ground' ? 'DOC: "That\'s why we practise in the wind tunnel, Wraith."' : 'Wraith down on the airfield. HAWK and DOC carry you out.')) : won ? (currentMission === 0 ? 'CHIEF: "Congratulations, Wraith. You are now marginally less likely to die. Black File is waiting."' : currentMission === 3 ? 'GRAVEL: "Measure, dial, breathe, squeeze, stay. Now do it when they shoot back."' : currentMission === 2 ? 'Exfil complete. The Conductor just lost an airfield.' : 'Extraction successful. Good work, Agent.')
+  $('endSubtitle').textContent = currentMission === 9 ? (won ? 'THE PATRON is dead, his villa is a bonfire and his ledger is on its way to every newspaper in Europe. DOC: "I\'d send flowers, but the gardens are on fire."' : EST.escaped ? 'He\'s on the lake with a speedboat and a grudge. HAWK: "Next time, Wraith, run faster."' : 'DOC: "Died on Lake Como. There are worse views to go out on."') : currentMission === 8 ? (won ? 'HAWK: "His bank\'s on fire, his guns are at the bottom of the North Sea, and we have his floor plans. Villa Aurora, here we come."' : 'DOC: "Cause of death: North Sea. It\'s a very common one out here."') : currentMission === 7 ? (won ? 'HAWK: "The Nordstern\'s on the bottom of the Maas and we have an address: Villa Aurora, Lake Como. Time to visit THE PATRON."' : 'DOC: "Rotterdam: the largest port in Europe. Also, apparently, your final resting place."') : currentMission === 6 ? (won ? (RAIL.conductor && RAIL.conductor.state === 'dead' ? 'HAWK: "The Conductor\'s dead and his ledger is ours. Every line points to one house: THE PATRON\'s estate."' : 'HAWK: "He ran. Good — he\'ll run home to THE PATRON, and we\'ll follow the ledger and the footprints."') : 'DOC: "Trains: 1. Wraith: 0. Mind the gap next time."') : currentMission === 5 ? (won ? 'HAWK: "220 metres on a rubber band. The Conductor\'s train is next — and you\'re buying the tickets."' : 'DOC: "The dam won. Dams usually do."') : currentMission === 4 ? (won ? 'HAWK: "In by parachute, out by helicopter. They never knew we were there."' : (H && H.phase !== 'ground' ? 'DOC: "That\'s why we practise in the wind tunnel, Wraith."' : 'Wraith down on the airfield. HAWK and DOC carry you out.')) : won ? (currentMission === 0 ? 'CHIEF: "Congratulations, Wraith. You are now marginally less likely to die. Black File is waiting."' : currentMission === 3 ? 'GRAVEL: "Measure, dial, breathe, squeeze, stay. Now do it when they shoot back."' : currentMission === 2 ? 'Exfil complete. The Conductor just lost an airfield.' : 'Extraction successful. Good work, Agent.')
     : (currentMission === 2 ? 'Wraith down. Gravel is going to be insufferable about this.' : 'Agent down. The intel is lost.');
   if (won) unlockAfterWin(currentMission);                            // v0.6.6: winning opens the next mission
   if (won && currentMission === 0) { try { localStorage.setItem('valkyrieTrainingDone', '1'); } catch (err) {} }
   if (won && currentMission === 3) { try { localStorage.setItem('valkyrieSniperLessonDone', '1'); } catch (err) {} }
-  const objLine = currentMission === 8
+  const objLine = currentMission === 9
+    ? estObjectives().map(o => (o.done ? '☑ ' : '☐ ') + o.text).join('<br>') + (won ? '<br><br><b style="color:#ffd860">CAMPAIGN COMPLETE — ALL MISSIONS</b><br>' + MISSION_ORDER.map(k => '✔ ' + MISSION_NAMES[k]).join('<br>') + '<br><i>Operation Valkyrie is over. THE PATRON is retired. Permanently.</i>' : '')
+    : currentMission === 8
     ? rigObjectives().map(o => (o.done ? '☑ ' : '☐ ') + o.text).join('<br>')
     : currentMission === 7
     ? portObjectives().map(o => (o.done ? '☑ ' : '☐ ') + o.text).join('<br>')
@@ -6890,7 +6915,7 @@ function endGame(won) {
     : `Intel recovered: ${intelItems.filter(i => i.collected).length} / ${intelItems.length}`;
   $('endStats').innerHTML = `Time: ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}<br>
     ${currentMission === 3 ? 'Plates hit: ' + player.shotsHit : 'Guards neutralised: ' + player.kills + ' / ' + enemies.length}<br>Accuracy: ${acc}% &nbsp; Headshots: ${player.headshots}<br>${objLine}`;
-  $('restartBtn').textContent = won && currentMission === 0 ? '▶ CONTINUE: MISSION 01 — BLACK FILE (Enter)' : won && currentMission === 3 ? '▶ CONTINUE: MISSION 02 — COLD HORIZON (Enter)' : won && currentMission === 2 ? '▶ CONTINUE: MISSION 03 — HALO INSERTION (Enter)' : won && currentMission === 4 ? '▶ CONTINUE: MISSION 04 — THE DAM (Enter)' : won && currentMission === 5 ? '▶ CONTINUE: MISSION 05 — THE CONDUCTOR\'S TRAIN (Enter)' : won && currentMission === 6 ? '▶ CONTINUE: MISSION 06 — PORT RAID (Enter)' : won && currentMission === 7 ? '▶ CONTINUE: MISSION 07 — OIL RIG (Enter)' : '↻ CLICK / TAP TO RESTART MISSION (Enter)';
+  $('restartBtn').textContent = won && currentMission === 0 ? '▶ CONTINUE: MISSION 01 — BLACK FILE (Enter)' : won && currentMission === 3 ? '▶ CONTINUE: MISSION 02 — COLD HORIZON (Enter)' : won && currentMission === 2 ? '▶ CONTINUE: MISSION 03 — HALO INSERTION (Enter)' : won && currentMission === 4 ? '▶ CONTINUE: MISSION 04 — THE DAM (Enter)' : won && currentMission === 5 ? '▶ CONTINUE: MISSION 05 — THE CONDUCTOR\'S TRAIN (Enter)' : won && currentMission === 6 ? '▶ CONTINUE: MISSION 06 — PORT RAID (Enter)' : won && currentMission === 7 ? '▶ CONTINUE: MISSION 07 — OIL RIG (Enter)' : won && currentMission === 8 ? '▶ CONTINUE: MISSION 08 — VILLA AURORA (Enter)' : '↻ CLICK / TAP TO RESTART MISSION (Enter)';
   $('endScreen').style.display = 'flex';
   safe('end:sound', () => (won ? SOUNDS.win() : SOUNDS.lose()));
 }
@@ -6906,7 +6931,7 @@ document.querySelectorAll('.gfxSel').forEach(el => el.addEventListener('change',
 document.querySelectorAll('input[name="mission"]').forEach(r => r.addEventListener('change', () => { if (r.checked && startOpen()) chooseMission(+r.value); }));
 // Tapping / clicking anywhere on a mission card picks it (pointer, touch AND click, whichever arrives).
 // v0.6.5: a genuine tap or click only, and only while the start screen is up (see onTap).
-for (const [id, m] of [['m0Card', 0], ['m1Card', 1], ['m3Card', 3], ['m2Card', 2], ['m4Card', 4], ['m5Card', 5], ['m6Card', 6], ['m7Card', 7], ['m8Card', 8]])
+for (const [id, m] of [['m0Card', 0], ['m1Card', 1], ['m3Card', 3], ['m2Card', 2], ['m4Card', 4], ['m5Card', 5], ['m6Card', 6], ['m7Card', 7], ['m8Card', 8], ['m9Card', 9]])
   onTap($(id), how => { noteInput('mission card ' + m + ' (' + how + ')'); chooseMission(m); }, { when: startOpen });
 // A link can pick the mission: ...?mission=2  or  ...#m2
 {
@@ -6916,9 +6941,9 @@ for (const [id, m] of [['m0Card', 0], ['m1Card', 1], ['m3Card', 3], ['m2Card', 2
   const params = new URLSearchParams(location.search);
   const q = (params.get('mission') || '').toLowerCase();
   const h = (location.hash || '').toLowerCase();
-  const fromName = { '0': 0, training: 0, train: 0, halyard: 0, camphalyard: 0, '1': 1, black: 1, blackfile: 1, mission1: 1, '2': 2, cold: 2, horizon: 2, mission2: 2, '3': 3, sniper: 3, lesson: 3, '4': 4, halo: 4, jump: 4, insertion: 4, mission3: 4, '5': 5, dam: 5, mission4: 5, '6': 6, train: 6, conductor: 6, mission5: 6, '7': 7, port: 7, ship: 7, mission6: 7, '8': 8, rig: 8, oilrig: 8, mission7: 8 };
+  const fromName = { '0': 0, training: 0, train: 0, halyard: 0, camphalyard: 0, '1': 1, black: 1, blackfile: 1, mission1: 1, '2': 2, cold: 2, horizon: 2, mission2: 2, '3': 3, sniper: 3, lesson: 3, '4': 4, halo: 4, jump: 4, insertion: 4, mission3: 4, '5': 5, dam: 5, mission4: 5, '6': 6, train: 6, conductor: 6, mission5: 6, '7': 7, port: 7, ship: 7, mission6: 7, '8': 8, rig: 8, oilrig: 8, mission7: 8, '9': 9, estate: 9, villa: 9, aurora: 9, patron: 9, finale: 9, mission8: 9 };
   const want = Object.prototype.hasOwnProperty.call(fromName, q) ? fromName[q]
-    : (h === '#rig' || h === '#m8' ? 8 : h === '#port' || h === '#m7' ? 7 : h === '#train' || h === '#m6' ? 6 : h === '#dam' || h === '#m5' ? 5 : h === '#halo' || h === '#m4' ? 4 : h === '#m3' || h === '#sniper' || h === '#lesson' ? 3 : h === '#m2' || h === '#mission2' || h === '#horizon' ? 2 : h === '#m1' || h === '#mission1' || h === '#blackfile' ? 1
+    : (h === '#estate' || h === '#m9' ? 9 : h === '#rig' || h === '#m8' ? 8 : h === '#port' || h === '#m7' ? 7 : h === '#train' || h === '#m6' ? 6 : h === '#dam' || h === '#m5' ? 5 : h === '#halo' || h === '#m4' ? 4 : h === '#m3' || h === '#sniper' || h === '#lesson' ? 3 : h === '#m2' || h === '#mission2' || h === '#horizon' ? 2 : h === '#m1' || h === '#mission1' || h === '#blackfile' ? 1
     : h === '#m0' || h === '#training' || h === '#halyard' ? 0 : -1);
   // v0.6.6: no mission in the link = the furthest mission you've earned, ticked, on the picker.
   // A link to a LOCKED mission falls back to the furthest one you've earned, with a short note.
@@ -6938,7 +6963,8 @@ function continueOrRestart() {
   else if (state === 'won' && currentMission === 4) { chooseMission(5, false); lastStartAt = -1e9; }   // v0.6.29
   else if (state === 'won' && currentMission === 5) { chooseMission(6, false); lastStartAt = -1e9; }   // v0.6.30
   else if (state === 'won' && currentMission === 6) { chooseMission(7, false); lastStartAt = -1e9; }   // v0.6.31
-  else if (state === 'won' && currentMission === 7) { chooseMission(8, false); lastStartAt = -1e9; }   // v0.6.32   // v0.6.27
+  else if (state === 'won' && currentMission === 7) { chooseMission(8, false); lastStartAt = -1e9; }   // v0.6.32
+  else if (state === 'won' && currentMission === 8) { chooseMission(9, false); lastStartAt = -1e9; }   // v0.6.33   // v0.6.27
   startMission();
 }
 // v0.6.5: Skip training needs a genuine tap AND a second tap to confirm (it sits below the briefing now).
@@ -9223,6 +9249,299 @@ function rigStartHeli() {
 }
 
 // #####################################################################
+// ##  SECTION 31: VILLA AURORA — THE PATRON'S ESTATE (v0.6.33)       ##
+// #####################################################################
+// The finale. A lakeside villa on Lake Como at night: terraced gardens, a hedge maze, cypress
+// avenues, stone balustrades, a boathouse. Three real levels joined by real STAIRS (wine cellar
+// and vault -4.5 m, grounds + ground floor 0 m, upper floor + library 4.5 m). Like the rig, each
+// level has its own wall grid and the game swaps grids halfway up a stair (no teleporting).
+const EST_MAPS = [
+  ["xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxx################xxxxxxxxxx", "xxxxxxxxxxxxxx#WW.WW.WW.....##xxxxxxxxxx", "xxxxxxxxxxxxxx#...........#S##xxxxxxxxxx", "xxxxxxxxxxxxxx#WW.WW.WW...#S##xxxxxxxxxx", "xxxxxxxxxxxxxx#...........####xxxxxxxxxx", "xxxxxxxxxxxxxx#...........####xxxxxxxxxx", "xxxxxxxxxxxxxx######V#########xxxxxxxxxx", "xxxxxxxxxxxxxx#....T.........#xxxxxxxxxx", "xxxxxxxxxxxxxx#..............#xxxxxxxxxx", "xxxxxxxxxxxxxx################xxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"],
+  ["xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "x.C..C..C..C....................C..C...x", "x.............################.........x", "x..#####......#....#.....#.r.#.........x", "x..#...#......#....#.r...#rSr#.........x", "x..#...#......#.....rSr..#rSr#.........x", "x..##.##......#....#rSr......#.........x", "x.............#....#.........#.........x", "x.............#..D.#....#....#......O..x", "x.............#.........#..K.#.........x", "x.............#....#....#....#.........x", "x.............#######..####.##.........x", "x......................................x", "x.....BB.BBBBBBBBBBBB..BBBBBBBBBB.BBBB.x", "x......................................x", "x.HHHHHHH.HHHHHHH..........FF..........x", "x.H.H.....H.....H..C....C..FF..........x", "x.H.HHH.HHH..HH.H......................x", "x.H...H.......H.H.BBB..BBBBB.BBBBBBBBB.x", "x.HHH...HHHHHHH.H..C....C..............x", "x.H.H.H.H...H...H......................x", "x.H.H.HHH...H.H.H......................x", "x.H.H.....H...H.H..C....C..............x", "x.H.HHHHHHHHHHH.H..........###..###....x", "x.H.H.........H.H..........#......#....x", "x.H.H.H..HHHHHH.H..C....C..#..www.#....x", "x.H...H....................#..www.#....x", "x.HHHHHHHHHHHHHHH..........#..www.#....x", "xBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB...Bx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"],
+  ["xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxx################xxxxxxxxxx", "xxxxxxxxxxxxxx#L.L.L#........#xxxxxxxxxx", "xxxxxxxxxxxxxx#.....#........#xxxxxxxxxx", "xxxxxxxxxxxxxx#L.L..#Sr...####xxxxxxxxxx", "xxxxxxxxxxxxxx#.....#Sr...#..#xxxxxxxxxx", "xxxxxxxxxxxxxx#L.L..#r....#..#xxxxxxxxxx", "xxxxxxxxxxxxxx#..............#xxxxxxxxxx", "xxxxxxxxxxxxxx#L.L..#.....#..#xxxxxxxxxx", "xxxxxxxxxxxxxx#.D...#.....#.D#xxxxxxxxxx", "xxxxxxxxxxxxxx################xxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]
+];
+const EST_STAIRS = [{ c: 27, r: 4, dc: 0, dr: 1, L: 0 }, { c: 21, r: 6, dc: 0, dr: -1, L: 1 }];
+const EST_NAMES = ['WINE CELLAR · VAULT', 'GROUNDS · GROUND FLOOR', 'UPPER FLOOR · LIBRARY'];
+const EST_W = 40, EST_H = 30;
+function estCell(c, r) { return { x: (EST.c0 + c) * CELL + CELL / 2, z: (EST.r0 + r) * CELL + CELL / 2 }; }
+function estLocal(x, z) { return [Math.floor(x / CELL) - EST.c0, Math.floor(z / CELL) - EST.r0]; }
+function estStairAt(x, z) {
+  const [c, r] = estLocal(x, z);
+  for (const s of EST_STAIRS) if ((c === s.c && r === s.r) || (c === s.c + s.dc && r === s.r + s.dr)) {
+    const ex = (EST.c0 + s.c) * CELL, ez = (EST.r0 + s.r) * CELL;
+    const u = s.dc === 1 ? x - ex : s.dc === -1 ? ex + CELL - x : s.dr === 1 ? z - ez : ez + CELL - z;
+    return { s, p: Math.min(1, Math.max(0, u / (2 * CELL))) };
+  }
+  return null;
+}
+function estGround(x, z) {
+  const [c, r] = estLocal(x, z); if (c < 0 || r < 0 || c >= EST_W || r >= EST_H) return null;
+  const st = estStairAt(x, z); if (st) return EST.Y[st.s.L] + (EST.Y[st.s.L + 1] - EST.Y[st.s.L]) * st.p;
+  return EST.Y[EST.level];
+}
+function estSetLevel(L, arrive) {
+  EST.level = L; solid = EST.grids[L].s; opaque = EST.grids[L].o;
+  for (const it of intelItems) if (it.estLevel !== undefined) it.group.position.x = it.home.x + (it.estLevel === L ? 0 : 5000);
+  for (const e of enemies) { if (e.estLevel === undefined) continue; const here = e.estLevel === L && !e.estHold; e.group.visible = here; if (e.state !== 'dead') e.dummy = !here; }
+  if (arrive) teammates.forEach((m, i) => { m.goal = null; m.path = []; const p = randomFloorNear(arrive.x + (i ? 1.4 : -1.4), arrive.z, 1.2); m.group.position.set(p.x, groundAt(p.x, p.z), p.z); });
+  if (!EST.said['lvl' + L] && EST.landed) { EST.said['lvl' + L] = true; showMessage(EST_NAMES[L], 2.5); }
+}
+function buildEstateMission() {
+  const Q = SETTINGS.graphicsQuality === 'high', low = SETTINGS.graphicsQuality === 'low', C = M2_WORLD.center, size = M2_WORLD.size;
+  sniperLights = []; sniperLamps = []; materiel = []; sniperWater = null; teammates = [];
+  sniperState = { leadersTotal: 0, objectivesAnnounced: false, lightsOut: false };
+  Object.assign(EST, { on: true, level: 1, seq: null, said: {}, landed: false, silentFail: false, powerOut: false, fleeing: false, fleeT: 0, escaped: false, patron: null, guards: [], sniper: null, amb: 0, lamps: [], vaultOpen: false });
+  heightField = { seg: 4, step: size / 4, x0: C.x - size / 2, z0: C.z - size / 2, data: new Float32Array(25) };
+  const x0 = EST.c0 * CELL, z0 = EST.r0 * CELL, x1 = x0 + EST_W * CELL, z1 = z0 + EST_H * CELL, xc = (x0 + x1) / 2, zc = (z0 + z1) / 2;
+  // ---- Lake Como at night: moon, stars, mountains, village lights across the water ----
+  scene.background = new THREE.Color(0x0b1224); scene.fog = new THREE.FogExp2(0x101828, 0.0042);
+  const moon = new THREE.DirectionalLight(0xa8bce8, 1.15); moon.position.set(xc + 300, 520, zc + 380); moon.target.position.set(xc, 0, zc);
+  moon.castShadow = !low; moon.shadow.mapSize.set(Q ? 2048 : 1024, Q ? 2048 : 1024); const sc = moon.shadow.camera; sc.left = -110; sc.right = 110; sc.top = 110; sc.bottom = -110; sc.near = 100; sc.far = 1400; moon.shadow.bias = -0.0005;
+  levelGroup.add(moon, moon.target); worldSun = moon; worldSun.userData.outdoor = true;
+  hemiLight.intensity = 0.45; hemiLight.color.set(0x7080b0); hemiLight.groundColor.set(0x1a2018); ambientLight.intensity = 0.12;
+  disposeEnv(); scene.environment = null;
+  { const n = 700, P = new Float32Array(n * 3); for (let k = 0; k < n; k++) { const v = new THREE.Vector3().setFromSphericalCoords(6000, Math.random() * 1.3, Math.random() * 6.283); P.set([v.x + xc, Math.abs(v.y) + 400, v.z + zc], k * 3); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); levelGroup.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 2, sizeAttenuation: false, fog: false }))); }
+  { const mm = new THREE.MeshBasicMaterial({ color: 0x0c1220, fog: false }), rand = makeRandom(33), P = [];
+    for (let k = 0; k < 16; k++) { const a = -0.4 + k / 16 * 7.1, d = 900 + rand() * 500, h = 300 + rand() * 380; const m = new THREE.Mesh(new THREE.ConeGeometry(h * 1.6, h, 7), mm); m.position.set(xc + Math.sin(a) * d, h / 2 - 20, zc + Math.cos(a) * d); levelGroup.add(m); }
+    for (let k = 0; k < 160; k++) { const a = rand() * 6.283, d = 650 + rand() * 300; P.push(xc + Math.sin(a) * d, 2 + rand() * 60, zc + 250 + Math.abs(Math.cos(a)) * d); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(P), 3)); levelGroup.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffc070, size: 2.5, sizeAttenuation: false, fog: false }))); }
+  const wGeo = new THREE.PlaneGeometry(4000, 2400);
+  if (Q) { sniperWater = new Water(wGeo, { textureWidth: 512, textureHeight: 512, waterNormals: makeWaterNormals(), sunDirection: new THREE.Vector3(0.4, 0.6, 0.5).normalize(), sunColor: 0x8090c0, waterColor: 0x0a1a24, distortionScale: 2.2, fog: true }); sniperWater.material.uniforms.size.value = 2.5; }
+  else sniperWater = new THREE.Mesh(wGeo, new THREE.MeshStandardMaterial({ color: 0x0c1c26, metalness: 0.7, roughness: 0.2 }));
+  sniperWater.rotation.x = -Math.PI / 2; sniperWater.position.set(xc, -0.7, z1 - CELL + 1200); levelGroup.add(sniperWater);
+  // ---- three wall grids + stairs ----
+  worldCols = worldRows = Math.ceil(size / CELL); worldOffset = { x: C.x - size / 2, z: C.z - size / 2 };
+  const N = worldCols * worldRows; EST.grids = [];
+  const gi = (c, r) => (EST.r0 + r) * worldCols + EST.c0 + c;
+  for (let L = 0; L < 3; L++) { const G = { s: new Uint8Array(N).fill(1), o: new Uint8Array(N) };
+    EST_MAPS[L].forEach((row, r) => { for (let c = 0; c < EST_W; c++) { const ch = row[c], k = gi(c, r); if ('.SOI'.includes(ch)) { G.s[k] = 0; G.o[k] = 0; } else { G.s[k] = 1; G.o[k] = '#HCTWVL'.includes(ch) ? 1 : 0; } } });
+    EST.grids.push(G); }
+  for (const s of EST_STAIRS) for (const L of [s.L, s.L + 1]) for (const k of [0, 1]) { const G = EST.grids[L], q = gi(s.c + s.dc * k, s.r + s.dr * k); G.s[q] = 0; G.o[q] = 0; }
+  EST.vaultCell = gi(20, 8);
+  estSetLevel(1);
+  estBuild(Q, low);
+  // ---- objectives: transformer, vault, ledger ----
+  const C2 = p => ({ x: p.x - C.x, z: p.z - C.z });
+  EST.level = 1; addMateriel({ type: 'generator', x: C2(estCell(5, 4)).x, z: C2(estCell(5, 4)).z }); Object.assign(materiel[materiel.length - 1], { estLevel: 1, estRole: 'power' });
+  EST.level = 0; addMateriel({ type: 'generator', x: C2(estCell(20, 7)).x, z: C2(estCell(20, 7)).z }); Object.assign(materiel[materiel.length - 1], { estLevel: 0, estRole: 'vault' });
+  EST.level = 2; const ip = estCell(17, 10); createIntel(ip.x, ip.z, 'THE PATRON\'s black ledger (library desk)'); { const it = intelItems[intelItems.length - 1]; it.estLevel = 2; it.home = it.group.position.clone(); }
+  // ---- guards ----
+  const GU = { 1: [[10, 12, [30, 12]], [30, 15, [36, 15]], [5, 8, 's'], [2, 10, [12, 10]], [9, 20], [13, 24], [26, 21, [36, 21]], [33, 16, 's'], [17, 25, [17, 15]], [18, 27, [26, 27]], [37, 20, [37, 12]], [14, 1, [30, 1]], [22, 12, 's'], [28, 26, 's'], [16, 9, 's'], [22, 9, [22, 7]], [26, 9, 's']],
+    2: [[24, 4, [24, 9]], [16, 8, 'o'], [18, 4], [28, 8, 's']], 0: [[17, 4, [25, 4]], [24, 6, 's'], [16, 6]] };
+  for (const L of [0, 1, 2]) for (const [c, r, x] of GU[L]) {
+    EST.level = L; const p = estCell(c, r), o = { label: 'Guard', uniform: 0x2a2e36, headgear: 'cap' };
+    if (x === 'o') Object.assign(o, { officer: true, label: 'Bellini, the accountant', uniform: 0x3a3226, headgear: 'beret' }); if (x === 's') o.label = 'Sentry';
+    createEnemy(p.x, p.z, o); const e = enemies[enemies.length - 1]; e.estLevel = L;
+    if (Array.isArray(x)) { const q = estCell(x[0], x[1]); e.patrol = { points: [{ x: p.x, z: p.z }, { x: q.x, z: q.z }], i: 1 }; }
+  }
+  EST.level = 1; { const p = estCell(36, 8); createEnemy(p.x, p.z, { baseY: 9, static: true, label: 'Sniper (belvedere)', headgear: 'balaclava', uniform: 0x1e2620 }); const e = enemies[enemies.length - 1]; e.estLevel = 1; e.baseY = 9; EST.sniper = e; }
+  // THE PATRON + three armoured bodyguards wait in the boathouse (they appear when he bolts from the panic room)
+  for (const [c, r, boss] of [[31, 24, true], [29, 24], [33, 24], [30, 22]]) {
+    const p = estCell(c, r); createEnemy(p.x, p.z, boss ? { officer: true, label: 'THE PATRON', uniform: 0xe8e2d4, headgear: 'cap' } : { label: 'Armoured bodyguard', uniform: 0x141414, headgear: 'helmet' });
+    const e = enemies[enemies.length - 1]; Object.assign(e, { estLevel: 1, estHold: true, health: boss ? 900 : 350 }); if (boss) { EST.patron = e; e.static = true; } else EST.guards.push(e);
+  }
+  sniperState.leadersTotal = enemies.filter(e => e.officer).length;
+  EST.level = 1; estSetLevel(1);
+  const st = estCell(36, 27); playerStart = { x: st.x, z: st.z, yaw: 0 };
+  createPickup(st.x + 1.5, st.z - 3, 'ammo'); { const p = estCell(23, 5); createPickup(p.x, p.z, 'health'); }
+  EST.level = 0; { const p = estCell(15, 4); createPickup(p.x, p.z, 'ammo'); } EST.level = 2; { const p = estCell(27, 4); createPickup(p.x, p.z, 'health'); }
+  EST.level = 1; const ex = estCell(36, 28); createExit(ex.x, ex.z); if (exitZone) exitZone.radius = 2.5;
+  createTeammate(st.x - 2, st.z + 1, 'HAWK'); createTeammate(st.x + 2, st.z + 1, 'DOC');
+  finalizeTargets();
+}
+function estBuild(Q, low) {
+  const x0 = EST.c0 * CELL, z0 = EST.r0 * CELL, x1 = x0 + EST_W * CELL, z1 = z0 + EST_H * CELL, xc = (x0 + x1) / 2, Y = EST.Y;
+  const vx0 = x0 + 14 * CELL, vx1 = x0 + 30 * CELL, vz0 = z0 + 2 * CELL, vz1 = z0 + 12 * CELL;
+  const P = (col, set, sc, o = {}) => pbr(new THREE.MeshStandardMaterial(Object.assign({ color: col, roughness: 0.85 }, o)), set, { mode: 'detail', scale: sc });
+  const plaster = P(0xe0b47a, 'plaster', 2), plasterIn = P(0xece2cc, 'plaster', 2), stone = P(0xd8ccb4, 'concrete', 2.5), cellarM = P(0x8a8478, 'rock', 2), grass = P(0x3e5a2c, 'grass', 3);
+  const gravel = P(0xb8ac98, 'gravel', 2), wood = P(0x6a4a30, 'wood', 1.5), marble = P(0xe8e4dc, 'concrete', 2, { roughness: 0.35 }), hedgeM = P(0x24401c, 'grass', 1.2), terracotta = P(0xa8502e, 'brick', 1.5), dark = new THREE.MeshStandardMaterial({ color: 0x23262a, roughness: 0.6, metalness: 0.5 });
+  const add = (geo, mat, x, y, z, wall = true) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; levelGroup.add(m); if (wall) wallMeshes.push(m); return m; };
+  const dm = new THREE.Object3D();
+  const inst = (geo, mat, list, shadow = true) => { if (!list.length) return null; const im = new THREE.InstancedMesh(geo, mat, list.length); list.forEach(([x, y, z, sy], i) => { dm.position.set(x, y, z); dm.scale.set(1, sy || 1, 1); dm.updateMatrix(); im.setMatrixAt(i, dm.matrix); }); im.castShadow = shadow; im.receiveShadow = true; levelGroup.add(im); return im; };
+  // grass around the villa (four planes so the cellar stair hole stays open), lake shore wall
+  const big = 700;
+  for (const [ax, bx, az, bz] of [[xc - big, xc + big, z0 - big, vz0], [xc - big, xc + big, vz1, z1 - CELL], [xc - big, vx0, vz0, vz1], [vx1, xc + big, vz0, vz1]]) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(bx - ax, bz - az), grass); m.rotation.x = -Math.PI / 2; m.position.set((ax + bx) / 2, -0.02, (az + bz) / 2); m.receiveShadow = true; levelGroup.add(m); }
+  add(new THREE.BoxGeometry(EST_W * CELL + 400, 2.2, 1.2), stone, xc, -1.1, z1 - CELL + 0.6, false);
+  // floors: villa (3 levels), paths (gravel), boathouse + hut (wood / stone)
+  const holes = new Set(); for (const s of EST_STAIRS) for (const k of [0, 1]) holes.add((s.L + 1) + ':' + (s.c + s.dc * k) + ':' + (s.r + s.dr * k));
+  const tile = new THREE.BoxGeometry(CELL, 0.3, CELL), fl = { 0: [], 1: [], 2: [], g: [], w: [] };
+  const inV = (c, r) => c >= 14 && c <= 29 && r >= 2 && r <= 11;
+  for (let r = 0; r < EST_H; r++) for (let c = 0; c < EST_W; c++) { const p = estCell(c, r), ch = EST_MAPS[1][r][c];
+    if (inV(c, r)) { for (const L of [0, 1, 2]) if (!holes.has(L + ':' + c + ':' + r)) fl[L].push([p.x, Y[L] - 0.15, p.z]); continue; }
+    if (ch === 'x' || ch === 'H' || ch === 'w') continue;
+    if ((c >= 27 && c <= 34 && r >= 23) || (c >= 3 && c <= 7 && r >= 3 && r <= 6)) fl.w.push([p.x, -0.13, p.z]);
+    else if (((c === 21 || c === 22) && r >= 12) || r === 12 || r === 14 || (r === 20 && c >= 17) || (c >= 35 && c <= 37 && r >= 24)) fl.g.push([p.x, -0.13, p.z]); }
+  inst(tile, cellarM, fl[0]); inst(tile, marble, fl[1]); inst(tile, wood, fl[2]); inst(tile, gravel, fl.g, false); inst(tile, wood, fl.w, false);
+  // walls: runs of '#' (villa plaster, cellar stone), hedges, cypresses, balustrades, furniture
+  const hedges = [], cyp = [], bal = [];
+  for (let L = 0; L < 3; L++) { const map = EST_MAPS[L];
+    for (let r = 0; r < EST_H; r++) { let c = 0; while (c < EST_W) { if (map[r][c] !== '#') { c++; continue; } let e = c; while (e + 1 < EST_W && map[r][e + 1] === '#') e++;
+        const per = r === 2 || r === 11, w = (e - c + 1) * CELL, a = estCell(c, r), b = estCell(e, r), mx = (a.x + b.x) / 2;
+        if (L === 1 && inV(c, r)) { const outer = per || c === 14 || e === 29; add(new THREE.BoxGeometry(w, outer ? 9.8 : 4.5, CELL), outer ? plaster : plasterIn, mx, outer ? 4.9 : 2.25, a.z); }
+        else if (L === 1) add(new THREE.BoxGeometry(w, 3.6, CELL), stone, mx, 1.8, a.z);
+        else if (L === 2) { if (!per && !(c === 14 && e === 14) && !(c === 29 && e === 29)) { add(new THREE.BoxGeometry(w, 4.5, CELL), plasterIn, mx, 6.75, a.z); } }
+        else add(new THREE.BoxGeometry(w, 4.5, CELL), cellarM, mx, -2.25, a.z);
+        c = e + 1; } }
+    for (let r = 0; r < EST_H; r++) for (let c = 0; c < EST_W; c++) { const ch = map[r][c], p = estCell(c, r), y = Y[L];
+      if (ch === 'H') hedges.push([p.x, 1.6, p.z]);
+      if (ch === 'C') cyp.push([p.x, 0, p.z]);
+      if (ch === 'B' || ch === 'r') bal.push([p.x, y + 0.5, p.z]);
+      if (ch === 'F') { if (map[r][c - 1] !== 'F' && map[r - 1][c] !== 'F') { const fx = p.x + CELL / 2, fz = p.z + CELL / 2; add(new THREE.CylinderGeometry(3.6, 3.8, 0.8, 24), stone, fx, 0.4, fz, false); add(new THREE.CylinderGeometry(0.5, 0.7, 2.6, 10), stone, fx, 1.3, fz, false);
+          const wtr = new THREE.Mesh(new THREE.CircleGeometry(3.3, 24), new THREE.MeshStandardMaterial({ color: 0x1a3040, metalness: 0.8, roughness: 0.1 })); wtr.rotation.x = -Math.PI / 2; wtr.position.set(fx, 0.7, fz); levelGroup.add(wtr); } }
+      if ('DK'.includes(ch)) add(new THREE.BoxGeometry(CELL * 0.8, 0.9, CELL * 0.5), wood, p.x, y + 0.45, p.z);
+      if (ch === 'W' || ch === 'L') add(new THREE.BoxGeometry(CELL * 0.9, ch === 'W' ? 2.4 : 3.6, CELL * 0.6), wood, p.x, y + (ch === 'W' ? 1.2 : 1.8), p.z);
+      if (ch === 'V') { EST.vaultDoor = add(new THREE.BoxGeometry(CELL, 4.4, 1.2), dark, p.x, y + 2.2, p.z); const wh = add(new THREE.TorusGeometry(0.8, 0.12, 8, 20), new THREE.MeshStandardMaterial({ color: 0xb0a070, metalness: 0.9, roughness: 0.3 }), p.x, y + 2.2, p.z - 0.65, false); EST.vaultWheel = wh; }
+      if (ch === 'T') { const sg = makeSign('TUNNEL → DARSENA (BOATHOUSE)', 3, 0.5, '#301010', '#ffd0c0', true); sg.position.set(p.x, y + 2.4, p.z - 1.9); levelGroup.add(sg); }
+    } }
+  inst(new THREE.BoxGeometry(CELL, 3.2, CELL), hedgeM, hedges);
+  inst(new THREE.BoxGeometry(CELL * 0.95, 0.9, 0.7), stone, bal);
+  // cypresses: in the gardens + a skyline of them up the hillside
+  { const rand = makeRandom(9); for (let k = 0; k < (low ? 30 : 70); k++) { const a = rand() * 6.283; let x = xc + (rand() - 0.5) * 320, z = z0 - 10 - rand() * 160; cyp.push([x, 3 + rand() * 6, z]); }
+    const trunk = [], crown = []; for (const [x, y, z] of cyp) { trunk.push([x, y + 1, z]); crown.push([x, y + 6.5, z]); }
+    inst(new THREE.CylinderGeometry(0.25, 0.35, 2, 6), wood, trunk); inst(new THREE.ConeGeometry(1.5, 11, 8), P(0x1a2e16, 'grass', 1), crown);
+    const hill = new THREE.Mesh(new THREE.BoxGeometry(900, 40, 200), grass); hill.position.set(xc, -12, z0 - 120); hill.rotation.x = 0.12; levelGroup.add(hill); }
+  // roof (terracotta hip roof), windows, signs
+  { const rw = vx1 - vx0 + 2, rd = vz1 - vz0 + 2; add(new THREE.BoxGeometry(rw, 0.4, rd), stone, (vx0 + vx1) / 2, 9.9, (vz0 + vz1) / 2, false);
+    const roof = add(new THREE.ConeGeometry(Math.SQRT1_2, 1, 4, 1).rotateY(Math.PI / 4), terracotta, (vx0 + vx1) / 2, 12.1, (vz0 + vz1) / 2, false); roof.scale.set(rw, 4.4, rd);
+    EST.winMat = new THREE.MeshBasicMaterial({ color: 0xffcf80 });
+    for (let c = 15; c <= 28; c += 1) if (c !== 21 && c !== 22) for (const yy of [2.2, 6.6]) for (const [z, rot] of [[vz1 + 0.03, 0], [vz0 - 0.03, Math.PI]]) { const p = estCell(c, 2); const w = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 2), EST.winMat); w.position.set(p.x, yy, z); w.rotation.y = rot; levelGroup.add(w); }
+    const nm = makeSign('VILLA AURORA', 6, 1, '#2a2018', '#f0d8a0', true); nm.position.set(estCell(21, 11).x + CELL / 2, 5.2, vz1 + 0.05); levelGroup.add(nm);
+    for (const [t, c, r, ry, y] of [['DARSENA · BOATHOUSE', 30.5, 22, 0, 3], ['TRASFORMATORE · ENEL · PERICOLO', 5, 6, 0, 2.6], ['LABIRINTO', 9, 14, 0, 2.6], ['BELVEDERE', 36, 9, 0, 2.4], ['CAVEAU · VAULT', 20, 7, 0, -2]]) {
+      const sg = makeSign(t, 3, 0.55, '#202818', '#f0f0d0', true); const p = estCell(c, r); sg.position.set(p.x, y, p.z + 1.9); sg.rotation.y = ry; levelGroup.add(sg); } }
+  // stairs: marble steps, signs
+  for (const s of EST_STAIRS) { const a = estCell(s.c, s.r), y0 = Y[s.L], rise = Y[s.L + 1] - y0, sx = a.x - s.dc * CELL / 2, sz = a.z - s.dr * CELL / 2;
+    for (let k = 0; k < 14; k++) { const t = (k + 0.5) / 14; add(new THREE.BoxGeometry(s.dc ? 0.6 : 3.4, rise / 14 + 0.05, s.dc ? 3.4 : 0.6), s.L === 0 ? cellarM : marble, sx + s.dc * 8 * t, y0 + rise * t - rise / 28, sz + s.dr * 8 * t, false); }
+    const up = makeSign('STAIRS ▲ ' + EST_NAMES[s.L + 1], 2.6, 0.5, '#2a2410', '#ffe7a0', true), bc = estCell(s.c - s.dc, s.r - s.dr); up.position.set(bc.x, y0 + 2.6, bc.z + s.dr * 1.9); up.rotation.y = s.dr > 0 ? Math.PI : 0; levelGroup.add(up);
+    const dn = makeSign('STAIRS ▼ ' + EST_NAMES[s.L], 2.6, 0.5, '#2a2410', '#ffe7a0', true), tc = estCell(s.c + 2 * s.dc, s.r + 2 * s.dr); dn.position.set(tc.x, Y[s.L + 1] + 2.6, tc.z - s.dr * 1.9); dn.rotation.y = s.dr > 0 ? 0 : Math.PI; levelGroup.add(dn); }
+  // belvedere (the sniper's tower)
+  { const p = estCell(36, 8); for (const [ox, oz] of [[-1.8, -1.8], [1.8, -1.8], [-1.8, 1.8], [1.8, 1.8]]) add(new THREE.CylinderGeometry(0.25, 0.3, 9, 10), stone, p.x + ox, 4.5, p.z + oz, false);
+    add(new THREE.BoxGeometry(4.4, 0.3, 4.4), stone, p.x, 8.85, p.z, false); add(new THREE.ConeGeometry(3.4, 2.4, 4).rotateY(Math.PI / 4), terracotta, p.x, 12.4, p.z, false);
+    for (const [ox, oz] of [[-1.8, -1.8], [1.8, -1.8], [-1.8, 1.8], [1.8, 1.8]]) add(new THREE.CylinderGeometry(0.15, 0.15, 2.4, 8), stone, p.x + ox, 10.2, p.z + oz, false); }
+  // boathouse roof, jetty, HAWK's boat, THE PATRON's speedboat
+  { const a = estCell(27, 23), b = estCell(34, 27); add(new THREE.BoxGeometry(b.x - a.x + CELL + 1, 0.4, b.z - a.z + CELL + 1), terracotta, (a.x + b.x) / 2, 3.8, (a.z + b.z) / 2, false);
+    const j = estCell(36, 28); add(new THREE.BoxGeometry(3 * CELL, 0.3, 26), wood, j.x, -0.2, j.z + 13, false);
+    const boat = new THREE.Group(), hull = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1, 7), new THREE.MeshStandardMaterial({ color: 0x22262a, roughness: 0.6 })); hull.position.y = 0.2; boat.add(hull); boat.position.set(j.x + 4, -0.6, j.z + 18); levelGroup.add(boat); EST.boat = boat;
+    const sp = new THREE.Group(), sh = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.9, 8), new THREE.MeshStandardMaterial({ color: 0xf2efe8, roughness: 0.3, metalness: 0.2 })), sw = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.8, 1.6), new THREE.MeshStandardMaterial({ color: 0x8a6a40, roughness: 0.3 }));
+    sw.position.set(0, 0.8, -0.6); sp.add(sh, sw); const s = estCell(31, 26); sp.position.set(s.x, -0.3, s.z); levelGroup.add(sp); EST.speedboat = sp;
+    const wt = new THREE.Mesh(new THREE.PlaneGeometry(3 * CELL, 3 * CELL), new THREE.MeshStandardMaterial({ color: 0x0c1c26, metalness: 0.7, roughness: 0.2 })); wt.rotation.x = -Math.PI / 2; wt.position.set(s.x, -0.6, s.z); levelGroup.add(wt); }
+  // garden lamps (go dark when you cut the power), interior lights
+  for (const [c, r] of [[21, 13], [22, 20], [30, 14], [12, 13], [34, 20], [21, 26]]) { const p = estCell(c, r);
+    add(new THREE.CylinderGeometry(0.08, 0.1, 3.2, 8), dark, p.x + 1.6, 1.6, p.z + 1.6, false); const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffe0a0 })); bulb.position.set(p.x + 1.6, 3.3, p.z + 1.6); levelGroup.add(bulb);
+    const l = new THREE.PointLight(0xffd8a0, low ? 0 : 140, 26, 1.6); l.position.copy(bulb.position); levelGroup.add(l); EST.lamps.push({ l, bulb }); }
+  for (const [c, r, L, col, I] of [[21, 7, 1, 0xffe0b0, 120], [17, 6, 2, 0xffd8a0, 110], [24, 7, 2, 0xffe0b0, 80], [20, 4, 0, 0xff8a60, 90], [20, 10, 0, 0xff3020, 60]]) { const p = estCell(c, r), l = new THREE.PointLight(col, I, 24, 1.6); l.position.set(p.x, Y[L] + 3.6, p.z); levelGroup.add(l); if (L > 0) EST.lamps.push({ l, bulb: null }); }
+}
+// ---- objectives / compass ----
+function estObjectives() {
+  const pw = materiel.find(m => m.estRole === 'power'), va = materiel.find(m => m.estRole === 'vault'), led = intelItems[0], P = EST.patron;
+  return [
+    { text: 'Land at the jetty', done: EST.landed },
+    { text: 'Cut the power and CCTV (C4 on the transformer, service hut, north-west)', done: !!pw && pw.destroyed },
+    { text: 'Silence the sniper in the belvedere', done: !!EST.sniper && EST.sniper.state === 'dead' },
+    { text: 'Steal THE PATRON\'s black ledger (library, upper floor)', done: !!led && led.collected },
+    { text: 'Blow the vault door in the wine cellar (C4)', done: !!va && va.destroyed },
+    { text: EST.fleeing && P && P.state !== 'dead' ? `STOP THE PATRON at the boathouse — speedboat leaves in ${Math.ceil(EST.fleeT)} s` : 'Confront THE PATRON', done: !!P && P.state === 'dead' },
+    { text: 'BONUS: all three armoured bodyguards', done: EST.guards.length > 0 && EST.guards.every(e => e.state === 'dead'), bonus: true },
+    { text: 'BONUS: unseen until the power is cut', done: EST.powerOut && !EST.silentFail, bonus: true },
+  ];
+}
+function estRoute(tx, tz, TL, label) {
+  const L = EST.level; if (TL === L) return { x: tx, z: tz, label };
+  if (TL > L) { const s = EST_STAIRS.find(s => s.L === L), b = estCell(s.c - s.dc, s.r - s.dr); return { x: b.x, z: b.z, label: 'STAIRS ▲ ' + EST_NAMES[L + 1] }; }
+  const s = EST_STAIRS.find(s => s.L === L - 1), t = estCell(s.c + 2 * s.dc, s.r + 2 * s.dr); return { x: t.x, z: t.z, label: 'STAIRS ▼ ' + EST_NAMES[L - 1] };
+}
+function estObjective() {
+  const ob = estObjectives(), pw = materiel.find(m => m.estRole === 'power'), va = materiel.find(m => m.estRole === 'vault');
+  if (!ob[1].done && pw) return estRoute(pw.x, pw.z, 1, 'TRANSFORMER');
+  if (!ob[2].done && EST.sniper) { const q = EST.sniper.group.position; return estRoute(q.x, q.z, 1, 'SNIPER (BELVEDERE)'); }
+  if (!ob[3].done) { const it = intelItems[0]; return estRoute(it.home.x, it.home.z, 2, 'LEDGER (LIBRARY)'); }
+  if (!ob[4].done && va) return estRoute(va.x, va.z, 0, 'VAULT');
+  if (!ob[5].done && EST.patron) { const q = EST.patron.group.position; return estRoute(q.x, q.z, 1, 'THE PATRON'); }
+  return exitZone ? estRoute(exitZone.x, exitZone.z, 1, 'JETTY — HAWK\'S BOAT') : null;
+}
+// ---- team: HAWK + DOC follow you everywhere (even upstairs) and shoot what shoots at you ----
+function estTeam(dt) {
+  const loud = enemies.some(e => e.state === 'chase' && e.estLevel === EST.level && !e.dummy);
+  for (const m of teammates) {
+    m.fireT = (m.fireT === undefined ? 1 : m.fireT) - dt; if (m.fireT > 0) continue; m.fireT = 1 + Math.random() * 1;
+    const p = m.group.position; let tgt = null, bd = 30;
+    for (const e of enemies) { if (e.state === 'dead' || e.dummy || e.estLevel !== EST.level || !(loud || e.state === 'chase')) continue; const q = e.group.position, d = dist2D(p.x, p.z, q.x, q.z);
+      if (d < bd && Math.abs(q.y - p.y) < 4 && hasLineOfSight(p.x, p.z, q.x, q.z)) { bd = d; tgt = e; } }
+    if (!tgt) continue;
+    const q = tgt.group.position; m.yaw = Math.atan2(q.x - p.x, q.z - p.z); m.group.rotation.y = m.yaw;
+    playNoise(0.07, 0.3 * volumeAt(p.x, p.z), 2600); spawnParticles(new THREE.Vector3(p.x + Math.sin(m.yaw) * 0.9, p.y + 1.35, p.z + Math.cos(m.yaw) * 0.9), 0xffd080, 4, 2, 0.04);
+    const armoured = tgt === EST.patron || EST.guards.includes(tgt);
+    if (armoured) { tgt.health -= 60; tgt.hitFlash = 0.12; if (tgt.health > 0) continue; }
+    else if (Math.random() > 0.55 - bd / 120) continue;
+    tgt.health = 0; lastHit = null; killEnemy(tgt, Math.random() < 0.3, {}); addKillFeed(m.name + ': ' + (tgt.label || 'guard'));
+    if (Math.random() < 0.5) radioSay(m.name, ['Tango down.', 'He\'s pruned.', 'One less waiter.', 'Down. Somebody tell the gardener.', 'That\'s the help taken care of.'][Math.floor(Math.random() * 5)], 2.5);
+  }
+}
+// ---- every frame ----
+function updateEstate(dt) {
+  if (currentMission !== 9 || state !== 'playing' || EST.seq) return;
+  const x = camera.position.x, z = camera.position.z, st = estStairAt(x, z);
+  if (st) { const want = st.p > 0.5 ? st.s.L + 1 : st.s.L; if (want !== EST.level) { const s = st.s, a = want > EST.level ? estCell(s.c + 2 * s.dc, s.r + 2 * s.dr) : estCell(s.c - s.dc, s.r - s.dr); estSetLevel(want, a); } }
+  if (!EST.powerOut && enemies.some(e => e.state === 'chase' && !e.dummy)) EST.silentFail = true;
+  estAmbience(dt); estTeam(dt);
+  const ob = estObjectives();
+  if (ob[1].done && !EST.powerOut) { EST.powerOut = true; for (const o of EST.lamps) { o.l.intensity = 0; if (o.bulb) o.bulb.material.color.set(0x222222); } EST.winMat.color.set(0x1a1814); SETTINGS.enemySightRange *= 0.7;
+    playTone(120, 40, 1.2, 0.2, 'sawtooth'); radioSay('DOC', 'Lights out, cameras blind. Guards can see about as well as THE PATRON\'s accountant sees his conscience.', 7); showMessage('POWER CUT — the villa is dark. N = night vision.', 4); }
+  if (ob[2].done && !EST.said.sniper) { EST.said.sniper = true; radioSay('HAWK', 'Belvedere\'s clear. Lovely view. Shame about the bloke in it.', 5); }
+  if (ob[3].done && !EST.said.ledger) { EST.said.ledger = true; radioSay('HAWK', 'The ledger. Every bribe, every gun, every name. Now the vault — wine cellar, stairs off the kitchen.', 7); }
+  if (ob[4].done && !EST.vaultOpen) { EST.vaultOpen = true; EST.grids[0].s[EST.vaultCell] = 0; EST.grids[0].o[EST.vaultCell] = 0; if (EST.vaultDoor) { EST.vaultDoor.visible = false; EST.vaultWheel.visible = false; const i = wallMeshes.indexOf(EST.vaultDoor); if (i >= 0) wallMeshes.splice(i, 1); }
+    EST.fleeing = true; EST.fleeT = 150; for (const e of [EST.patron, ...EST.guards]) { e.estHold = false; } estSetLevel(EST.level);
+    showMessage('THE PANIC ROOM IS EMPTY — HE\'S IN THE TUNNEL TO THE BOATHOUSE!', 5); radioSay('DOC', 'Panic room\'s empty and the champagne\'s still cold. He went through the tunnel — BOATHOUSE, Wraith, before that speedboat leaves!', 8); }
+  if (EST.fleeing && EST.patron.state !== 'dead') { EST.fleeT -= dt; if (EST.fleeT <= 0) { estStartEscape(); return; } }
+  if (ob[5].done && !EST.said.boss) { EST.said.boss = true; EST.fleeing = false; radioSay('HAWK', 'THE PATRON is down. Retired, effective immediately. Jetty — I\'ll bring the boat round.', 7); showMessage('THE PATRON IS DEAD — GET TO THE JETTY', 4); }
+  if (EST.speedboat) EST.speedboat.position.y = -0.3 + Math.sin(elapsed * 1.3) * 0.05;
+}
+function estAmbience(dt) {
+  EST.amb -= dt; if (EST.amb <= 0) { EST.amb = 2.2; playNoise(1.6, 0.02, 380); if (Math.random() < 0.5 && EST.level === 1) playTone(4200, 4300, 0.12, 0.012, 'sine'); }
+  if (EST.boat) EST.boat.position.y = -0.6 + Math.sin(elapsed * 1.1) * 0.08;
+}
+// ---- intro: across the lake by boat at night ----
+function estIntro() { EST.seq = { type: 'boat', t: 0 }; weaponRoot.visible = false; for (const m of teammates) m.group.visible = false;
+  showMessage('Lake Como, 23:40. Villa Aurora. THE PATRON is home.', 5);
+  radioSay('HAWK', 'This is it, Wraith. The plans from the rig say the boathouse jetty is the blind spot. We\'re with you all the way in.', 7); }
+function updateEstateSeq(dt) {
+  const S = EST.seq; S.t += dt; estAmbience(dt); const j = estCell(36, 28);
+  if (S.type === 'boat') {
+    const T = 6, u = Math.min(1, S.t / T), e = 1 - (1 - u) * (1 - u), bx = j.x + 60 - 56 * e, bz = j.z + 220 - 202 * e;
+    EST.boat.position.set(bx, -0.6 + Math.sin(S.t * 1.4) * 0.15, bz); EST.boat.rotation.set(0, Math.atan2(-56, -202), Math.sin(S.t * 2) * 0.04);
+    camera.position.set(bx, 1.5 + Math.sin(S.t * 1.4) * 0.15, bz + 1); camera.rotation.set(0.06, Math.atan2(-(estCell(21, 8).x - bx), -(estCell(21, 8).z - bz)), 0, 'YXZ');
+    if (S.t > T) { EST.seq = null; EST.landed = true; EST.boat.rotation.set(0, 0, 0); const p = estCell(36, 27); camera.position.set(p.x, player.eyeY, p.z); camera.rotation.set(0, 0, 0, 'YXZ'); weaponRoot.visible = true; player.velocity.set(0, 0, 0);
+      teammates.forEach((m, i) => { m.group.visible = true; m.group.position.set(p.x + (i ? 1.6 : -1.6), 0, p.z + 1.5); });
+      showMessage('Follow the yellow ◆. Transformer first — kill the lights. N = night vision.', 5); radioSay('DOC', 'Transformer\'s in the service hut, top left of the gardens. Cut it and the cameras die with it. Mind the belvedere — there\'s a sniper.', 8); }
+    return;
+  }
+  if (S.type === 'finale') {
+    const T = 14, t = S.t, u = Math.min(1, t / 10), bx = j.x + 4 + 30 * u, bz = j.z + 18 + 110 * u * u;
+    EST.boat.position.set(bx, -0.6, bz); EST.boat.rotation.set(0, Math.PI, 0); camera.position.set(bx, 2 + u * 6, bz + 3); camera.lookAt(estCell(21, 7).x, 6, estCell(21, 7).z);
+    if (t > 1.5 && S.boom < 6 && t > 1.5 + S.boom * 1.1) { const c = estCell(15 + S.boom * 3, 3 + (S.boom % 3) * 3), p = new THREE.Vector3(c.x, 6 + Math.random() * 4, c.z);
+      spawnParticles(p, 0xffa040, 50, 14, 0.5); spawnParticles(p, 0x302820, 30, 7, 0.7); const l = new THREE.PointLight(0xff8030, 5000, 300, 1.4); l.position.copy(p); levelGroup.add(l); setTimeout(() => levelGroup.remove(l), 900);
+      playNoise(2.2, 0.45, 180); playTone(48, 22, 1.5, 0.3, 'sine'); S.boom++; }
+    if (t > 2 && !S.m1) { S.m1 = true; radioSay('DOC', 'Villa Aurora. Eleven bedrooms, nine bathrooms, one very expensive bonfire.', 5); }
+    if (t > 6.5 && !S.m2) { S.m2 = true; radioSay('HAWK', 'The ledger goes to every paper in Europe in the morning. His friends are going to have a very bad breakfast.', 6); }
+    if (t > 11 && !S.m3) { S.m3 = true; showMessage('VALKYRIE — CAMPAIGN COMPLETE', 4); }
+    if (t > T && state === 'playing') { EST.seq = null; endGame(true); }
+    return;
+  }
+  if (S.type === 'escape') {
+    const u = Math.min(1, S.t / 6), s = estCell(31, 26); EST.speedboat.position.set(s.x, -0.3, s.z + 300 * u * u); camera.lookAt(EST.speedboat.position);
+    if (S.t > 6.5 && state === 'playing') { EST.seq = null; endGame(false); }
+  }
+}
+function estStartFinale() {
+  if (EST.seq || EST.level !== 1) return;
+  EST.seq = { type: 'finale', t: 0, boom: 0 }; weaponRoot.visible = false; for (const m of teammates) m.group.visible = false;
+  showMessage('ABOARD — HIT IT, HAWK!', 2.5); playNoise(2, 0.2, 220);
+}
+function estStartEscape() { EST.escaped = true; EST.seq = { type: 'escape', t: 0 }; weaponRoot.visible = false; showMessage('THE SPEEDBOAT IS AWAY — THE PATRON ESCAPED', 4); playNoise(3, 0.3, 300);
+  radioSay('DOC', 'And there goes the man, the myth, the outboard motor.', 5); }
+
+// #####################################################################
 // ##  SECTION 14: GAME LOOP (runs ~60 times a second)                ##
 // #####################################################################
 const clock = new THREE.Clock();
@@ -9250,6 +9569,9 @@ function gameLoop() {
     debugInfo.updates++;
     if (DAM.jump) {                              // v0.6.29: the bungee exit
       safe('damJump', () => updateDamJump(dt));
+      safe('hud', () => updateHUD(dt));
+    } else if (EST.on && EST.seq) {             // v0.6.33: boat in / finale / escape
+      safe('estSeq', () => updateEstateSeq(dt));
       safe('hud', () => updateHUD(dt));
     } else if (RIG.on && RIG.seq) {             // v0.6.32: boat + ladder / helicopter
       safe('rigSeq', () => updateRigSeq(dt));
@@ -9290,6 +9612,7 @@ function gameLoop() {
     safe('rail', () => updateRail(dt));
     safe('port', () => updatePort(dt));
     safe('rig', () => updateRig(dt));
+    safe('estate', () => updateEstate(dt));
     }
   }
   if (!(state === 'playing' && haloActive()) && HA.on) { haloAudioMute(); if (document.body.classList.contains('haloOn')) document.body.classList.remove('haloOn'); }
@@ -11485,7 +11808,7 @@ if (!debugInfo.on) document.getElementById('debugHud').style.display = 'none';
 window.__game = {
   THREE, SOUNDS, sfxBuf: () => sfxBuf, renderer, setGraphics, worldSun: () => worldSun, gfx: () => SETTINGS.graphicsQuality, blastFX, demoBlast, explosionAt, DEMO_AT, demoTargets: () => demoTargets, materiel: () => materiel, reloadPose, knifeModel, reloadMag, fx: () => effects.length, startReload, weaponState: () => weaponState,
   endMission: won => endGame(won),
-  progress: () => ({ dev: DEV, unlockedIdx, unlocked: [0, 1, 2, 3, 4, 5, 6, 7, 8].filter(isUnlocked) }),
+  progress: () => ({ dev: DEV, unlockedIdx, unlocked: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].filter(isUnlocked) }),
   sig: () => SIG, fr: () => FR, orderCover, hjobAhead, coverOn, hawk, SIGAT, FRAT, cutJammer,
   SETTINGS, CALIBERS, WEAPONS, player, camera, startMission, switchWeapon,
   enemies: () => enemies, state: () => state, weaponState: () => weaponState, renderFrame: () => { updateFigureLOD(); renderer.render(scene, camera); }, figureLOD: () => enemies.filter(e => e.fig && e.fig.lod).length, glFinish: () => renderer.getContext().finish(), debugInfo, VERSION, aimOffset: () => aimOffset, lastShotInfo: () => lastShotInfo, lean, safeUnlock, endGame,
@@ -11520,6 +11843,8 @@ window.__game = {
   gateSideText, layoutHud: () => { hudLayoutAt = 0; layoutHud(); }, exitLockedText, exitZone: () => exitZone, showMessage, showQuip, radioSay,
   radioPressed, trainingOverview, teleportTo, curStep, trainGates: () => trainGates, obstacles: () => obstacles, chooseMission, currentWeapon: () => currentWeapon, aiming: () => aiming,
   aimAt: (x, y, z) => { const d = new THREE.Vector3(x, y, z).sub(camera.position); camera.rotation.set(Math.asin(THREE.MathUtils.clamp(d.y / d.length(), -1, 1)), Math.atan2(-d.x, -d.z), 0, 'YXZ'); },
+  // v0.6.33 estate hooks
+  EST, EST_MAPS, EST_STAIRS, estObjectives, estObjective, estSetLevel, estCell, estStairAt, estStartFinale,
   // v0.6.32 rig hooks
   RIG, RIG_MAPS, RIG_STAIRS, rigObjectives, rigObjective, rigSetLevel, rigCell, rigStairAt, rigStartHeli,
   // v0.6.31 port hooks
