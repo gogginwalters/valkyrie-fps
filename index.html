@@ -412,7 +412,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 // ##  running, and the DEBUG box (bottom-left, ` or G) shows which   ##
 // ##  part failed and why.                                           ##
 // #####################################################################
-const VERSION = 'v0.6.35';
+const VERSION = 'v0.6.36';
 // v0.6.6 MISSION UNLOCKS. Order: TRAINING (0) -> BLACK FILE (1) -> SNIPER LESSON (3) -> COLD HORIZON (2).
 // A new player has only TRAINING; winning a mission unlocks the next one (saved as valkyrieUnlocked =
 // how far along that list you've got, 0-3). Developer mode (?dev=1, remembered; ?dev=0 clears it)
@@ -862,7 +862,7 @@ const BRIEFINGS = {
     <li><b>Under canopy:</b> <b>A D</b> toggles, <b>S</b> hold = both toggles down (brakes / flare), <b>C</b> half brakes, <b>R</b> rear risers. Follow the GPS ◆, land <b>into the wind</b> (west — the windsock's mouth). <b>Flare at 10–15 ft</b>: too high = you stall and drop, too late = you slam in.</li>
     <li>Rare emergencies: line twists (kick out: A, D, A, D…) or a malfunction (<b>X</b> cut away, <b>Space</b> reserve).</li>
     <li><b>On the ground:</b> blow the radar dish (C4: <b>B</b> plant, <b>Y</b> fire), grab the flight logs at the HQ, exfil at the west end of the runway. Quietly. Night vision: <b>N</b>.</li></ul>
-    <p style="color:#9a9">Hold <b>Shift</b> to speed up time ×4 in the slow parts (high in freefall, high under canopy). Every keystroke is explained on screen as you go.</p>`,
+    <p style="color:#9a9">The long waits are cut down: high-altitude freefall and the long canopy ride run faster on their own (break-off, flare and landing stay at real speed). Hold <b>Shift</b> to hurry the remaining slow parts even more. Every keystroke is explained on screen as you go.</p>`,
   0: `<p><b>CAMP HALYARD — NAVAL SPECIAL WARFARE TRAINING ANNEX.</b> Before anyone hands you a Black File, CHIEF wants to see you can walk, talk and shoot without hurting yourself. Or him.</p>
     <ul><li><b>13 stations</b> in a row: movement · look · comms · live-fire range · sniper lane · weapons locker · knife · garrote · <b>navigation maze</b> · <b>demolition range</b> · <b>breaching shoot house</b> (door charge, shotgun, ram, torch, wall charge, flashbangs, team stack, hostages) · <b>signals</b> (bug a phone line, intercept a transmission, cut a jammer and a junction box, order HAWK to cover a door) · and a timed <b>FINAL RUN</b> that uses all of it, then graduation.</li>
     <li>CHIEF's box at the top of the screen tells you exactly what to press — worded for <b>your</b> device (Magic Keyboard + trackpad, mouse, or touch).</li>
@@ -7028,7 +7028,7 @@ document.addEventListener('pointerlockerror', () => {
 document.addEventListener('visibilitychange', () => { if (document.hidden) pauseGame('Paused'); });
 
 // #####################################################################
-// ##  SECTION 26: HALO INSERTION (v0.6.27) — MISSION 03              ##
+// ##  SECTION 26: HALO INSERTION (v0.6.27, tighter in v0.6.36)       ##
 // ##  A night HALO jump (High Altitude, Low Opening) from a C-130 at ##
 // ##  25,000 ft, freefall in formation with HAWK and DOC, break-off  ##
 // ##  at 5,500 ft, pull at 4,000 ft, fly the canopy to the LZ, flare ##
@@ -7401,7 +7401,7 @@ function haloKey(code) {
   const ph = H.phase;
   if (ph === 'cabin') {
     if (code === 'KeyB' && !H.o2) { H.o2 = true; playNoise(0.35, 0.2, 2500); playTone(500, 300, 0.12, 0.1, 'sine'); H.step = 1; H.stepT = 0;
-      haloJM('JUMPMASTER', 'Good — you\'re on your <b>bailout bottle</b> now. Without it you\'d black out in under a minute up here (25,000 ft).', null, 'Wait for the next command', 6); }
+      haloJM('JUMPMASTER', 'Good — you\'re on your <b>bailout bottle</b> now. Without it you\'d black out in under a minute up here (25,000 ft).', null, 'Wait for the next command', 4); }
     if (code === 'Space') haloExit(false);
   } else if (ph === 'freefall') {
     if (code === 'KeyF') haloGrip();
@@ -7429,15 +7429,15 @@ function cabinUpdate(dt) {
   camera.position.copy(H.P0).add(_ha.set(H.pos.x, 1.7 + Math.sin(H.T * 0.7) * 0.012, H.pos.z));
   p.props.forEach((d, i) => (d.rotation.z += dt * 40 + i));
   const next = (secs, fn) => { if (H.stepT > secs) { H.step++; H.stepT = 0; fn(); } };
-  if (H.step === 1) next(3, () => haloJM('JUMPMASTER', 'STAND UP!', 'palms up, both arms lifted', 'You\'re on your feet.', 5));
-  else if (H.step === 2) next(3, () => haloJM('JUMPMASTER', 'CHECK EQUIPMENT!', 'hands patting the chest', 'Rig ✓  altimeter ✓  GPS board ✓  O2 ✓  rifle strapped ✓', 5));
-  else if (H.step === 3) next(3.5, () => { haloJM('JUMPMASTER', 'RAMP COMING DOWN. It\'s minus 30 °C out there.', 'arm swept towards the tail', null, 5); playNoise(1.2, 0.2, 300); setPlaneLights(true, false); });
-  else if (H.step === 4) { H.rampOpen = Math.min(1, H.rampOpen + dt / 4); if (H.rampOpen >= 1) next(0.5, () => haloJM('JUMPMASTER', 'MOVE TO THE RAMP! Stop at the yellow line.', 'both arms pointing at the ramp', 'Walk forward (W) to the yellow line', 30)); }
-  else if (H.step === 5) { if (H.pos.x < -0.8) { H.step++; H.stepT = 0; haloJM('JUMPMASTER', 'ONE MINUTE!', 'one index finger held up', 'HAWK goes first, then DOC, then you. Then you fly down to them and take grips.', 6); } }
-  else if (H.step === 6) next(4, () => haloJM('JUMPMASTER', 'THIRTY SECONDS!', 'thumb and finger almost touching', 'On GO: Space to dive out. Face out, look at the horizon, no turning — then ARCH.', 6));
-  else if (H.step === 7) next(3, () => haloJM('JUMPMASTER', 'STAND BY…', 'pointing at the open ramp', null, 4));
-  else if (H.step === 8) next(2.5, () => { H.green = true; setPlaneLights(false, true); H.goAt = H.T; H.step = 9; haloJM('JUMPMASTER', 'GREEN LIGHT — GO, GO, GO!', 'arm chopping out towards the sky', 'HAWK… DOC… now YOU: press Space', 9); });
-  else if (H.step === 9 && H.T - H.goAt > 9) { haloJM('JUMPMASTER', 'Out you go, Wraith!', 'a hand in your back', null, 3); haloExit(true); return; }
+  if (H.step === 1) next(1.5, () => haloJM('JUMPMASTER', 'STAND UP!', 'palms up, both arms lifted', 'You\'re on your feet.', 4));
+  else if (H.step === 2) next(1.5, () => haloJM('JUMPMASTER', 'CHECK EQUIPMENT!', 'hands patting the chest', 'Rig ✓  altimeter ✓  GPS board ✓  O2 ✓  rifle strapped ✓', 4));
+  else if (H.step === 3) next(2, () => { haloJM('JUMPMASTER', 'RAMP COMING DOWN. It\'s minus 30 °C out there.', 'arm swept towards the tail', null, 4); playNoise(1.2, 0.2, 300); setPlaneLights(true, false); });
+  else if (H.step === 4) { H.rampOpen = Math.min(1, H.rampOpen + dt / 2); if (H.rampOpen >= 1) next(0.5, () => haloJM('JUMPMASTER', 'MOVE TO THE RAMP! Stop at the yellow line.', 'both arms pointing at the ramp', 'Walk forward (W) to the yellow line', 20)); }
+  else if (H.step === 5) { if (H.pos.x < -0.8) { H.step++; H.stepT = 0; haloJM('JUMPMASTER', 'ONE MINUTE!', 'one index finger held up', 'HAWK goes first, then DOC, then you. Then you fly down to them and take grips.', 5); } }
+  else if (H.step === 6) next(2, () => haloJM('JUMPMASTER', 'THIRTY SECONDS!', 'thumb and finger almost touching', 'On GO: Space to dive out. Face out, look at the horizon, no turning — then ARCH.', 5));
+  else if (H.step === 7) next(1.5, () => haloJM('JUMPMASTER', 'STAND BY…', 'pointing at the open ramp', null, 3));
+  else if (H.step === 8) next(1.2, () => { H.green = true; setPlaneLights(false, true); H.goAt = H.T; H.step = 9; haloJM('JUMPMASTER', 'GREEN LIGHT — GO, GO, GO!', 'arm chopping out towards the sky', 'HAWK… DOC… now YOU: press Space', 6); });
+  else if (H.step === 9 && H.T - H.goAt > 5) { haloJM('JUMPMASTER', 'Out you go, Wraith!', 'a hand in your back', null, 3); haloExit(true); return; }
   p.ramp.rotation.z = -1.05 * (1 - H.rampOpen); p.door.position.y = 1.4 + 1.1 * H.rampOpen;
   H.mates.forEach((m, i) => {
     if (m.phase !== 'cabin') return;
@@ -7590,7 +7590,7 @@ function deployUpdate(dt) {
     H.phase = 'canopy'; H.V = H.malf === 'streamer' ? 3 : 9; H.W = targetW; H.pitchOff = 0; H.brake = 0; H.tl = H.tr = 0; H.canopyT = 0; H.roll = 0;
     if (H.malf === 'twist') { H.twist = 2 + Math.floor(Math.random() * 2); H.kickLast = ''; haloJM('DOC', 'LINE TWISTS! Your lines are twisted above your head and you\'re spinning. ' + H.twistWhy + 'Pull the risers apart and <b>kick</b> your way out.', null, 'Tap A, D, A, D… to kick out', 9); }
     else if (H.malf === 'streamer') haloJM('DOC', 'MALFUNCTION — your main is a streamer, it won\'t inflate! You\'re still falling far too fast.', null, 'X = cut it away, then Space = RESERVE. NOW.', 12);
-    else haloJM('DOC', H.reserve ? 'Reserve is out and flying. Smaller canopy: faster, harder to land — flare well.' : 'Good canopy? <b>Canopy check:</b> square, flying straight? Try a little left (A), a little right (D), a little brake (S). Then follow the yellow ◆ on your GPS board to the LZ.', null, 'Look up (trackpad) — that\'s your canopy', 12);
+    else haloJM('DOC', H.reserve ? 'Reserve is out and flying. Smaller canopy: faster, harder to land — flare well.' : 'Good canopy? <b>Canopy check:</b> square, flying straight? Try a little left (A), a little right (D), a little brake (S). Then follow the yellow ◆ on your GPS board to the LZ.', null, 'Look up (trackpad) — that\'s your canopy', 6);
   }
 }
 function haloCutaway() {
@@ -7663,7 +7663,7 @@ function canopyUpdate(dt) {
   if (!keys.KeyS && H.brake < base + 0.3 && H.flareStart !== undefined && H.agl * FT > 30) H.flareStart = undefined;
   // landing-pattern calls (HAWK on the radio) + DOC's flare call, only on your first landing ever
   const ft = H.agl * FT;
-  if (ft < 1000 && !H.said.p1000) { H.said.p1000 = true; haloJM('HAWK', '1,000 ft. Set up your pattern: fly <b>downwind</b> (east) past the LZ, turn across, then turn <b>into the wind</b> — face WEST, into the windsock\'s mouth — by 300 ft.', null, 'Land INTO the wind. C = half brakes if you want more time.', 10); }
+  if (ft < 1000 && !H.said.p1000) { H.said.p1000 = true; haloJM('HAWK', '1,000 ft. Set up your pattern: fly <b>downwind</b> (east) past the LZ, turn across, then turn <b>into the wind</b> — face WEST, into the windsock\'s mouth — by 300 ft.', null, 'Land INTO the wind. C = half brakes if you want more time.', 7); }
   if (ft < 300 && !H.said.p300) { H.said.p300 = true; const into = Math.cos(wrapA(H.yaw - UPWIND_YAW)) > 0.7; haloJM('HAWK', '300 ft — FINAL. ' + (into ? 'Good, you\'re into the wind. Wings level, no more turns.' : 'You\'re NOT facing into the wind — turn gently to face WEST!'), null, 'Hands up (or half brakes). Flare at 10–15 ft: hold S.', 8); }
   if (!haloFlareTipDone && ft < 32 && !H.said.flare1) { H.said.flare1 = true; haloJM('DOC', 'Flare…', null, null, 3); }
   if (!haloFlareTipDone && ft < 14 && !H.said.flare2) { H.said.flare2 = true; haloJM('DOC', '…NOW! Hold S!', null, null, 3); playTone(1200, 1200, 0.08, 0.15, 'square'); }
@@ -7758,7 +7758,7 @@ function updateMatesAir(dt) {
           if (H.phase === 'freefall' && !H.docked) { const dx = H.pos.x - m.pos.x, dz = H.pos.z - m.pos.z, d = Math.hypot(dx, dz); if (d > 8) { tx += dx / d * Math.min(6, d * 0.1); tz += dz / d * Math.min(6, d * 0.1); } }
         } else {                // DOC flies to his slot on HAWK's right and takes grips
           const s = slotPos(base, 1), dx = s.x - m.pos.x, dz = s.z - m.pos.z, dy = s.y - m.pos.y, d = Math.hypot(dx, dz);
-          if (!m.docked && Math.hypot(d, dy) < 0.5 && H.T - m.exitT > 6) m.docked = true;
+          if (!m.docked && Math.hypot(d, dy) < 0.5 && H.T - m.exitT > 3) m.docked = true;
           if (m.docked) { m.pos.copy(s); m.vel.copy(base.vel); m.yaw = base.yaw + Math.PI / 2; lockToSlot = true; }
           else { tx = base.vel.x + THREE.MathUtils.clamp(dx * 0.6, -8, 8); tz = base.vel.z + THREE.MathUtils.clamp(dz * 0.6, -8, 8); tau = 0.8; vt = THREE.MathUtils.clamp(-base.vel.y - dy * 0.9, 40 * fac, 78 * fac); pose = dy < -3 ? 'dive' : dy > 3 ? 'dearch' : 'forward'; m.yaw += wrapA(Math.atan2(-dx, -dz) - m.yaw) * Math.min(1, dt * 2); }
         }
@@ -7802,15 +7802,38 @@ function updateMatesAir(dt) {
   });
 }
 // ---------- per frame (instead of updatePlayer etc. while the jump is on) ----------
+// v0.6.36: the long high-altitude fall and the long canopy ride are sped up on their own
+// (break-off / wave-off / pull, and the last 280 ft of canopy for the flare, stay at real speed).
+// Shift still adds up to ×4 in the remaining slow parts. Returns a multiplier; updateHalo sub-steps it.
+function haloTimeScale() {
+  if (!H) return 1;
+  const shift = !!(keys.ShiftLeft || keys.ShiftRight), ph = H.phase;
+  if (ph === 'cabin') return (shift && !H.green && H.step !== 5 && H.step >= 1) ? 4 : 1;
+  if (ph === 'freefall' && H.tumble <= 0) {
+    const ft = H.altDZ * FT;
+    let s = 1;
+    if (ft > 6500) s = 1 + 5 * (ft - 6500) / (25000 - 6500);   // ×6 at 25,000 ft, ×1 at 6,500
+    if (shift && ft > 6000) s = Math.max(s, 4);
+    return s;
+  }
+  if (ph === 'canopy' && !H.malf && H.twist <= 0) {
+    const ft = H.agl * FT;
+    let s = 1;
+    if (ft >= 1200) s = 12;          // the long ride from 4,000 ft down to pattern altitude
+    else if (ft > 280) s = 4;        // pattern / downwind / final, still quicker
+    if (shift && ft > 300) s = Math.max(s, 4);
+    return s;
+  }
+  return 1;
+}
 function updateHalo(dt) {
   if (!H) return;
   document.body.classList.add('haloOn');
   haloAudioStart();
-  const shift = !!(keys.ShiftLeft || keys.ShiftRight);
-  H.ff = shift && (H.phase === 'cabin' ? !H.green && H.step !== 5 && H.step >= 1 : H.phase === 'freefall' ? H.altDZ * FT > 6000 && !H.docked && H.tumble <= 0 : H.phase === 'canopy' ? H.agl * FT > 300 && !H.malf && H.twist <= 0 : false);
+  const scale = haloTimeScale(); H.timeScale = scale; H.ff = scale > 1.05;
   // take back last frame's camera shake / pitch offset first, so trackpad look is never disturbed
   const e0 = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ'); e0.x -= H.appliedP; e0.y -= H.appliedY; e0.z = 0; camera.quaternion.setFromEuler(e0); H.appliedP = H.appliedY = 0;
-  const steps = H.ff ? 4 : 1;
+  const steps = Math.max(1, Math.round(scale));
   for (let s = 0; s < steps && haloActive(); s++) haloStep(dt);
   if (!haloActive()) return;
   if (H.phase !== 'cabin') {
@@ -7860,7 +7883,7 @@ function updateHaloHUD(dt) {
     let sep = 1e9; H.mates.forEach(m => (sep = Math.min(sep, Math.hypot(m.pos.x - H.pos.x, m.pos.z - H.pos.z))));
     form = `SEPARATION ${Math.round(sep)} m  ${sep >= 50 ? '✓ clear' : '— keep tracking (hold W)'}\n${H.looked.l && H.looked.r ? 'airspace checked ✓' : 'check your airspace: look left AND right (trackpad)'}`;
   }
-  if (H.ff) form = (form ? form + '\n' : '') + '⏩ ×4 time';
+  if (H.ff) form = (form ? form + '\n' : '') + '⏩ ×' + Math.round(H.timeScale || 4) + ' time';
   ui.form.style.display = form ? 'block' : 'none'; if (ui.form.textContent !== form) ui.form.textContent = form;
   const aglFt = H.agl * FT;                       // the altimeter is useless near the ground; you judge it by eye — this is your eye
   if (ph === 'canopy' && aglFt < 100) { ui.agl.style.display = 'block'; ui.agl.innerHTML = `${Math.max(0, Math.round(aglFt))} ft<small>${aglFt <= 15 && aglFt >= 10 ? 'FLARE ZONE — hold S' : aglFt > 15 ? 'ground coming up… wait for it' : 'feet and knees together'}</small>`; }
@@ -11945,7 +11968,7 @@ window.__game = {
   // v0.6.29 dam hooks
   DAM, damObjectives, damObjective, damOnCrest, damCrestPt, damFind, DAM_PH, DAM_CR, damCell, damStartJump,
   // v0.6.27 HALO hooks
-  halo: () => H, haloStep, haloKey, haloActive, haloLZ, haloObjectives, haloScoreTotal, haloScoreHTML, HALO, keys, setMalf: m => (haloForceMalf = m), canopyTarget,
+  halo: () => H, haloStep, haloKey, haloActive, haloLZ, haloObjectives, haloScoreTotal, haloScoreHTML, haloTimeScale, HALO, keys, setMalf: m => (haloForceMalf = m), canopyTarget,
   onPlayerShotNoise, nvMode: () => nvMode, lastShot: () => ({ lastShotSpot, repeatShots }), setZoom, weapon: () => WEAPONS[currentWeapon], zoomStep: () => zoomStep,
 };
 </script>
