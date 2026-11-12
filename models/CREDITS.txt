@@ -13,10 +13,10 @@ vehicles/humvee.glb  "Humvee" by madtrollstudio — CC-BY 3.0
 vehicles/m939.glb    "M939 Truck" by J-Toastie — CC-BY 3.0
                      https://poly.pizza/m/y8lBpvMlim
                      Used for the cargo trucks in Sniper Lesson / Cold Horizon.
-props/knife.glb      "Knife" by Quaternius — CC0
-                     https://poly.pizza/m/N9bfPFP1hr
-                     Honest stand-in: a generic clip-point combat knife with a brown grip and
-                     serrated spine, close to a KA-BAR in shape; not a branded KA-BAR model.
+props/knife.glb      "Kabar" by Pichuliru — CC0  (v0.6.37; replaces the older Quaternius knife)
+                     https://poly.pizza/m/bAaO335d6A
+                     Honest stand-in: a stacked-leather-grip, clip-point combat knife in the
+                     KA-BAR style. Not a trademarked or official KA-BAR product.
 The gloved hand, the M112 C4 block, the linear door charge, the reload magazine and all explosion
 effects are drawn by the game itself (no outside assets).
 

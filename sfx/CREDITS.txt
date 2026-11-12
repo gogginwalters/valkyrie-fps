@@ -63,3 +63,16 @@ garrote_choke.mp3 "Being Strangled" by Mutcholoko (acted, for a short film) http
 body_fall.mp3     "Body fall.wav" by DylanTheFish https://freesound.org/s/417994/
 explosion.mp3     "Explosion, Medium Blast" by Kinoton https://freesound.org/s/516914/
 Enemy rifle fire now reuses the akm / m4 recordings above.
+
+==== v0.6.37 feel pass (trimmed, faded, loudness-set; all CC0 1.0 from Freesound) ====
+garrote_break.mp3  "Necksnap_build.wav" by danielrutterfilms — foley of a twig and tree bark,
+                   made as a neck-break for a film-school project. The snap is cut from the
+                   build-up and limited so it is solid, not cartoon-loud.
+                   https://freesound.org/s/134025/
+garrote_wire.mp3   Same source as v0.6.24 ("String tightens and whips.wav" by romeoplank,
+                   https://freesound.org/s/337668/). Tightened to the pull itself and raised
+                   so you can hear the wire go tight.
+garrote_choke.mp3  Same source as v0.6.24 ("Being Strangled" by Mutcholoko,
+                   https://freesound.org/s/501148/). Lead-in trimmed so the struggle starts
+                   sooner and covers the hold.
+body_fall.mp3      Unchanged: "Body fall.wav" by DylanTheFish https://freesound.org/s/417994/

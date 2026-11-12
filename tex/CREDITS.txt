@@ -14,3 +14,16 @@ gravel      Gravel Floor            https://polyhaven.com/a/gravel_floor        
 snow        Snow 02                 https://polyhaven.com/a/snow_02               Rob Tuytel
 rock        Aerial Rocks 02         https://polyhaven.com/a/aerial_rocks_02       Rob Tuytel
 grass       Sparse Grass            https://polyhaven.com/a/sparse_grass          Amal Kumar
+
+==== v0.6.37 gun / knife PBR (1k WebP, colour + OpenGL normal + roughness, metalness where provided) ====
+Used on first-person guns, the knife, suppressors / the Barrett scope, and the rifles the soldiers carry.
+gunmetal    Metal 006                 https://ambientcg.com/a/Metal006          ambientCG, CC0 1.0
+            Scratched bare steel, tinted in-game to each gun's colour.
+gunpoly     Plastic 006               https://ambientcg.com/a/Plastic006        ambientCG, CC0 1.0
+            Fine polymer wear (normal + roughness; colour stays the model's).
+gunbrass    Metal 008                 https://ambientcg.com/a/Metal008          ambientCG, CC0 1.0
+            Warm copper/brass, used on visible casings.
+gunwood     Walnut Veneer 02          https://polyhaven.com/a/walnut_veneer_02  Jenelle van Heerden, CC0 1.0
+            Furniture-scale walnut grain for wooden stocks and grips (tinted to the model colour).
+gunleather  Brown Leather             https://polyhaven.com/a/brown_leather     Rob Tuytel, CC0 1.0
+            Stacked-leather knife grip and brown pistol grip panels.
